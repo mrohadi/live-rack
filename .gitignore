@@ -5,6 +5,7 @@
 
 # Go
 /bin/
+scripts/notion-seed/notion-seed
 /dist/
 *.exe
 *.test

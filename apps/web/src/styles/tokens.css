@@ -30,6 +30,31 @@
   --accent:      #2563eb;
   --accent-soft: color-mix(in oklab, #2563eb 18%, transparent);
   --accent-text: #2563eb;
+
+  /* Shell aliases — reference CSS vars used by .sidebar, .nav-item, etc. */
+  --bg:           #ffffff;
+  --panel:        #f5f7fb;
+  --panel-2:      #eef2f8;
+  --border:       #e3e8f0;
+  --border-strong:#cdd5e0;
+  --text:         #0b1220;
+  --text-2:       #5b6577;
+  --text-3:       #8a93a3;
+  --success:      #16a34a;
+  --success-soft: #dcfce7;
+  --warning:      #d97706;
+  --warning-soft: #fef3c7;
+  --danger:       #dc2626;
+  --danger-soft:  #fee2e2;
+  --violet:       #7c3aed;
+  --violet-soft:  #ede9fe;
+  --radius:       10px;
+  --radius-sm:    6px;
+  --shadow-sm:    0 1px 2px rgba(11,18,32,.04), 0 1px 3px rgba(11,18,32,.04);
+  --shadow-md:    0 4px 12px rgba(11,18,32,.06), 0 1px 3px rgba(11,18,32,.04);
+  --shadow-lg:    0 12px 32px rgba(11,18,32,.10), 0 2px 6px rgba(11,18,32,.06);
+  --sans:         'Inter', system-ui, sans-serif;
+  --mono:         'JetBrains Mono', ui-monospace, monospace;
 }
 
 [data-theme="dark"] {
@@ -46,4 +71,23 @@
   --color-destructive:      0 63% 61%;
   --color-success:          142 69% 58%;
   --color-warning:          38 92% 62%;
+
+  /* Shell aliases — dark */
+  --bg:           #0b0d10;
+  --panel:        #14181d;
+  --panel-2:      #1a1f26;
+  --border:       #242a33;
+  --border-strong:#323a46;
+  --text:         #e8ecf2;
+  --text-2:       #9aa3b2;
+  --text-3:       #6b7282;
+  --accent-soft:  #1e2a4a;
+  --accent-text:  #93b4ff;
+  --success-soft: #0d2e1a;
+  --warning-soft: #2e2210;
+  --danger-soft:  #2e1414;
+  --violet-soft:  #1e1633;
+  --shadow-sm:    0 1px 2px rgba(0,0,0,.4);
+  --shadow-md:    0 4px 12px rgba(0,0,0,.4);
+  --shadow-lg:    0 12px 32px rgba(0,0,0,.5);
 }

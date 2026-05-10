@@ -2,14 +2,19 @@
 // all phase tickets (P0–P11). Idempotent: skips tickets whose Ticket ID
 // already exists in the DB.
 //
-// Usage:
+// Usage (first run — creates DB):
 //
-//	NOTION_API_KEY=secret_xxx NOTION_PARENT_PAGE_ID=<page-id> go run ./scripts/notion-seed
+//	NOTION_API_KEY=secret_xxx NOTION_PARENT_PAGE_ID=<page-id> go run -C scripts/notion-seed .
+//
+// Usage (re-run against existing DB):
+//
+//	NOTION_API_KEY=secret_xxx NOTION_DATABASE_ID=<db-id> go run -C scripts/notion-seed .
 package main
 
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -23,17 +28,25 @@ const baseURL = "https://api.notion.com/v1"
 
 func main() {
 	apiKey := mustEnv("NOTION_API_KEY")
-	parentPageID := mustEnv("NOTION_PARENT_PAGE_ID")
 
-	c := &client{key: apiKey, http: &http.Client{Timeout: 30 * time.Second}}
+	c := &client{key: apiKey, http: &http.Client{Timeout: 90 * time.Second}}
 
-	slog.Info("creating database", "parent", parentPageID)
-	dbID, err := c.createDatabase(parentPageID)
-	if err != nil {
-		slog.Error("create database", "err", err)
-		os.Exit(1)
+	var dbID string
+	if id := os.Getenv("NOTION_DATABASE_ID"); id != "" {
+		dbID = id
+		slog.Info("using existing database", "id", dbID)
+	} else {
+		parentPageID := mustEnv("NOTION_PARENT_PAGE_ID")
+		slog.Info("creating database", "parent", parentPageID)
+		var err error
+		dbID, err = c.createDatabase(parentPageID)
+		if err != nil {
+			slog.Error("create database", "err", err)
+			os.Exit(1)
+		}
+		slog.Info("database created", "id", dbID)
+		slog.Info("tip: re-run with NOTION_DATABASE_ID=" + dbID + " to skip creation")
 	}
-	slog.Info("database created", "id", dbID)
 
 	existing, err := c.existingTicketIDs(dbID)
 	if err != nil {
@@ -54,7 +67,7 @@ func main() {
 		}
 		slog.Info("created", "ticket", t.ID, "title", t.Title)
 		created++
-		time.Sleep(334 * time.Millisecond) // Notion rate limit: 3 req/s
+		time.Sleep(400 * time.Millisecond) // Notion rate limit: ~3 req/s
 	}
 
 	slog.Info("done", "created", created, "skipped", skipped)
@@ -68,37 +81,61 @@ type client struct {
 }
 
 func (c *client) do(method, path string, body any) (map[string]any, error) {
-	var r io.Reader
+	var bodyBytes []byte
 	if body != nil {
-		b, err := json.Marshal(body)
+		var err error
+		bodyBytes, err = json.Marshal(body)
 		if err != nil {
 			return nil, err
 		}
-		r = bytes.NewReader(b)
 	}
-	req, err := http.NewRequest(method, baseURL+path, r)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Authorization", "Bearer "+c.key)
-	req.Header.Set("Notion-Version", notionVersion)
-	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
+	var lastErr error
+	for attempt := range 4 {
+		if attempt > 0 {
+			wait := time.Duration(attempt*attempt) * time.Second
+			slog.Info("retry", "attempt", attempt, "wait", wait, "path", path)
+			time.Sleep(wait)
+		}
 
-	raw, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
+		var r io.Reader
+		if bodyBytes != nil {
+			r = bytes.NewReader(bodyBytes)
+		}
+		req, err := http.NewRequest(method, baseURL+path, r)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Authorization", "Bearer "+c.key)
+		req.Header.Set("Notion-Version", notionVersion)
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := c.http.Do(req)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+
+		raw, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			lastErr = err
+			continue
+		}
+
+		// Retry on 429 or 5xx.
+		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500 {
+			lastErr = fmt.Errorf("notion %s %s → %d: %s", method, path, resp.StatusCode, raw)
+			continue
+		}
+		if resp.StatusCode >= 400 {
+			return nil, fmt.Errorf("notion %s %s → %d: %s", method, path, resp.StatusCode, raw)
+		}
+
+		var out map[string]any
+		return out, json.Unmarshal(raw, &out)
 	}
-	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("notion %s %s → %d: %s", method, path, resp.StatusCode, raw)
-	}
-	var out map[string]any
-	return out, json.Unmarshal(raw, &out)
+	return nil, errors.Join(fmt.Errorf("all retries failed for %s %s", method, path), lastErr)
 }
 
 func (c *client) createDatabase(parentPageID string) (string, error) {

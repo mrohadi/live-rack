@@ -3,7 +3,10 @@
     "notion": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@anthropic/mcp-notion"],
+      "args": [
+        "-y",
+        "@anthropic/mcp-notion"
+      ],
       "env": {
         "NOTION_API_KEY": "${NOTION_API_KEY}"
       }
@@ -11,7 +14,10 @@
     "github": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@anthropic/mcp-github"],
+      "args": [
+        "-y",
+        "@anthropic/mcp-github"
+      ],
       "env": {
         "GITHUB_TOKEN": "${GITHUB_TOKEN}"
       }
@@ -19,7 +25,10 @@
     "postgres": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@anthropic/mcp-postgres"],
+      "args": [
+        "-y",
+        "@anthropic/mcp-postgres"
+      ],
       "env": {
         "DATABASE_URL": "${DATABASE_URL}"
       }
@@ -27,7 +36,17 @@
     "memory": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@anthropic/mcp-memory"]
+      "args": [
+        "-y",
+        "@anthropic/mcp-memory"
+      ]
+    },
+    "code-review-graph": {
+      "command": "code-review-graph",
+      "args": [
+        "serve"
+      ],
+      "type": "stdio"
     }
   }
 }

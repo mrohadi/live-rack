@@ -56,11 +56,30 @@ jobs:
           node-version: "20"
           cache: "pnpm"
       - run: pnpm install --frozen-lockfile
-      - name: Go lint
+      - name: Go lint (api)
         uses: golangci/golangci-lint-action@v6
         with:
           version: latest
-          args: --config .golangci.yml
+          args: --config ../../.golangci.yml ./...
+          working-directory: services/api
+      - name: Go lint (pkg/auth)
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          args: --config ../../.golangci.yml ./...
+          working-directory: pkg/auth
+      - name: Go lint (pkg/domain)
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          args: --config ../../.golangci.yml ./...
+          working-directory: pkg/domain
+      - name: Go lint (pkg/observability)
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          args: --config ../../.golangci.yml ./...
+          working-directory: pkg/observability
       - name: TS lint + typecheck
         working-directory: apps/web
         run: |

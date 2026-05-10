@@ -19,6 +19,10 @@ dist/
 .vite/
 *.tsbuildinfo
 
+# tsc in-place JS outputs (no outDir set)
+apps/web/src/**/*.js
+apps/scanner/src/**/*.js
+
 # Build outputs
 apps/web/dist/
 apps/scanner/dist/

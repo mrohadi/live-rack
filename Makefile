@@ -1,4 +1,4 @@
-.PHONY: dev dev-status seed seed-reset test lint typecheck build clean
+.PHONY: dev dev-status seed seed-reset test lint typecheck build clean hooks-install
 
 # Start full local dev stack
 dev:
@@ -46,6 +46,10 @@ migrate-up:
 
 migrate-status:
 	goose -dir migrations postgres "$$DATABASE_URL" status
+
+hooks-install:
+	go install github.com/evilmartians/lefthook@latest
+	lefthook install
 
 clean:
 	rm -rf bin/ apps/web/dist/ coverage.out

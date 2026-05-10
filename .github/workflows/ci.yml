@@ -15,6 +15,30 @@ permissions:
   pull-requests: write
 
 jobs:
+  commit-lint:
+    name: Commit Messages
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check all PR commit messages
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
+          FAILED=0
+          while IFS= read -r sha; do
+            MSG_FILE=$(mktemp)
+            git log --format=%B -n 1 "$sha" > "$MSG_FILE"
+            echo "Checking $sha: $(head -1 "$MSG_FILE")"
+            if ! bash scripts/ci/check-commit-msg.sh "$MSG_FILE"; then
+              FAILED=1
+            fi
+            rm "$MSG_FILE"
+          done < <(git rev-list "$BASE".."$HEAD")
+          exit $FAILED
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
@@ -127,7 +151,8 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [lint, test-go, test-frontend]
+    needs: [commit-lint, lint, test-go, test-frontend]
+    if: always() && !failure() && !cancelled()
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5

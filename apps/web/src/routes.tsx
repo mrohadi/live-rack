@@ -17,7 +17,10 @@ export const routes: RouteObject[] = [
     children: [
       {
         index: true,
-        lazy: () => import("./features/dashboard/DashboardPage").then((m) => ({ Component: m.DashboardPage })),
+        lazy: () =>
+          import("./features/dashboard/DashboardPage").then((m) => ({
+            Component: m.DashboardPage,
+          })),
       },
       {
         path: "map",
@@ -25,7 +28,10 @@ export const routes: RouteObject[] = [
       },
       {
         path: "inventory",
-        lazy: () => import("./features/inventory/InventoryPage").then((m) => ({ Component: m.InventoryPage })),
+        lazy: () =>
+          import("./features/inventory/InventoryPage").then((m) => ({
+            Component: m.InventoryPage,
+          })),
       },
       {
         path: "tasks",
@@ -33,15 +39,24 @@ export const routes: RouteObject[] = [
       },
       {
         path: "pipelines",
-        lazy: () => import("./features/pipelines/PipelinesPage").then((m) => ({ Component: m.PipelinesPage })),
+        lazy: () =>
+          import("./features/pipelines/PipelinesPage").then((m) => ({
+            Component: m.PipelinesPage,
+          })),
       },
       {
         path: "analytics",
-        lazy: () => import("./features/analytics/AnalyticsPage").then((m) => ({ Component: m.AnalyticsPage })),
+        lazy: () =>
+          import("./features/analytics/AnalyticsPage").then((m) => ({
+            Component: m.AnalyticsPage,
+          })),
       },
       {
         path: "integrations",
-        lazy: () => import("./features/integrations/IntegrationsPage").then((m) => ({ Component: m.IntegrationsPage })),
+        lazy: () =>
+          import("./features/integrations/IntegrationsPage").then((m) => ({
+            Component: m.IntegrationsPage,
+          })),
       },
       {
         path: "users",

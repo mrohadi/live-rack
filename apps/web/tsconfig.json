@@ -14,7 +14,7 @@
     "isolatedModules": true,
     "esModuleInterop": true,
     "paths": { "@/*": ["./src/*"] },
-    "types": ["vite/client"]
+    "types": ["vite/client", "vitest/globals"]
   },
   "include": ["src"],
   "exclude": ["node_modules", "dist"]

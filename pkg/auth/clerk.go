@@ -10,6 +10,7 @@ import (
 	"github.com/clerk/clerk-sdk-go/v2/jwks"
 	"github.com/clerk/clerk-sdk-go/v2/jwt"
 	"github.com/google/uuid"
+
 	"github.com/live-rack/pkg/domain"
 )
 

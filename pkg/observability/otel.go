@@ -11,8 +11,8 @@ import (
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/exporters/prometheus"
 	"go.opentelemetry.io/otel/metric"
-	"go.opentelemetry.io/otel/sdk/resource"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.25.0"
 	"go.opentelemetry.io/otel/trace"
@@ -27,12 +27,6 @@ type Config struct {
 	// OTLPEndpoint is the gRPC endpoint for Tempo (e.g. "localhost:4317").
 	// If empty, tracing is disabled.
 	OTLPEndpoint string
-}
-
-// Provider bundles the tracer and meter providers.
-type Provider struct {
-	tp *sdktrace.TracerProvider
-	mp *sdkmetric.MeterProvider
 }
 
 // Tracer returns a named tracer from the global provider.

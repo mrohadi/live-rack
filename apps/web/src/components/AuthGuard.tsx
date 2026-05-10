@@ -19,7 +19,9 @@ export function AuthGuard() {
   if (!organization) {
     return (
       <div className="flex h-screen items-center justify-center flex-col gap-4">
-        <p className="text-sm text-muted-foreground">No organization found. Contact your administrator.</p>
+        <p className="text-sm text-muted-foreground">
+          No organization found. Contact your administrator.
+        </p>
       </div>
     );
   }

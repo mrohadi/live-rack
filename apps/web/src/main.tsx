@@ -4,7 +4,6 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { RouterProvider, createBrowserRouter } from "react-router-dom";
 
-import "./styles/tokens.css";
 import "./styles/index.css";
 import { routes } from "./routes";
 
@@ -26,5 +25,5 @@ createRoot(document.getElementById("root")!).render(
         <RouterProvider router={router} />
       </QueryClientProvider>
     </ClerkProvider>
-  </StrictMode>
+  </StrictMode>,
 );

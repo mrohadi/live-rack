@@ -1,0 +1,95 @@
+<mxfile host="app.diagrams.net" modified="2026-05-10T00:00:00.000Z" agent="live-rack" version="24.0.0">
+  <diagram id="live-rack-arch" name="live-rack architecture">
+    <mxGraphModel dx="1422" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="g_clients" value="Clients" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;verticalAlign=top;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="40" y="40" width="260" height="280" as="geometry"/></mxCell>
+        <mxCell id="c_web" value="Web SPA&#10;React + Tailwind" style="rounded=1;fillColor=#fff;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="60" y="80" width="220" height="60" as="geometry"/></mxCell>
+        <mxCell id="c_pwa" value="Scanner PWA&#10;Camera / WebHID / Offline queue" style="rounded=1;fillColor=#fff;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="60" y="160" width="220" height="60" as="geometry"/></mxCell>
+        <mxCell id="c_mob" value="Mobile bottom-tab&#10;PWA install" style="rounded=1;fillColor=#fff;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="60" y="240" width="220" height="60" as="geometry"/></mxCell>
+
+        <mxCell id="g_edge" value="Edge" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=top;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="340" y="40" width="240" height="280" as="geometry"/></mxCell>
+        <mxCell id="e_cdn" value="CDN / Static" style="rounded=1;fillColor=#fff;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="360" y="80" width="200" height="50" as="geometry"/></mxCell>
+        <mxCell id="e_gw" value="API Gateway&#10;Go / Echo" style="rounded=1;fillColor=#fff;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="360" y="150" width="200" height="60" as="geometry"/></mxCell>
+        <mxCell id="e_ws" value="WebSocket Gateway" style="rounded=1;fillColor=#fff;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="360" y="230" width="200" height="60" as="geometry"/></mxCell>
+
+        <mxCell id="g_core" value="Core Services (Go monorepo)" style="rounded=1;fillColor=#fff2cc;strokeColor=#d6b656;verticalAlign=top;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="620" y="40" width="500" height="540" as="geometry"/></mxCell>
+        <mxCell id="s_auth" value="Auth / Tenant" style="rounded=1;fillColor=#fff;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="640" y="80" width="220" height="50" as="geometry"/></mxCell>
+        <mxCell id="s_zone" value="Zones &amp; Map" style="rounded=1;fillColor=#fff;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="880" y="80" width="220" height="50" as="geometry"/></mxCell>
+        <mxCell id="s_inv" value="Inventory &amp; Scan" style="rounded=1;fillColor=#fff;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="640" y="150" width="220" height="50" as="geometry"/></mxCell>
+        <mxCell id="s_pos" value="POS Sync" style="rounded=1;fillColor=#fff;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="880" y="150" width="220" height="50" as="geometry"/></mxCell>
+        <mxCell id="s_task" value="Tasks" style="rounded=1;fillColor=#fff;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="640" y="220" width="220" height="50" as="geometry"/></mxCell>
+        <mxCell id="s_pipe" value="Pipelines" style="rounded=1;fillColor=#fff;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="880" y="220" width="220" height="50" as="geometry"/></mxCell>
+        <mxCell id="s_intg" value="Integrations Hub" style="rounded=1;fillColor=#fff;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="640" y="290" width="220" height="50" as="geometry"/></mxCell>
+        <mxCell id="s_notif" value="Notifications" style="rounded=1;fillColor=#fff;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="880" y="290" width="220" height="50" as="geometry"/></mxCell>
+        <mxCell id="s_ingest" value="Ingest Worker&#10;NATS &#8594; ClickHouse" style="rounded=1;fillColor=#fff;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="640" y="370" width="220" height="60" as="geometry"/></mxCell>
+        <mxCell id="s_rollup" value="Rollup Jobs&#10;zone perf / heatmap / TTS" style="rounded=1;fillColor=#fff;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="880" y="370" width="220" height="60" as="geometry"/></mxCell>
+        <mxCell id="s_insight" value="Insight Engine&#10;combos, lift, signals" style="rounded=1;fillColor=#fff;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="760" y="450" width="220" height="60" as="geometry"/></mxCell>
+
+        <mxCell id="g_bus" value="Event Bus" style="rounded=1;fillColor=#f8cecc;strokeColor=#b85450;verticalAlign=top;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="340" y="360" width="240" height="120" as="geometry"/></mxCell>
+        <mxCell id="b_nats" value="NATS JetStream&#10;scan.recorded&#10;pos.sale&#10;recommendation.created" style="rounded=1;fillColor=#fff;strokeColor=#b85450;" vertex="1" parent="1"><mxGeometry x="360" y="390" width="200" height="80" as="geometry"/></mxCell>
+
+        <mxCell id="g_data" value="Data Layer" style="rounded=1;fillColor=#e1d5e7;strokeColor=#9673a6;verticalAlign=top;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="1160" y="40" width="280" height="540" as="geometry"/></mxCell>
+        <mxCell id="d_pg" value="Postgres 16 + Timescale&#10;OLTP + scan/sales hypertables&#10;RLS by org_id" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#fff;strokeColor=#9673a6;" vertex="1" parent="1"><mxGeometry x="1190" y="80" width="220" height="100" as="geometry"/></mxCell>
+        <mxCell id="d_ch" value="ClickHouse&#10;analytics warehouse" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#fff;strokeColor=#9673a6;" vertex="1" parent="1"><mxGeometry x="1190" y="200" width="220" height="90" as="geometry"/></mxCell>
+        <mxCell id="d_redis" value="Redis 7&#10;cache, locks, rate-limit" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#fff;strokeColor=#9673a6;" vertex="1" parent="1"><mxGeometry x="1190" y="310" width="220" height="80" as="geometry"/></mxCell>
+        <mxCell id="d_s3" value="S3-compatible Object Store&#10;scanner photos / exports" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#fff;strokeColor=#9673a6;" vertex="1" parent="1"><mxGeometry x="1190" y="410" width="220" height="80" as="geometry"/></mxCell>
+        <mxCell id="d_meili" value="Meilisearch&#10;(post-MVP)" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#fff;strokeColor=#9673a6;" vertex="1" parent="1"><mxGeometry x="1190" y="510" width="220" height="60" as="geometry"/></mxCell>
+
+        <mxCell id="g_ext" value="Third-party" style="rounded=1;fillColor=#ffe6cc;strokeColor=#d79b00;verticalAlign=top;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="40" y="360" width="260" height="540" as="geometry"/></mxCell>
+        <mxCell id="x_shop" value="Shopify (OAuth + webhook)" style="rounded=1;fillColor=#fff;strokeColor=#d79b00;" vertex="1" parent="1"><mxGeometry x="60" y="400" width="220" height="40" as="geometry"/></mxCell>
+        <mxCell id="x_sq" value="Square POS (OAuth + webhook)" style="rounded=1;fillColor=#fff;strokeColor=#d79b00;" vertex="1" parent="1"><mxGeometry x="60" y="450" width="220" height="40" as="geometry"/></mxCell>
+        <mxCell id="x_str" value="Stripe (Connect)" style="rounded=1;fillColor=#fff;strokeColor=#d79b00;" vertex="1" parent="1"><mxGeometry x="60" y="500" width="220" height="40" as="geometry"/></mxCell>
+        <mxCell id="x_ship" value="Shippo (REST poll)" style="rounded=1;fillColor=#fff;strokeColor=#d79b00;" vertex="1" parent="1"><mxGeometry x="60" y="550" width="220" height="40" as="geometry"/></mxCell>
+        <mxCell id="x_wx" value="OpenWeather (cron)" style="rounded=1;fillColor=#fff;strokeColor=#d79b00;" vertex="1" parent="1"><mxGeometry x="60" y="600" width="220" height="40" as="geometry"/></mxCell>
+        <mxCell id="x_trn" value="Transit API (cron)" style="rounded=1;fillColor=#fff;strokeColor=#d79b00;" vertex="1" parent="1"><mxGeometry x="60" y="650" width="220" height="40" as="geometry"/></mxCell>
+        <mxCell id="x_zbr" value="Zebra Devices (WebHID/BT)" style="rounded=1;fillColor=#fff;strokeColor=#d79b00;" vertex="1" parent="1"><mxGeometry x="60" y="700" width="220" height="40" as="geometry"/></mxCell>
+        <mxCell id="x_clerk" value="Clerk / WorkOS (Auth, SSO, 2FA)" style="rounded=1;fillColor=#fff;strokeColor=#d79b00;" vertex="1" parent="1"><mxGeometry x="60" y="750" width="220" height="40" as="geometry"/></mxCell>
+
+        <mxCell id="g_obs" value="Observability" style="rounded=1;fillColor=#f5f5f5;strokeColor=#666;verticalAlign=top;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="620" y="610" width="500" height="120" as="geometry"/></mxCell>
+        <mxCell id="o_graf" value="Grafana" style="rounded=1;fillColor=#fff;strokeColor=#666;" vertex="1" parent="1"><mxGeometry x="640" y="650" width="100" height="60" as="geometry"/></mxCell>
+        <mxCell id="o_loki" value="Loki (logs)" style="rounded=1;fillColor=#fff;strokeColor=#666;" vertex="1" parent="1"><mxGeometry x="760" y="650" width="100" height="60" as="geometry"/></mxCell>
+        <mxCell id="o_tempo" value="Tempo (traces)" style="rounded=1;fillColor=#fff;strokeColor=#666;" vertex="1" parent="1"><mxGeometry x="880" y="650" width="100" height="60" as="geometry"/></mxCell>
+        <mxCell id="o_prom" value="Prometheus" style="rounded=1;fillColor=#fff;strokeColor=#666;" vertex="1" parent="1"><mxGeometry x="1000" y="650" width="100" height="60" as="geometry"/></mxCell>
+
+        <mxCell id="ed1" style="endArrow=classic;" edge="1" parent="1" source="c_web" target="e_cdn"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ed2" style="endArrow=classic;" edge="1" parent="1" source="c_pwa" target="e_gw"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ed3" style="endArrow=classic;" edge="1" parent="1" source="c_mob" target="e_ws"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ed4" style="endArrow=classic;" edge="1" parent="1" source="c_web" target="e_ws"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ed5" style="endArrow=classic;" edge="1" parent="1" source="e_gw" target="s_auth"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ed6" style="endArrow=classic;" edge="1" parent="1" source="e_gw" target="s_inv"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ed7" style="endArrow=classic;" edge="1" parent="1" source="e_gw" target="s_zone"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ed8" style="endArrow=classic;" edge="1" parent="1" source="e_gw" target="s_task"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ed9" style="endArrow=classic;" edge="1" parent="1" source="e_gw" target="s_pos"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ed10" style="endArrow=classic;" edge="1" parent="1" source="e_gw" target="s_pipe"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ed11" style="endArrow=classic;" edge="1" parent="1" source="e_gw" target="s_intg"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ed12" style="endArrow=classic;dashed=1;" edge="1" parent="1" source="e_ws" target="b_nats"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ed13" style="endArrow=classic;" edge="1" parent="1" source="s_inv" target="b_nats"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ed14" style="endArrow=classic;" edge="1" parent="1" source="s_pos" target="b_nats"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ed15" style="endArrow=classic;" edge="1" parent="1" source="b_nats" target="s_ingest"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ed16" style="endArrow=classic;" edge="1" parent="1" source="s_ingest" target="d_ch"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ed17" style="endArrow=classic;" edge="1" parent="1" source="d_ch" target="s_rollup"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ed18" style="endArrow=classic;" edge="1" parent="1" source="s_rollup" target="s_insight"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ed19" style="endArrow=classic;" edge="1" parent="1" source="s_insight" target="b_nats"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ed20" style="endArrow=classic;" edge="1" parent="1" source="s_auth" target="d_pg"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ed21" style="endArrow=classic;" edge="1" parent="1" source="s_zone" target="d_pg"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ed22" style="endArrow=classic;" edge="1" parent="1" source="s_inv" target="d_pg"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ed23" style="endArrow=classic;" edge="1" parent="1" source="s_task" target="d_pg"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ed24" style="endArrow=classic;" edge="1" parent="1" source="s_pipe" target="d_pg"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ed25" style="endArrow=classic;" edge="1" parent="1" source="s_intg" target="d_pg"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ed26" style="endArrow=classic;" edge="1" parent="1" source="s_inv" target="d_s3"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ed27" style="endArrow=classic;" edge="1" parent="1" source="s_auth" target="d_redis"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ed28" style="endArrow=classic;dashed=1;" edge="1" parent="1" source="s_intg" target="x_shop"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ed29" style="endArrow=classic;dashed=1;" edge="1" parent="1" source="s_intg" target="x_sq"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ed30" style="endArrow=classic;dashed=1;" edge="1" parent="1" source="s_intg" target="x_str"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ed31" style="endArrow=classic;dashed=1;" edge="1" parent="1" source="s_intg" target="x_ship"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ed32" style="endArrow=classic;dashed=1;" edge="1" parent="1" source="s_intg" target="x_wx"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ed33" style="endArrow=classic;dashed=1;" edge="1" parent="1" source="s_intg" target="x_trn"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ed34" style="endArrow=classic;dashed=1;" edge="1" parent="1" source="s_inv" target="x_zbr"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ed35" style="endArrow=classic;dashed=1;" edge="1" parent="1" source="s_auth" target="x_clerk"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

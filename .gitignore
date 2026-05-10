@@ -1,0 +1,61 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Go
+/bin/
+/dist/
+*.exe
+*.test
+coverage.out
+coverage.html
+*.prof
+
+# Node / pnpm
+node_modules/
+.pnpm-store/
+dist/
+.vite/
+*.tsbuildinfo
+
+# Build outputs
+apps/web/dist/
+apps/scanner/dist/
+apps/docs/.next/
+apps/docs/out/
+
+# Test artifacts
+playwright-report/
+test-results/
+coverage/
+
+# Terraform
+deploy/terraform/.terraform/
+deploy/terraform/*.tfstate
+deploy/terraform/*.tfstate.backup
+deploy/terraform/*.tfvars
+!deploy/terraform/*.tfvars.example
+
+# Docker
+.docker/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Secrets
+*.pem
+*.key
+*.p12
+*.jks
+serviceAccountKey.json
+
+# Claude Code local
+.claude/.gitignore

@@ -21,5 +21,5 @@ module.exports = {
     "@typescript-eslint/consistent-type-imports": "error",
     "no-console": ["warn", { allow: ["warn", "error"] }],
   },
-  ignorePatterns: ["dist/", "coverage/", "*.config.js", "*.config.cjs"],
+  ignorePatterns: ["dist/", "coverage/", "*.config.js", "*.config.cjs", "**/*.js"],
 };

@@ -1,0 +1,41 @@
+pre-commit:
+  parallel: true
+  commands:
+    gofmt:
+      glob: "**/*.go"
+      run: gofmt -l {staged_files}
+      fail_text: "Run: gofmt -w {staged_files}"
+
+    golangci-lint:
+      glob: "**/*.go"
+      run: golangci-lint run --config .golangci.yml --fix=false {staged_files}
+      fail_text: "Fix golangci-lint errors before committing"
+
+    eslint:
+      root: "apps/web/"
+      glob: "src/**/*.{ts,tsx}"
+      run: pnpm exec eslint --max-warnings 0 {staged_files}
+      fail_text: "Fix ESLint errors before committing"
+
+    prettier:
+      root: "apps/web/"
+      glob: "src/**/*.{ts,tsx,css}"
+      run: pnpm exec prettier --check {staged_files}
+      fail_text: "Run: pnpm exec prettier --write {staged_files}"
+
+    gitleaks:
+      run: gitleaks protect --staged --redact -v
+      fail_text: "Secret detected — remove it before committing"
+
+commit-msg:
+  commands:
+    conventional-commit:
+      run: bash scripts/ci/check-commit-msg.sh {1}
+      fail_text: |
+        Commit message must follow Conventional Commits:
+          <type>(scope): <description>
+
+          Types: feat fix chore test docs refactor perf build ci
+          Body must include: Refs LR-{n}
+
+        Example: feat(p0): add zone model (passes zone_test.go)\n\nRefs LR-102

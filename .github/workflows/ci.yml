@@ -15,6 +15,30 @@ permissions:
   pull-requests: write
 
 jobs:
+  commit-lint:
+    name: Commit Messages
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check all PR commit messages
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
+          FAILED=0
+          while IFS= read -r sha; do
+            MSG_FILE=$(mktemp)
+            git log --format=%B -n 1 "$sha" > "$MSG_FILE"
+            echo "Checking $sha: $(head -1 "$MSG_FILE")"
+            if ! bash scripts/ci/check-commit-msg.sh "$MSG_FILE"; then
+              FAILED=1
+            fi
+            rm "$MSG_FILE"
+          done < <(git rev-list "$BASE".."$HEAD")
+          exit $FAILED
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
@@ -32,16 +56,38 @@ jobs:
           node-version: "20"
           cache: "pnpm"
       - run: pnpm install --frozen-lockfile
-      - name: Go lint
-        uses: golangci/golangci-lint-action@v6
+      - name: Go lint (api)
+        uses: golangci/golangci-lint-action@v7
         with:
-          version: latest
+          version: v2.12.2
+          args: --config ../../.golangci.yml ./...
+          working-directory: services/api
+      - name: Go lint (pkg/auth)
+        uses: golangci/golangci-lint-action@v7
+        with:
+          version: v2.12.2
+          args: --config ../../.golangci.yml ./...
+          working-directory: pkg/auth
+      - name: Go lint (pkg/domain)
+        uses: golangci/golangci-lint-action@v7
+        with:
+          version: v2.12.2
+          args: --config ../../.golangci.yml ./...
+          working-directory: pkg/domain
+      - name: Go lint (pkg/observability)
+        uses: golangci/golangci-lint-action@v7
+        with:
+          version: v2.12.2
+          args: --config ../../.golangci.yml ./...
+          working-directory: pkg/observability
       - name: TS lint + typecheck
+        working-directory: apps/web
         run: |
-          pnpm -F web lint
-          pnpm -F web typecheck
+          pnpm exec eslint . --max-warnings 0
+          pnpm exec tsc --noEmit
       - name: Prettier check
-        run: pnpm -F web exec prettier --check "src/**/*.{ts,tsx}"
+        working-directory: apps/web
+        run: pnpm exec prettier --check "src/**/*.{ts,tsx,css}"
 
   test-go:
     name: Go Tests
@@ -65,27 +111,47 @@ jobs:
           - 4222:4222
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-go@v5
         with:
           go-version: "1.22"
           cache: true
-      - name: Install goose
-        run: go install github.com/pressly/goose/v3/cmd/goose@latest
+      - name: Install goose + gotestsum
+        run: |
+          go install github.com/pressly/goose/v3/cmd/goose@latest
+          go install gotest.tools/gotestsum@latest
       - name: Run migrations
         run: goose -dir migrations postgres "postgres://postgres:postgres@localhost:5432/testdb?sslmode=disable" up
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/testdb?sslmode=disable
       - name: Run tests
-        run: go test -v -race -coverprofile=coverage.out ./...
+        run: |
+          gotestsum --junitfile test-results.xml -- -race -coverprofile=coverage.out \
+            github.com/live-rack/services/api/... \
+            github.com/live-rack/pkg/auth/... \
+            github.com/live-rack/pkg/domain/... \
+            github.com/live-rack/pkg/observability/...
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/testdb?sslmode=disable
           NATS_URL: nats://localhost:4222
       - name: Coverage report
         run: go tool cover -func=coverage.out | tail -1
+      - name: Coverage delta check
+        env:
+          BASE_REF: ${{ github.base_ref || 'main' }}
+        run: bash scripts/ci/check-coverage-delta.sh "$BASE_REF" coverage.out
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-test-results
+          path: test-results.xml
       - name: Upload coverage
         uses: codecov/codecov-action@v4
         with:
           files: coverage.out
+          flags: go
 
   test-frontend:
     name: Frontend Tests
@@ -100,17 +166,19 @@ jobs:
           node-version: "20"
           cache: "pnpm"
       - run: pnpm install --frozen-lockfile
-      - name: Run Vitest
-        run: pnpm -F web test --reporter=verbose --coverage
+      - name: Run Vitest with coverage
+        run: pnpm -F web exec vitest run --reporter=verbose --coverage
       - name: Upload coverage
         uses: codecov/codecov-action@v4
         with:
           files: apps/web/coverage/lcov.info
+          flags: frontend
 
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [lint, test-go, test-frontend]
+    needs: [commit-lint, lint, test-go, test-frontend]
+    if: always() && !failure() && !cancelled()
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -127,10 +195,16 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Build Go services
         run: |
-          go build -o /dev/null ./services/api/...
-          go build -o /dev/null ./services/ingest/...
-          go build -o /dev/null ./services/rollup/...
-          go build -o /dev/null ./services/integrations/...
-          go build -o /dev/null ./services/insight/...
+          go build -o /dev/null github.com/live-rack/services/api/...
       - name: Build frontend
         run: pnpm -F web build
+      - name: Bundle size check
+        working-directory: apps/web
+        run: |
+          BUNDLE_KB=$(du -sk dist/assets/*.js 2>/dev/null | awk '{sum+=$1} END {print sum}')
+          LIMIT_KB=500
+          echo "JS bundle: ${BUNDLE_KB}KB (limit: ${LIMIT_KB}KB)"
+          if [ "${BUNDLE_KB:-0}" -gt "$LIMIT_KB" ]; then
+            echo "FAIL: bundle exceeds ${LIMIT_KB}KB"
+            exit 1
+          fi

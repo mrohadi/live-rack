@@ -16,12 +16,12 @@ const (
 )
 
 type Org struct {
-	ID          uuid.UUID `json:"id"`
-	ClerkOrgID  string    `json:"clerk_org_id"`
-	Name        string    `json:"name"`
-	Plan        Plan      `json:"plan"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID         uuid.UUID `json:"id"`
+	ClerkOrgID string    `json:"clerk_org_id"`
+	Name       string    `json:"name"`
+	Plan       Plan      `json:"plan"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 type Store struct {

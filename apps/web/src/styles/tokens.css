@@ -1,0 +1,49 @@
+/* Design tokens — generated from tokens.ts.
+   Tailwind reads these via hsl(var(--color-*) / <alpha-value>).
+   Runtime --accent is overridden by App via style prop for SVG fills. */
+
+:root {
+  /* Colors — light mode (HSL channels, no wrapper) */
+  --color-primary: 220 91% 56%;
+  --color-secondary: 215 16% 47%;
+  --color-accent: 220 91% 56%;
+  --color-surface: 0 0% 100%;
+  --color-background: 210 40% 98%;
+  --color-foreground: 222 84% 5%;
+  --color-muted: 210 40% 96%;
+  --color-muted-foreground: 215 16% 47%;
+  --color-border: 214 32% 91%;
+  --color-destructive: 0 72% 51%;
+  --color-success: 142 71% 45%;
+  --color-warning: 38 92% 50%;
+
+  /* Typography */
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", monospace;
+
+  /* Radius */
+  --radius: 0.5rem;
+  --radius-sm: 0.25rem;
+  --radius-lg: 0.75rem;
+
+  /* Runtime accent (overridden by App for SVG fills + color-mix) */
+  --accent: #2563eb;
+  --accent-soft: color-mix(in oklab, #2563eb 18%, transparent);
+  --accent-text: #2563eb;
+}
+
+[data-theme="dark"] {
+  /* Colors — dark mode */
+  --color-primary: 217 91% 60%;
+  --color-secondary: 215 20% 65%;
+  --color-accent: 217 91% 60%;
+  --color-surface: 222 47% 11%;
+  --color-background: 222 84% 5%;
+  --color-foreground: 210 40% 98%;
+  --color-muted: 217 33% 17%;
+  --color-muted-foreground: 215 20% 65%;
+  --color-border: 217 33% 17%;
+  --color-destructive: 0 63% 61%;
+  --color-success: 142 69% 58%;
+  --color-warning: 38 92% 62%;
+}

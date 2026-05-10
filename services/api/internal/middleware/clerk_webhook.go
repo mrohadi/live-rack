@@ -15,11 +15,13 @@ type ClerkWebhookEvent struct {
 	Data json.RawMessage `json:"data"`
 }
 
+// ClerkOrgCreatedData holds org fields from a Clerk organization.created event.
 type ClerkOrgCreatedData struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 }
 
+// ClerkUserCreatedData holds user fields from a Clerk user.created event.
 type ClerkUserCreatedData struct {
 	ID             string `json:"id"`
 	EmailAddresses []struct {
@@ -37,11 +39,13 @@ type WebhookProvisioner interface {
 	ProvisionUser(clerkUserID, clerkOrgID, email, displayName, avatarURL string) error
 }
 
+// ClerkWebhookHandler verifies and dispatches Clerk webhook events.
 type ClerkWebhookHandler struct {
 	wh          *svix.Webhook
 	provisioner WebhookProvisioner
 }
 
+// NewClerkWebhookHandler constructs a handler that verifies Clerk webhook signatures.
 func NewClerkWebhookHandler(signingSecret string, p WebhookProvisioner) (*ClerkWebhookHandler, error) {
 	wh, err := svix.NewWebhook(signingSecret)
 	if err != nil {

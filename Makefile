@@ -1,4 +1,4 @@
-.PHONY: dev dev-status seed seed-reset test lint typecheck build clean
+.PHONY: dev dev-status seed seed-reset test lint prettier-check prettier-fix typecheck build clean hooks-install notion-seed
 
 # Start full local dev stack
 dev:
@@ -17,13 +17,24 @@ seed-reset:
 
 # Run all tests
 test:
-	go test -race ./...
-	pnpm -F web test --run
+	go test -race github.com/live-rack/services/api/... github.com/live-rack/pkg/auth/... github.com/live-rack/pkg/domain/... github.com/live-rack/pkg/observability/...
+	pnpm -F web exec vitest run
 
 # Lint
 lint:
-	golangci-lint run ./...
+	golangci-lint run --config .golangci.yml ./services/api/...
+	golangci-lint run --config .golangci.yml ./pkg/auth/...
+	golangci-lint run --config .golangci.yml ./pkg/domain/...
+	golangci-lint run --config .golangci.yml ./pkg/observability/...
 	pnpm -F web lint
+
+# Prettier format check
+prettier-check:
+	pnpm -F web exec prettier --check "src/**/*.{ts,tsx,css}"
+
+# Prettier auto-fix
+prettier-fix:
+	pnpm -F web exec prettier --write "src/**/*.{ts,tsx,css}"
 
 # Type check
 typecheck:
@@ -31,9 +42,7 @@ typecheck:
 
 # Build all
 build:
-	go build -o bin/api ./services/api/...
-	go build -o bin/ingest ./services/ingest/...
-	go build -o bin/rollup ./services/rollup/...
+	go build -o bin/api github.com/live-rack/services/api/...
 	pnpm -F web build
 
 # Generate sqlc
@@ -46,6 +55,14 @@ migrate-up:
 
 migrate-status:
 	goose -dir migrations postgres "$$DATABASE_URL" status
+
+hooks-install:
+	go install github.com/evilmartians/lefthook@latest
+	lefthook install
+
+notion-seed:
+	GOWORK=off NOTION_API_KEY=$$NOTION_API_KEY NOTION_PARENT_PAGE_ID=$$NOTION_PARENT_PAGE_ID \
+	go run -C scripts/notion-seed .
 
 clean:
 	rm -rf bin/ apps/web/dist/ coverage.out

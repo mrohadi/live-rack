@@ -1,92 +1,31 @@
 {
-  "includeCoAuthoredBy": true,
+  "includeCoAuthoredBy": false,
   "env": {
     "INSIDE_CLAUDE_CODE": "1",
     "BASH_DEFAULT_TIMEOUT_MS": "420000",
     "BASH_MAX_TIMEOUT_MS": "600000"
   },
   "hooks": {
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/skill-eval.sh",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "Edit|MultiEdit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "[ \"$(git -C \"$CLAUDE_PROJECT_DIR\" branch --show-current 2>/dev/null)\" != \"main\" ] || { echo '{\"block\": true, \"message\": \"Cannot edit on main. Create a feature branch: git checkout -b feat/p{n}-{ticket}-{slug}\"}' >&2; exit 2; }",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
     "PostToolUse": [
       {
-        "matcher": "Edit|MultiEdit|Write",
+        "matcher": "Edit|Write|Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "if [[ \"$CLAUDE_TOOL_INPUT_FILE_PATH\" =~ \\.(go)$ ]]; then\n  gofmt -w \"$CLAUDE_TOOL_INPUT_FILE_PATH\" 2>&1\n  echo '{\"feedback\": \"gofmt applied.\", \"suppressOutput\": true}'\nfi",
+            "command": "code-review-graph update --skip-flows",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "code-review-graph status",
             "timeout": 10
-          }
-        ]
-      },
-      {
-        "matcher": "Edit|MultiEdit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "if [[ \"$CLAUDE_TOOL_INPUT_FILE_PATH\" =~ \\.(ts|tsx|js|jsx)$ ]]; then\n  npx prettier --write \"$CLAUDE_TOOL_INPUT_FILE_PATH\" 2>/dev/null\n  echo '{\"feedback\": \"Prettier applied.\", \"suppressOutput\": true}'\nfi",
-            "timeout": 30
-          }
-        ]
-      },
-      {
-        "matcher": "Edit|MultiEdit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "if [[ \"$CLAUDE_TOOL_INPUT_FILE_PATH\" =~ _test\\.go$ ]]; then\n  dir=$(dirname \"$CLAUDE_TOOL_INPUT_FILE_PATH\")\n  echo '{\"feedback\": \"Running Go tests...\"}' >&2\n  go test \"$dir\" 2>&1 | tail -20\nfi",
-            "timeout": 120
-          }
-        ]
-      },
-      {
-        "matcher": "Edit|MultiEdit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "if [[ \"$CLAUDE_TOOL_INPUT_FILE_PATH\" =~ \\.test\\.(ts|tsx)$ ]]; then\n  echo '{\"feedback\": \"Running Vitest...\"}' >&2\n  npx vitest run \"$CLAUDE_TOOL_INPUT_FILE_PATH\" 2>&1 | tail -20\nfi",
-            "timeout": 90
-          }
-        ]
-      },
-      {
-        "matcher": "Edit|MultiEdit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "if [[ \"$CLAUDE_TOOL_INPUT_FILE_PATH\" =~ \\.(ts|tsx)$ ]]; then\n  output=$(cd \"$(dirname \"$CLAUDE_TOOL_INPUT_FILE_PATH\")\" && npx tsc --noEmit 2>&1)\n  [ $? -eq 0 ] && echo '{\"feedback\": \"TypeScript OK.\", \"suppressOutput\": true}' || echo \"{\\\"feedback\\\": \\\"TypeScript errors: $output\\\"}\" >&2\n  exit 0\nfi",
-            "timeout": 30
-          }
-        ]
-      },
-      {
-        "matcher": "Edit|MultiEdit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "if [[ \"$CLAUDE_TOOL_INPUT_FILE_PATH\" =~ package\\.json$ ]]; then\n  echo '{\"feedback\": \"Installing deps...\"}' >&2\n  pnpm install 2>&1 | tail -5 && echo '{\"feedback\": \"Deps installed.\", \"suppressOutput\": true}'\nfi",
-            "timeout": 90
           }
         ]
       }

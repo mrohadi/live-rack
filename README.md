@@ -1,51 +1,309 @@
-# live-rack — SaaS Warehouse Zoning, Real-Time Tracking & Analytics Platform
+# live-rack
 
-## Context
+SaaS Warehouse Zoning, Real-Time Tracking & Analytics Platform.
 
-Greenfield SaaS targeting retail/warehouse operators. Connects physical store layout, item movement, POS sales, and external signals into one operational console. Differentiator: cross-signal intelligence (zone × demographics × weather × transit) plus scanner-based mis-scan prevention.
+---
+
+## Prerequisites
+
+| Tool | Version | Install |
+|---|---|---|
+| Go | 1.22+ | `brew install go` |
+| Node.js | 20+ | `brew install node` |
+| pnpm | 9+ | `npm i -g pnpm@9` |
+| Docker + Compose | v2 | [docker.com](https://docker.com) |
+| direnv | latest | `brew install direnv` |
+| golangci-lint | latest | `brew install golangci-lint` |
+| gitleaks | latest | `brew install gitleaks` |
+| goose | latest | `go install github.com/pressly/goose/v3/cmd/goose@latest` |
+| sqlc | latest | `brew install sqlc` |
+
+---
+
+## Quick Start
+
+```bash
+# 1. Clone
+git clone https://github.com/your-org/live-rack && cd live-rack
+
+# 2. Install frontend deps
+pnpm install
+
+# 3. Start all infrastructure (DB, NATS, Redis, ClickHouse, MinIO, observability)
+make dev
+
+# 4. Run migrations
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/liverack?sslmode=disable make migrate-up
+
+# 5. Install pre-commit hooks (one-time per machine)
+make hooks-install
+
+# 6. Set up backend env vars
+cp .env.example services/api/.env
+# Edit services/api/.env — fill in CLERK_SECRET_KEY at minimum
+echo 'dotenv' > services/api/.envrc
+cd services/api && direnv allow && cd ../..
+
+# 7. Set up frontend env vars
+cp apps/web/.env.example apps/web/.env.local
+# Edit apps/web/.env.local — fill in VITE_CLERK_PUBLISHABLE_KEY
+
+# 8. Start API (terminal 1)
+cd services/api && go run .
+
+# 9. Start web app (terminal 2)
+pnpm -F web dev
+```
+
+---
+
+## Environment Variables
+
+### Backend — `services/api/.env`
+
+Copy from `.env.example` at repo root, then fill in values:
+
+```env
+# Required
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/liverack?sslmode=disable
+CLERK_SECRET_KEY=sk_test_...          # Clerk Dashboard → API Keys → Secret key
+
+# Optional
+CLERK_WEBHOOK_SECRET=whsec_...        # only if using Clerk webhooks
+OTEL_EXPORTER_OTLP_ENDPOINT=localhost:4317  # enables tracing → Tempo
+LOG_LEVEL=debug                       # debug | info | warn | error
+PORT=8080
+```
+
+Loaded automatically via `direnv` + `dotenv`. After editing `.env`:
+
+```bash
+cd services/api
+direnv allow
+```
+
+### Frontend — `apps/web/.env.local`
+
+```env
+VITE_CLERK_PUBLISHABLE_KEY=pk_test_...   # Clerk Dashboard → API Keys → Publishable key
+VITE_API_URL=http://localhost:8080
+```
+
+> **Clerk keys**: Both keys on same page at [dashboard.clerk.com](https://dashboard.clerk.com) → your app → API Keys.
+> `pk_test_` = safe for browser. `sk_test_` = server-only, never expose to frontend.
+
+---
+
+## Make Targets
+
+```bash
+make dev              # docker compose up -d (all infra)
+make dev-status       # show running containers
+make migrate-up       # run goose migrations (needs DATABASE_URL)
+make migrate-status   # show migration state
+make generate         # sqlc generate
+make seed             # load fixture data
+make seed-reset       # truncate + reseed
+make test             # go test -race ./... + vitest
+make lint             # golangci-lint + eslint
+make typecheck        # tsc --noEmit
+make build            # compile all Go services + frontend
+make hooks-install    # install lefthook pre-commit hooks
+make notion-seed      # seed Notion backlog (needs NOTION_API_KEY + NOTION_PARENT_PAGE_ID)
+make clean            # rm build artefacts + docker compose down -v
+```
+
+---
+
+## Service URLs (local)
+
+| Service | URL | Notes |
+|---|---|---|
+| Web app | http://localhost:5173 | `pnpm -F web dev` |
+| API | http://localhost:8080 | `go run .` from `services/api/` |
+| API health | http://localhost:8080/healthz | |
+| API metrics | http://localhost:8080/metrics | Prometheus scrape |
+| Postgres | `localhost:5432` | user: postgres / pw: postgres / db: liverack |
+| NATS | `localhost:4222` | monitoring: http://localhost:8222 |
+| ClickHouse | http://localhost:8123 | HTTP interface |
+| Redis | `localhost:6379` | |
+| MinIO console | http://localhost:9001 | user: minioadmin / pw: minioadmin |
+| Grafana | http://localhost:3000 | anonymous admin |
+| Prometheus | http://localhost:9090 | |
+| Loki | http://localhost:3100 | |
+| Tempo | http://localhost:3200 | |
+| OTLP gRPC | `localhost:4317` | services → collector |
+
+---
+
+## Running Tests
+
+```bash
+# All (Go + frontend)
+make test
+
+# Go only with coverage
+go test -race -coverprofile=coverage.out ./...
+go tool cover -func=coverage.out
+
+# Frontend only
+pnpm -F web test
+
+# Frontend with coverage report
+pnpm -F web test --run --coverage
+
+# Single Go package
+go test -v ./pkg/auth/...
+```
+
+---
+
+## Database Migrations
+
+```bash
+export DATABASE_URL=postgres://postgres:postgres@localhost:5432/liverack?sslmode=disable
+
+# Apply all pending
+goose -dir migrations postgres "$DATABASE_URL" up
+
+# Check status
+goose -dir migrations postgres "$DATABASE_URL" status
+
+# Rollback one
+goose -dir migrations postgres "$DATABASE_URL" down
+```
+
+---
+
+## Notion Backlog Seed
+
+Creates `live-rack · Backlog` database and seeds all 66 tickets (P0–P11).
+
+```bash
+# First run — creates DB, prints NOTION_DATABASE_ID
+NOTION_API_KEY=secret_xxx NOTION_PARENT_PAGE_ID=<page-id> make notion-seed
+
+# Re-run — skips DB creation, idempotent
+NOTION_API_KEY=secret_xxx NOTION_DATABASE_ID=<db-id> make notion-seed
+```
+
+---
+
+## Pre-commit Hooks
+
+Powered by [lefthook](https://github.com/evilmartians/lefthook). Install once:
+
+```bash
+make hooks-install
+# also requires: brew install golangci-lint gitleaks
+```
+
+Hooks run on `git commit`:
+- `gofmt` — formats staged `.go` files
+- `golangci-lint` — lints staged `.go` files
+- `eslint` — lints staged `.ts/.tsx`
+- `prettier` — checks staged `.ts/.tsx/.css`
+- `gitleaks` — blocks secrets from committing
+
+Commit messages must follow Conventional Commits + include `Refs LR-{n}`:
+```
+feat(p1): add zone drag-resize
+<blank line>
+Refs LR-104
+```
+
+Skip hooks (CI only, not for normal use):
+```bash
+LEFTHOOK=0 git commit ...
+```
+
+---
+
+## Observability
+
+Grafana at http://localhost:3000 (anonymous admin).
+
+Provisioned datasources: Prometheus, Loki, Tempo — linked for trace↔log correlation.
+
+Dashboard: `live-rack · API Overview` — req/s, p95 latency, error rate, traces.
+
+Enable tracing in API:
+```bash
+# add to services/api/.env
+OTEL_EXPORTER_OTLP_ENDPOINT=localhost:4317
+```
+
+---
+
+## Project Structure
+
+```
+live-rack/
+├── apps/
+│   ├── web/                React SPA (Vite + TypeScript + Tailwind)
+│   └── scanner/            PWA — camera + WebHID barcode scanning
+├── services/
+│   ├── api/                Go Echo HTTP + WebSocket gateway
+│   ├── ingest/             NATS → ClickHouse worker
+│   ├── rollup/             Cron analytics jobs
+│   ├── integrations/       Shopify, Square, Stripe, Shippo, Weather, Transit
+│   └── insight/            Recommendation engine
+├── pkg/
+│   ├── domain/             Pure entities — Zone, Item, Task, Pipeline, User, Org
+│   ├── store/              sqlc-generated Postgres repos
+│   ├── events/             NATS subject schemas
+│   ├── auth/               Clerk adapter, RBAC
+│   └── observability/      OTel bootstrap
+├── deploy/
+│   ├── docker/             docker-compose (infra + observability)
+│   ├── grafana/            Prometheus, Loki, Tempo, OTel collector configs + dashboards
+│   └── terraform/          AWS modules — network, db, cache, bus, observability
+├── migrations/             goose SQL files
+├── scripts/
+│   ├── ci/                 Coverage delta + commit message check scripts
+│   └── notion-seed/        Notion backlog seeder (Go)
+├── .github/workflows/      CI — lint, test, coverage, security, commit-lint
+├── .env.example            All env var reference (copy to services/api/.env)
+├── lefthook.yml            Pre-commit hook definitions
+└── Makefile                All developer commands
+```
 
 ---
 
 ## Tech Stack
 
-| Layer | Pick | Why |
-|---|---|---|
-| Frontend web | React 18 + Vite + TypeScript + Tailwind + shadcn/ui + Zustand + TanStack Query | Matches design bundle; fast DX; component primitives |
-| Map canvas | Konva.js (react-konva) | Drag/resize zones, heatmap overlays, item pins; better than raw SVG for 100+ shapes |
-| Charts | Recharts + visx (heatmap) | Sparklines, bars, 7×24 heatmap |
-| Mobile scanner | PWA (web first) → React Native later | Camera barcode via `@zxing/browser`; WebHID for Zebra USB; offline queue via IndexedDB |
-| Backend API | **Go 1.22 + Echo + sqlc + goose** _(locked)_ | Fits real-time/event-driven; one binary deploy; strong concurrency; team can hire |
-| Realtime | NATS JetStream + WebSocket gateway (Go) | Durable streams, fan-out to clients, replay; replaces ad-hoc Redis Pub/Sub |
-| Primary DB | PostgreSQL 16 + TimescaleDB ext | OLTP + time-series (sales, scans, sensor) in one engine |
-| Analytics warehouse | ClickHouse | Heatmaps, co-purchase lift, demographic rollups; cheap columnar scans |
-| Cache / queue | Redis 7 | Session, rate-limit, short-lived locks |
-| Object storage | S3-compatible (R2/MinIO) | Scanner photos, returns evidence, exports |
-| Auth | Clerk or WorkOS (SSO/SAML) | Faster than home-rolled; multi-tenant orgs out of the box |
-| Search | Postgres trigram → Meilisearch later | ⌘K SKU/zone/task search |
-| Observability | Grafana + Loki (logs) + Tempo (traces) + Prometheus | Single pane; OpenTelemetry SDKs in Go and React |
-| CI/CD | GitHub Actions + Docker | Portable runtime artefacts |
-| Hosting | _Deferred — choose at GA_ | Terraform abstracts Fly.io / AWS ECS / GCP Cloud Run; pick by cost + compliance posture closer to launch |
-| IaC | Terraform | Stateful infra reproducible across hosting choices |
+| Layer | Technology |
+|---|---|
+| Frontend | React 18 + Vite + TypeScript + Tailwind + shadcn/ui + Zustand + TanStack Query |
+| Backend | Go 1.22 + Echo + sqlc + goose |
+| Realtime | NATS JetStream + WebSocket gateway |
+| Primary DB | PostgreSQL 16 + TimescaleDB |
+| Analytics | ClickHouse |
+| Cache | Redis 7 |
+| Object storage | MinIO (S3-compatible) |
+| Auth | Clerk — multi-tenant, SSO, 2FA |
+| Scanner PWA | @zxing/browser + WebHID + IndexedDB offline queue |
+| Observability | Grafana + Loki + Tempo + Prometheus + OpenTelemetry |
+| IaC | Terraform (AWS) |
+| CI/CD | GitHub Actions |
 
 ---
 
-## High-Level Architecture
+## Architecture
 
 ```mermaid
 flowchart LR
   subgraph Clients
     WEB[Web SPA<br/>React+Tailwind]
     PWA[Scanner PWA<br/>Camera/WebHID]
-    MOB[Mobile bottom-tab]
   end
 
   subgraph Edge
-    CDN[CDN / Static]
-    GW[API Gateway<br/>Go Echo]
-    WS[WebSocket<br/>Gateway]
+    GW[API Gateway<br/>Go Echo :8080]
+    WS[WebSocket Gateway]
   end
 
-  subgraph Core[Core services - Go monorepo]
+  subgraph Core[Go services]
     AUTH[Auth/Tenant]
     ZONE[Zones & Map]
     INV[Inventory & Scan]
@@ -53,234 +311,35 @@ flowchart LR
     TASK[Tasks]
     PIPE[Pipelines]
     INTG[Integrations Hub]
-    NOTIF[Notifications]
   end
 
   subgraph Data
-    PG[(Postgres<br/>+Timescale)]
-    CH[(ClickHouse)]
-    REDIS[(Redis)]
-    S3[(Object Store)]
+    PG[(Postgres+Timescale<br/>:5432)]
+    CH[(ClickHouse<br/>:8123)]
+    REDIS[(Redis :6379)]
+    S3[(MinIO :9002)]
   end
 
-  subgraph Bus[Event Bus]
-    NATS[NATS JetStream]
+  subgraph Bus
+    NATS[NATS JetStream<br/>:4222]
   end
 
-  subgraph Analytics
-    INGEST[Ingest worker]
-    AGG[Rollup jobs]
-    ML[Insight engine<br/>combos / lift]
+  subgraph Obs[Observability]
+    PROM[Prometheus :9090]
+    LOKI[Loki :3100]
+    TEMPO[Tempo :3200]
+    GRAF[Grafana :3000]
   end
 
-  subgraph External[3rd-party]
-    SHOP[Shopify]
-    SQ[Square POS]
-    STR[Stripe]
-    SHIP[Shippo]
-    WX[OpenWeather]
-    TRN[Transit API]
-    ZBR[Zebra Devices]
-  end
-
-  WEB & PWA & MOB --> CDN
-  WEB & PWA & MOB --> GW
-  WEB & PWA & MOB <--> WS
-
-  GW --> AUTH & ZONE & INV & POS & TASK & PIPE & INTG & NOTIF
+  WEB & PWA --> GW
+  WEB & PWA <--> WS
+  GW --> AUTH & ZONE & INV & POS & TASK & PIPE & INTG
   WS <--> NATS
-
-  AUTH & ZONE & INV & POS & TASK & PIPE & INTG --> PG
   INV & POS --> NATS
-  NATS --> WS
-  NATS --> INGEST --> CH
-  CH --> AGG --> ML
+  AUTH & ZONE & INV & TASK --> PG
+  INV --> NATS --> CH
   INV --> S3
-  AUTH & ZONE & INV --> REDIS
-
-  INTG <--> SHOP & SQ & STR & SHIP & WX & TRN
-  INV <--> ZBR
+  AUTH --> REDIS
+  GW --> PROM
+  PROM & LOKI & TEMPO --> GRAF
 ```
-
-## Module Breakdown (Go monorepo)
-
-```
-live-rack/
-├── apps/
-│   ├── web/                React SPA
-│   ├── scanner/            PWA (subset of web, install prompt)
-│   └── docs/               Mintlify or Astro
-├── services/
-│   ├── api/                Echo HTTP+WS gateway, OpenAPI
-│   ├── ingest/             NATS → ClickHouse worker
-│   ├── rollup/             Cron-driven analytics jobs
-│   ├── integrations/       Shopify/Square/Stripe/Shippo/Weather/Transit adapters
-│   └── insight/            Co-purchase lift, time-to-sell, signal recommender
-├── pkg/
-│   ├── domain/             Pure entities (Zone, Item, Task, Pipeline, User, Org)
-│   ├── store/              sqlc-generated Postgres + Timescale repos
-│   ├── events/             NATS subject schemas, codecs
-│   ├── auth/               Clerk/WorkOS adapter, RBAC + zone-scoped policy
-│   └── observability/      OTel setup
-├── deploy/
-│   ├── terraform/
-│   ├── docker/
-│   └── grafana/            Dashboards as code
-└── migrations/             goose SQL
-```
-
----
-
-## Data Model (core tables)
-
-- `orgs`, `stores`, `users`, `roles`, `role_bindings`, `zone_scopes`
-- `zones` (id, store_id, name, type, x, y, w, h, capacity, color, constraints jsonb)
-- `items` (sku, org_id, name, category, price, attrs jsonb)
-- `item_locations` (item_id, zone_id, qty, slot_addr, updated_at) — current state
-- `scan_events` (Timescale hypertable: ts, scanner_id, sku, zone_id, action, valid, reason)
-- `sales_events` (Timescale: ts, source, order_id, sku, qty, amount, channel)
-- `tasks` (id, store_id, title, assignee, priority, due_at, status, zone_id)
-- `pipelines`, `pipeline_stages`, `pipeline_cards`
-- `integrations` (org_id, kind, status, config jsonb, secrets enc)
-- `webhooks_inbound`, `webhooks_outbound` (idempotency keys)
-- `audit_log` (immutable, partitioned by month)
-- ClickHouse: `zone_perf_5m`, `heatmap_hourly`, `time_to_sell`, `combos_lift`
-
-Multi-tenancy: `org_id` on every row + Postgres RLS policies; Clerk org → `org_id` mapping at gateway.
-
----
-
-## Real-Time Flow
-
-1. Scanner POSTs scan → `inventory` service validates against zone constraints + dwell rules.
-2. Service writes to Postgres (`item_locations`) and emits `scan.recorded` to NATS.
-3. WebSocket gateway subscribes per-org subject; pushes to connected clients.
-4. `ingest` worker streams scan + sales events into ClickHouse for aggregation.
-5. `insight` service publishes recommendations (e.g., weather-driven zone moves) onto `recommendation.created`; UI surfaces them on Analytics screen with Apply button.
-
-POS integration: Square/Shopify webhooks land at gateway → `pos.sale` event → triggers task creation rules (low-stock restock, restoration pipeline intake).
-
----
-
-## Integrations Strategy
-
-| Vendor | Mode | Notes |
-|---|---|---|
-| Shopify | OAuth + webhooks | Inventory sync, order webhooks, location API for zone visibility |
-| Square POS | OAuth + Catalog/Inventory webhooks | Real-time sales |
-| Stripe | Connect + payment_intent webhooks | Refunds correlate to returns zone |
-| Shippo | API polling | Outbound zone status |
-| Zebra | WebHID (browser) + Bluetooth (mobile) | DataWedge profile shipped |
-| OpenWeather | Cron pull (15m) | Per-store geo |
-| Transit API | Cron pull (5m) | Per-store catchment |
-| Klaviyo / NetSuite | Roadmap | Outbound events only initially |
-
-All integrations live in `services/integrations` behind a uniform `Adapter` interface with retry/idempotency middleware.
-
----
-
-## Security & RBAC
-
-- Roles: Admin / Manager / Staff / Read-only / Service (matches design).
-- Permission matrix stored as `role_permissions` (role × resource × action).
-- Zone scoping enforced in repo layer (`WHERE zone_id = ANY(user.zone_scope)`).
-- 2FA via Clerk (TOTP + WebAuthn).
-- Audit log on every write; immutable, monthly partition.
-- Secrets via AWS Secrets Manager / SOPS in dev.
-- Service tokens are first-class users with API-only perms (Shopify integration as user).
-
----
-
-## Git Strategy (per-phase branches, trunk-based)
-
-**Model:** Trunk-based with short-lived feature branches per phase. `main` always deployable. Long-lived release tags `v0.x.y` per phase completion.
-
-| Branch | Purpose | Lifecycle |
-|---|---|---|
-| `main` | Always green, deployable, protected | Permanent — squash-merge only, signed commits, required reviews |
-| `phase/p{n}-{slug}` | Long-running phase integration branch | Cut from `main` at phase start, merged back at phase end |
-| `feat/p{n}-{ticket}-{slug}` | Single ticket inside a phase | Branched from `phase/p{n}-*`, PR back into it |
-| `fix/{ticket}-{slug}` | Hotfix off `main` | Cherry-picked back into active phase branch |
-| `chore/`, `docs/`, `refactor/` | Non-feature work | Direct PR into `main` or active phase |
-
-**Phase-to-branch map:**
-```
-phase/p0-foundations
-phase/p1-zones-map
-phase/p2-scanner
-phase/p3-inventory
-phase/p4-tasks
-phase/p5-pipelines
-phase/p6-pos-integrations
-phase/p7-analytics
-phase/p8-external-signals
-phase/p9-rbac-audit
-phase/p10-integrations-marketplace
-phase/p11-hardening-launch
-```
-
-**Conventions:**
-- **Conventional Commits** (`feat:`, `fix:`, `chore:`, `test:`, `docs:`, `refactor:`, `perf:`, `build:`, `ci:`).
-- Commit body references ticket: `Refs LR-123`.
-- **Semantic PR titles**, squash-merge to phase branch, merge-commit phase→main with `release:` prefix.
-- **Branch protection on `main`**: required reviews (1+), required CI green, signed commits, linear history, no force-push.
-- Tag releases `v0.{phase}.{patch}` — e.g. `v0.6.0` at end of P6.
-- Pre-commit hooks: `gofmt`, `golangci-lint`, `eslint`, `prettier`, `gitleaks`.
-- PR template enforces: linked Notion ticket, screenshots/recordings for UI changes, test evidence (coverage delta), deploy notes.
-- Auto-rebase phase branch on `main` daily via GitHub Action; never merge `main` into phase branch.
-
----
-
-## TDD Workflow (Red → Green → Refactor)
-
-Every phase ticket follows TDD. CI rejects PRs whose new code lacks corresponding tests (enforced via coverage delta + diff-aware check).
-
-**Layered testing pyramid:**
-
-| Layer | Tool | Scope | Target coverage |
-|---|---|---|---|
-| Unit | Go `testing` + testify; Vitest | Pure functions, domain entities, reducers | ≥85% on `pkg/domain` |
-| Repo / DB | `testcontainers-go` (real Postgres + Timescale) | sqlc queries, RLS policies, hypertable inserts | ≥80% on `pkg/store` |
-| Service | Go service tests w/ NATS + Postgres in containers | Validation rules, event emission, idempotency | ≥75% per service |
-| Contract | `oapi-codegen` + Pact | API + webhook payloads | 100% of public endpoints |
-| Component (FE) | Vitest + Testing Library + MSW | React components, hooks, stores | ≥70% on `src/features` |
-| E2E | Playwright | Cross-screen user journeys | Smoke per phase + regression bank |
-| Load | k6 | Scan throughput, WS fan-out | p95 push <500ms @ 10k scans/min |
-| Security | gosec, semgrep, trivy, OWASP ZAP baseline | Static + image + dynamic | Zero criticals |
-
-**Per-ticket loop:**
-1. **Red** — write failing test in the lowest meaningful layer (unit if possible, repo/contract if domain-level). Commit `test(p{n}): add failing test for X`.
-2. **Green** — minimum code to pass. Commit `feat(p{n}): X (passes Y test)`.
-3. **Refactor** — improve internals; tests still green. Commit `refactor(p{n}): clean up X`.
-4. **Promote** — add E2E only when feature is user-facing.
-
-**TDD-specific tooling decisions:**
-- `gotestsum` for clean output and JUnit XML.
-- `mockery` for interface mocks (auth, integrations).
-- `wiremock` for outbound third-party HTTP (Shopify/Square sandboxes available too).
-- `tilt` or `docker compose` for local stack — every dev gets identical Postgres+NATS+ClickHouse via `make dev`.
-- VHS / Storybook for visual TDD on React components.
-- Mutation testing on `pkg/domain` quarterly (`go-mutesting`) to validate test quality.
-
-**CI gates per PR:**
-- Lint (`golangci-lint`, `eslint`, `prettier --check`)
-- Type check (`tsc --noEmit`)
-- Unit + repo + service tests
-- Contract tests (Pact verify against OpenAPI)
-- Coverage diff (fail if drops > 0.5pp on touched files)
-- E2E smoke (Playwright shard on phase branch nightly)
-- Security: `gosec`, `trivy`, `gitleaks`, `semgrep`
-- Bundle size budget (FE), binary size budget (Go)
-
----
-
-## MISC
-
-- **Local stack** — `docker compose up` brings Postgres+Timescale, NATS, ClickHouse, Redis, MinIO. `make seed` loads `data.jsx` fixtures.
-- **TDD CI gate** — every PR rejected if coverage delta on touched files drops > 0.5pp or contract tests fail.
-- **API contract tests** — OpenAPI spec checked into repo; `oapi-codegen` generates Go server + TS client; Pact verifies provider/consumer per merge.
-- **E2E** — Playwright covers per phase: zone create → drag (P1), scan happy + mis-scan (P2), inventory realtime update (P3), task lifecycle (P4), pipeline card flow (P5), Shopify webhook → sale → task (P6), heatmap render (P7), weather signal → Apply (P8), RBAC/zone scope (P9).
-- **Load** — k6 script in `tests/load/`: 10k scan events/min, 1k concurrent WS clients; p95 push latency target <500ms.
-- **Observability** — Grafana dashboards as code under `deploy/grafana/`; SLO: API p95 <200ms, scan→UI push <1s, ingest lag <60s.
-- **Security** — `gosec`, `trivy` images, `semgrep` SAST, `gitleaks` pre-commit, OWASP ZAP baseline in CI.
-- **Phase exit criteria** — every phase ends with: all tickets `Done` in Notion, all tests green, phase E2E suite added to regression bank, demo recorded, release tag `v0.{phase}.0` pushed, `phase/p{n}-*` branch merged to `main` and deleted.

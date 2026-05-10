@@ -1,9 +1,11 @@
+// Package middleware provides Echo middleware for the live-rack API.
 package middleware
 
 import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
+
 	pkgauth "github.com/live-rack/pkg/auth"
 )
 

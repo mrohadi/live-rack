@@ -52,7 +52,7 @@ hooks-install:
 	lefthook install
 
 notion-seed:
-	NOTION_API_KEY=$$NOTION_API_KEY NOTION_PARENT_PAGE_ID=$$NOTION_PARENT_PAGE_ID \
+	GOWORK=off NOTION_API_KEY=$$NOTION_API_KEY NOTION_PARENT_PAGE_ID=$$NOTION_PARENT_PAGE_ID \
 	go run -C scripts/notion-seed .
 
 clean:

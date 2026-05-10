@@ -21,6 +21,12 @@ linters:
         - G115
     exhaustive:
       default-signifies-exhaustive: true
+  exclusions:
+    rules:
+      - path: "_test\\.go"
+        linters: [gosec, unparam]
+      - path: "pkg/store/db/"
+        linters: [unused, exhaustive]
 
 formatters:
   enable:
@@ -31,11 +37,6 @@ formatters:
         - github.com/live-rack
 
 issues:
-  exclude:
-    - path: "_test\\.go"
-      linters: [gosec, unparam]
-    - path: "pkg/store/db/"
-      linters: [unused, exhaustive]
   max-issues-per-linter: 50
   max-same-issues: 10
 

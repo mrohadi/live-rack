@@ -36,12 +36,15 @@ jobs:
         uses: golangci/golangci-lint-action@v6
         with:
           version: latest
+          args: --config .golangci.yml
       - name: TS lint + typecheck
+        working-directory: apps/web
         run: |
-          pnpm -F web lint
-          pnpm -F web typecheck
+          pnpm exec eslint . --max-warnings 0
+          pnpm exec tsc --noEmit
       - name: Prettier check
-        run: pnpm -F web exec prettier --check "src/**/*.{ts,tsx}"
+        working-directory: apps/web
+        run: pnpm exec prettier --check "src/**/*.{ts,tsx,css}"
 
   test-go:
     name: Go Tests
@@ -65,27 +68,40 @@ jobs:
           - 4222:4222
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-go@v5
         with:
           go-version: "1.22"
           cache: true
-      - name: Install goose
-        run: go install github.com/pressly/goose/v3/cmd/goose@latest
+      - name: Install goose + gotestsum
+        run: |
+          go install github.com/pressly/goose/v3/cmd/goose@latest
+          go install gotest.tools/gotestsum@latest
       - name: Run migrations
         run: goose -dir migrations postgres "postgres://postgres:postgres@localhost:5432/testdb?sslmode=disable" up
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/testdb?sslmode=disable
       - name: Run tests
-        run: go test -v -race -coverprofile=coverage.out ./...
+        run: gotestsum --junitfile test-results.xml -- -race -coverprofile=coverage.out ./...
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/testdb?sslmode=disable
           NATS_URL: nats://localhost:4222
       - name: Coverage report
         run: go tool cover -func=coverage.out | tail -1
+      - name: Coverage delta check
+        run: bash scripts/ci/check-coverage-delta.sh ${{ github.base_ref || 'main' }} coverage.out
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-test-results
+          path: test-results.xml
       - name: Upload coverage
         uses: codecov/codecov-action@v4
         with:
           files: coverage.out
+          flags: go
 
   test-frontend:
     name: Frontend Tests
@@ -100,12 +116,13 @@ jobs:
           node-version: "20"
           cache: "pnpm"
       - run: pnpm install --frozen-lockfile
-      - name: Run Vitest
-        run: pnpm -F web test --reporter=verbose --coverage
+      - name: Run Vitest with coverage
+        run: pnpm -F web test --run --reporter=verbose --coverage
       - name: Upload coverage
         uses: codecov/codecov-action@v4
         with:
           files: apps/web/coverage/lcov.info
+          flags: frontend
 
   build:
     name: Build
@@ -134,3 +151,13 @@ jobs:
           go build -o /dev/null ./services/insight/...
       - name: Build frontend
         run: pnpm -F web build
+      - name: Bundle size check
+        working-directory: apps/web
+        run: |
+          BUNDLE_KB=$(du -sk dist/assets/*.js 2>/dev/null | awk '{sum+=$1} END {print sum}')
+          LIMIT_KB=500
+          echo "JS bundle: ${BUNDLE_KB}KB (limit: ${LIMIT_KB}KB)"
+          if [ "${BUNDLE_KB:-0}" -gt "$LIMIT_KB" ]; then
+            echo "FAIL: bundle exceeds ${LIMIT_KB}KB"
+            exit 1
+          fi

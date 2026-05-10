@@ -8,6 +8,10 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
     globals: true,
+    alias: {
+      // Force konva browser build in tests — node build requires native 'canvas' binding
+      konva: "konva/lib/index.js",
+    },
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov", "html"],

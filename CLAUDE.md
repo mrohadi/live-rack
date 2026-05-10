@@ -138,6 +138,7 @@ Before implementing ANY task, check if a skill applies:
 - Building React components → `react-patterns` skill
 - Working on NATS events / WS → `nats-patterns` skill
 - Scanner PWA / barcode / WebHID → `scanner-patterns` skill
+- **Before any `git commit` or `gh pr create`** → `pre-commit-checks` skill (runs lint, prettier, typecheck, tests)
 
 ## Notion Backlog
 

@@ -1,4 +1,4 @@
-.PHONY: dev dev-status seed seed-reset test lint typecheck build clean hooks-install notion-seed
+.PHONY: dev dev-status seed seed-reset test lint prettier-check prettier-fix typecheck build clean hooks-install notion-seed
 
 # Start full local dev stack
 dev:
@@ -27,6 +27,14 @@ lint:
 	golangci-lint run --config .golangci.yml ./pkg/domain/...
 	golangci-lint run --config .golangci.yml ./pkg/observability/...
 	pnpm -F web lint
+
+# Prettier format check
+prettier-check:
+	pnpm -F web exec prettier --check "src/**/*.{ts,tsx,css}"
+
+# Prettier auto-fix
+prettier-fix:
+	pnpm -F web exec prettier --write "src/**/*.{ts,tsx,css}"
 
 # Type check
 typecheck:

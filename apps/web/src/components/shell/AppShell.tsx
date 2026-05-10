@@ -16,11 +16,7 @@ export function AppShell() {
   return (
     <div className="app" data-drawer={drawerOpen ? "open" : "closed"}>
       {/* Mobile drawer backdrop */}
-      <div
-        className="mobile-drawer-backdrop"
-        onClick={closeDrawer}
-        aria-hidden="true"
-      />
+      <div className="mobile-drawer-backdrop" onClick={closeDrawer} aria-hidden="true" />
 
       <Sidebar onNavigate={closeDrawer} />
 

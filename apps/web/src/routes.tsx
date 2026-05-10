@@ -28,8 +28,7 @@ export const routes: RouteObject[] = [
           },
           {
             path: "map",
-            lazy: () =>
-              import("./features/map/MapPage").then((m) => ({ Component: m.MapPage })),
+            lazy: () => import("./features/map/MapPage").then((m) => ({ Component: m.MapPage })),
           },
           {
             path: "scanner",

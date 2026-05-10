@@ -12,6 +12,7 @@ SaaS Warehouse Zoning, Real-Time Tracking & Analytics Platform.
 | Node.js | 20+ | `brew install node` |
 | pnpm | 9+ | `npm i -g pnpm@9` |
 | Docker + Compose | v2 | [docker.com](https://docker.com) |
+| direnv | latest | `brew install direnv` |
 | golangci-lint | latest | `brew install golangci-lint` |
 | gitleaks | latest | `brew install gitleaks` |
 | goose | latest | `go install github.com/pressly/goose/v3/cmd/goose@latest` |
@@ -28,22 +29,29 @@ git clone https://github.com/your-org/live-rack && cd live-rack
 # 2. Install frontend deps
 pnpm install
 
-# 3. Copy env files and fill in values
-cp apps/web/.env.example apps/web/.env.local
-
-# 4. Start all infrastructure (DB, NATS, Redis, ClickHouse, MinIO, observability)
+# 3. Start all infrastructure (DB, NATS, Redis, ClickHouse, MinIO, observability)
 make dev
 
-# 5. Run migrations
+# 4. Run migrations
 DATABASE_URL=postgres://postgres:postgres@localhost:5432/liverack?sslmode=disable make migrate-up
 
-# 6. Install pre-commit hooks (one-time per machine)
+# 5. Install pre-commit hooks (one-time per machine)
 make hooks-install
 
-# 7. Start API
-cd services/api && DATABASE_URL=postgres://postgres:postgres@localhost:5432/liverack?sslmode=disable CLERK_SECRET_KEY=sk_test_xxx go run .
+# 6. Set up backend env vars
+cp .env.example services/api/.env
+# Edit services/api/.env — fill in CLERK_SECRET_KEY at minimum
+echo 'dotenv' > services/api/.envrc
+cd services/api && direnv allow && cd ../..
 
-# 8. Start web app (separate terminal)
+# 7. Set up frontend env vars
+cp apps/web/.env.example apps/web/.env.local
+# Edit apps/web/.env.local — fill in VITE_CLERK_PUBLISHABLE_KEY
+
+# 8. Start API (terminal 1)
+cd services/api && go run .
+
+# 9. Start web app (terminal 2)
 pnpm -F web dev
 ```
 
@@ -51,23 +59,38 @@ pnpm -F web dev
 
 ## Environment Variables
 
-### `apps/web/.env.local`
+### Backend — `services/api/.env`
+
+Copy from `.env.example` at repo root, then fill in values:
 
 ```env
-VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
+# Required
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/liverack?sslmode=disable
+CLERK_SECRET_KEY=sk_test_...          # Clerk Dashboard → API Keys → Secret key
+
+# Optional
+CLERK_WEBHOOK_SECRET=whsec_...        # only if using Clerk webhooks
+OTEL_EXPORTER_OTLP_ENDPOINT=localhost:4317  # enables tracing → Tempo
+LOG_LEVEL=debug                       # debug | info | warn | error
+PORT=8080
+```
+
+Loaded automatically via `direnv` + `dotenv`. After editing `.env`:
+
+```bash
+cd services/api
+direnv allow
+```
+
+### Frontend — `apps/web/.env.local`
+
+```env
+VITE_CLERK_PUBLISHABLE_KEY=pk_test_...   # Clerk Dashboard → API Keys → Publishable key
 VITE_API_URL=http://localhost:8080
 ```
 
-### API service (shell or `.env`)
-
-```env
-DATABASE_URL=postgres://postgres:postgres@localhost:5432/liverack?sslmode=disable
-CLERK_SECRET_KEY=sk_test_...
-CLERK_WEBHOOK_SECRET=whsec_...          # optional — only for Clerk webhooks
-OTEL_EXPORTER_OTLP_ENDPOINT=localhost:4317  # optional — enable tracing
-LOG_LEVEL=info                          # debug | info | warn | error
-PORT=8080
-```
+> **Clerk keys**: Both keys on same page at [dashboard.clerk.com](https://dashboard.clerk.com) → your app → API Keys.
+> `pk_test_` = safe for browser. `sk_test_` = server-only, never expose to frontend.
 
 ---
 
@@ -96,8 +119,8 @@ make clean            # rm build artefacts + docker compose down -v
 
 | Service | URL | Notes |
 |---|---|---|
-| Web app | http://localhost:3000 | `pnpm -F web dev` |
-| API | http://localhost:8080 | `go run ./services/api` |
+| Web app | http://localhost:5173 | `pnpm -F web dev` |
+| API | http://localhost:8080 | `go run .` from `services/api/` |
 | API health | http://localhost:8080/healthz | |
 | API metrics | http://localhost:8080/metrics | Prometheus scrape |
 | Postgres | `localhost:5432` | user: postgres / pw: postgres / db: liverack |
@@ -105,13 +128,11 @@ make clean            # rm build artefacts + docker compose down -v
 | ClickHouse | http://localhost:8123 | HTTP interface |
 | Redis | `localhost:6379` | |
 | MinIO console | http://localhost:9001 | user: minioadmin / pw: minioadmin |
-| Grafana | http://localhost:3000 | anonymous admin (conflicts with web dev on same port — see note) |
+| Grafana | http://localhost:3000 | anonymous admin |
 | Prometheus | http://localhost:9090 | |
 | Loki | http://localhost:3100 | |
 | Tempo | http://localhost:3200 | |
 | OTLP gRPC | `localhost:4317` | services → collector |
-
-> **Port conflict**: Grafana and Vite dev server both default to `:3000`. Run `pnpm -F web dev -- --port 5173` or change Grafana's port in `deploy/docker/docker-compose.yml`.
 
 ---
 
@@ -208,7 +229,8 @@ Dashboard: `live-rack · API Overview` — req/s, p95 latency, error rate, trace
 
 Enable tracing in API:
 ```bash
-OTEL_EXPORTER_OTLP_ENDPOINT=localhost:4317 go run ./services/api
+# add to services/api/.env
+OTEL_EXPORTER_OTLP_ENDPOINT=localhost:4317
 ```
 
 ---
@@ -241,6 +263,7 @@ live-rack/
 │   ├── ci/                 Coverage delta + commit message check scripts
 │   └── notion-seed/        Notion backlog seeder (Go)
 ├── .github/workflows/      CI — lint, test, coverage, security, commit-lint
+├── .env.example            All env var reference (copy to services/api/.env)
 ├── lefthook.yml            Pre-commit hook definitions
 └── Makefile                All developer commands
 ```

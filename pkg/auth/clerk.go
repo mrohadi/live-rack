@@ -29,7 +29,7 @@ type ClerkVerifier struct {
 func NewClerkVerifier(secretKey string, resolver OrgResolver) *ClerkVerifier {
 	clerk.SetKey(secretKey)
 	return &ClerkVerifier{
-		jwksClient: jwks.NewClient(),
+		jwksClient: jwks.NewClient(&clerk.ClientConfig{}),
 		resolver:   resolver,
 	}
 }
@@ -50,7 +50,7 @@ func (v *ClerkVerifier) VerifyRequest(r *http.Request) (*domain.Principal, error
 		return nil, fmt.Errorf("auth: invalid token: %w", err)
 	}
 
-	clerkOrgID, _ := claims.Extra["org_id"].(string)
+	clerkOrgID := claims.ActiveOrganizationID
 	clerkUserID := claims.Subject
 	if clerkOrgID == "" {
 		return nil, fmt.Errorf("auth: token missing org_id claim")

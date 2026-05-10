@@ -1,3 +1,4 @@
+// Package main is the entry point for the live-rack API service.
 package main
 
 import (

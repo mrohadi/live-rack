@@ -1,3 +1,4 @@
+// Package middleware provides Echo middleware for the live-rack API.
 package middleware
 
 import (

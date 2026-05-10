@@ -1,4 +1,4 @@
-.PHONY: dev dev-status seed seed-reset test lint typecheck build clean hooks-install
+.PHONY: dev dev-status seed seed-reset test lint typecheck build clean hooks-install notion-seed
 
 # Start full local dev stack
 dev:
@@ -50,6 +50,10 @@ migrate-status:
 hooks-install:
 	go install github.com/evilmartians/lefthook@latest
 	lefthook install
+
+notion-seed:
+	NOTION_API_KEY=$$NOTION_API_KEY NOTION_PARENT_PAGE_ID=$$NOTION_PARENT_PAGE_ID \
+	go run -C scripts/notion-seed .
 
 clean:
 	rm -rf bin/ apps/web/dist/ coverage.out

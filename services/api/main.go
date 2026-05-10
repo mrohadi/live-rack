@@ -1,3 +1,4 @@
+// Package main is the entry point for the live-rack API service.
 package main
 
 import (
@@ -13,7 +14,11 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 	echomw "github.com/labstack/echo/v4/middleware"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/labstack/echo/otelecho"
+
 	pkgauth "github.com/live-rack/pkg/auth"
+	obs "github.com/live-rack/pkg/observability"
 	apimw "github.com/live-rack/services/api/internal/middleware"
 )
 
@@ -23,8 +28,25 @@ func main() {
 	}))
 	slog.SetDefault(log)
 
+	ctx := context.Background()
+
+	shutdown, err := obs.Setup(ctx, obs.Config{
+		ServiceName:    "api",
+		ServiceVersion: envOr("SERVICE_VERSION", "dev"),
+		OTLPEndpoint:   os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
+	})
+	if err != nil {
+		log.Error("otel setup", "err", err)
+		os.Exit(1)
+	}
+	defer func() {
+		if err := shutdown(context.Background()); err != nil {
+			log.Error("otel shutdown", "err", err)
+		}
+	}()
+
 	dbURL := mustEnv("DATABASE_URL")
-	pool, err := pgxpool.New(context.Background(), dbURL)
+	pool, err := pgxpool.New(ctx, dbURL)
 	if err != nil {
 		log.Error("connect postgres", "err", err)
 		os.Exit(1)
@@ -32,7 +54,6 @@ func main() {
 	defer pool.Close()
 
 	// setOrgID executes SET LOCAL app.org_id = '<id>' on the acquired connection.
-	// Called inside Auth middleware before every request hits a handler.
 	setOrgID := func(orgID string) error {
 		conn, err := pool.Acquire(context.Background())
 		if err != nil {
@@ -43,8 +64,6 @@ func main() {
 		return err
 	}
 
-	// TODO(LR-005): wire real DBResolver once sqlc is generated.
-	// For now verifier is constructed; resolver stubbed until pkg/store is generated.
 	_ = pkgauth.NewClerkVerifier(mustEnv("CLERK_SECRET_KEY"), nil)
 
 	e := echo.New()
@@ -53,19 +72,23 @@ func main() {
 	e.Use(echomw.RequestID())
 	e.Use(echomw.Logger())
 	e.Use(echomw.CORS())
+	e.Use(otelecho.Middleware("api"))
 
-	// Health — no auth required.
+	// Health — no auth.
 	e.GET("/healthz", func(c echo.Context) error {
-		if err := pool.Ping(context.Background()); err != nil {
+		if err := pool.Ping(c.Request().Context()); err != nil {
 			return c.JSON(http.StatusServiceUnavailable, map[string]string{"db": "down"})
 		}
 		return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 	})
 
+	// Prometheus scrape endpoint — no auth.
+	e.GET("/metrics", echo.WrapHandler(promhttp.Handler()))
+
 	// Clerk webhook — signed by Svix, no JWT auth.
 	clerkWebhookSecret := os.Getenv("CLERK_WEBHOOK_SECRET")
 	if clerkWebhookSecret != "" {
-		whHandler, err := apimw.NewClerkWebhookHandler(clerkWebhookSecret, nil /* provisioner wired post-sqlc */)
+		whHandler, err := apimw.NewClerkWebhookHandler(clerkWebhookSecret, nil)
 		if err != nil {
 			log.Error("init clerk webhook handler", "err", err)
 			os.Exit(1)
@@ -73,12 +96,12 @@ func main() {
 		e.POST("/webhooks/clerk", echo.WrapHandler(http.HandlerFunc(whHandler.ServeHTTP)))
 	}
 
-	// Authenticated API group — RLS applied to every handler via setOrgID.
+	// Authenticated API group.
 	api := e.Group("/api/v1", apimw.Auth(
 		pkgauth.NewClerkVerifier(mustEnv("CLERK_SECRET_KEY"), nil),
 		setOrgID,
 	))
-	_ = api // routes added per phase
+	_ = api
 
 	port := envOr("PORT", "8080")
 	srv := &http.Server{

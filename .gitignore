@@ -5,6 +5,7 @@
 
 # Go
 /bin/
+scripts/notion-seed/notion-seed
 /dist/
 *.exe
 *.test
@@ -62,4 +63,11 @@ Thumbs.db
 serviceAccountKey.json
 
 # Claude Code local
+.claude/settings.local.json
 .claude/.gitignore
+# Added by code-review-graph
+.code-review-graph/
+
+# Grafana local state
+deploy/grafana/grafana.db
+deploy/grafana/grafana-storage/

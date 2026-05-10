@@ -1,0 +1,45 @@
+version: "2"
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - gosec
+    - bodyclose
+    - contextcheck
+    - exhaustive
+    - noctx
+    - sqlclosecheck
+    - unparam
+    - wastedassign
+  settings:
+    gosec:
+      excludes:
+        - G115
+    exhaustive:
+      default-signifies-exhaustive: true
+  exclusions:
+    rules:
+      - path: "_test\\.go"
+        linters: [gosec, unparam]
+      - path: "pkg/store/db/"
+        linters: [unused, exhaustive]
+
+formatters:
+  enable:
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/live-rack
+
+issues:
+  max-issues-per-linter: 50
+  max-same-issues: 10
+
+run:
+  timeout: 5m
+  tests: true

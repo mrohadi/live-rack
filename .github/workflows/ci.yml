@@ -138,7 +138,9 @@ jobs:
       - name: Coverage report
         run: go tool cover -func=coverage.out | tail -1
       - name: Coverage delta check
-        run: bash scripts/ci/check-coverage-delta.sh ${{ github.base_ref || 'main' }} coverage.out
+        env:
+          BASE_REF: ${{ github.base_ref || 'main' }}
+        run: bash scripts/ci/check-coverage-delta.sh "$BASE_REF" coverage.out
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4

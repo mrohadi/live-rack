@@ -1,0 +1,15 @@
+go 1.22
+
+use (
+	./services/api
+	./services/ingest
+	./services/rollup
+	./services/integrations
+	./services/insight
+	./pkg/domain
+	./pkg/store
+	./pkg/events
+	./pkg/auth
+	./pkg/observability
+	./pkg/testutil
+)

@@ -1,0 +1,8 @@
+env                = "development"
+aws_region         = "us-east-1"
+vpc_cidr           = "10.0.0.0/16"
+availability_zones = ["us-east-1a", "us-east-1b", "us-east-1c"]
+db_instance_class  = "db.t4g.medium"
+db_storage_gb      = 100
+cache_node_type    = "cache.t4g.small"
+alert_email        = "ops@example.com"

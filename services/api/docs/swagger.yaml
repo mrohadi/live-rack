@@ -1,0 +1,244 @@
+basePath: /api/v1
+definitions:
+  zones.ErrorResponse:
+    properties:
+      message:
+        example: zone not found
+        type: string
+    type: object
+  zones.ZoneResponse:
+    properties:
+      capacity:
+        example: 50
+        type: integer
+      color:
+        example: '#6366f1'
+        type: string
+      constraints:
+        type: object
+      created_at:
+        type: string
+      height:
+        example: 80
+        type: number
+      id:
+        example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+        type: string
+      name:
+        example: Zone A
+        type: string
+      org_id:
+        type: string
+      store_id:
+        type: string
+      type:
+        enum:
+        - general
+        - frozen
+        - returns
+        - staging
+        - display
+        - checkout
+        example: general
+        type: string
+      updated_at:
+        type: string
+      width:
+        example: 100
+        type: number
+      x:
+        example: 10
+        type: number
+      "y":
+        example: 20
+        type: number
+    type: object
+  zones.zoneRequest:
+    properties:
+      capacity:
+        type: integer
+      color:
+        type: string
+      constraints:
+        type: object
+      height:
+        type: number
+      name:
+        type: string
+      type:
+        enum:
+        - general
+        - frozen
+        - returns
+        - staging
+        - display
+        - checkout
+        type: string
+      width:
+        type: number
+      x:
+        type: number
+      "y":
+        type: number
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Warehouse zoning, scanning, and analytics API.
+  title: live-rack API
+  version: 0.1.0
+paths:
+  /stores/{storeID}/zones:
+    get:
+      parameters:
+      - description: Store UUID
+        in: path
+        name: storeID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/zones.ZoneResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/zones.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/zones.ErrorResponse'
+      summary: List zones by store
+      tags:
+      - zones
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Store UUID
+        in: path
+        name: storeID
+        required: true
+        type: string
+      - description: Zone body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/zones.zoneRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/zones.ZoneResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/zones.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/zones.ErrorResponse'
+      summary: Create a zone
+      tags:
+      - zones
+  /stores/{storeID}/zones/{id}:
+    delete:
+      parameters:
+      - description: Store UUID
+        in: path
+        name: storeID
+        required: true
+        type: string
+      - description: Zone UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/zones.ErrorResponse'
+      summary: Delete a zone
+      tags:
+      - zones
+    get:
+      parameters:
+      - description: Store UUID
+        in: path
+        name: storeID
+        required: true
+        type: string
+      - description: Zone UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/zones.ZoneResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/zones.ErrorResponse'
+      summary: Get a zone by ID
+      tags:
+      - zones
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Store UUID
+        in: path
+        name: storeID
+        required: true
+        type: string
+      - description: Zone UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Zone body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/zones.zoneRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/zones.ZoneResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/zones.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/zones.ErrorResponse'
+      summary: Update a zone
+      tags:
+      - zones
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

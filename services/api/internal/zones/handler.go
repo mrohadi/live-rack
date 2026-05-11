@@ -13,6 +13,29 @@ import (
 	"github.com/live-rack/pkg/store"
 )
 
+// ErrorResponse is used in Swagger failure responses.
+type ErrorResponse struct {
+	Message string `json:"message" example:"zone not found"`
+}
+
+// ZoneResponse mirrors store.Zone for Swagger doc generation.
+type ZoneResponse struct {
+	ID          string  `json:"id"          example:"3fa85f64-5717-4562-b3fc-2c963f66afa6"`
+	OrgID       string  `json:"org_id"`
+	StoreID     string  `json:"store_id"`
+	Name        string  `json:"name"        example:"Zone A"`
+	Type        string  `json:"type"        example:"general"  enums:"general,frozen,returns,staging,display,checkout"`
+	X           float64 `json:"x"           example:"10"`
+	Y           float64 `json:"y"           example:"20"`
+	Width       float64 `json:"width"       example:"100"`
+	Height      float64 `json:"height"      example:"80"`
+	Color       string  `json:"color"       example:"#6366f1"`
+	Capacity    int32   `json:"capacity"    example:"50"`
+	Constraints any     `json:"constraints" swaggertype:"object"`
+	CreatedAt   string  `json:"created_at"`
+	UpdatedAt   string  `json:"updated_at"`
+}
+
 // ZoneStore is the narrow interface the handler requires.
 type ZoneStore interface {
 	CreateZone(ctx context.Context, arg store.CreateZoneParams) (store.Zone, error)
@@ -43,15 +66,15 @@ func (h *Handler) Register(g *echo.Group) {
 
 // zoneRequest is the JSON body for create/update.
 type zoneRequest struct {
-	Name        string          `json:"name"`
-	Type        store.ZoneType  `json:"type"`
-	X           float64         `json:"x"`
-	Y           float64         `json:"y"`
-	Width       float64         `json:"width"`
-	Height      float64         `json:"height"`
-	Color       string          `json:"color"`
-	Capacity    int32           `json:"capacity"`
-	Constraints json.RawMessage `json:"constraints"`
+	Name        string  `json:"name"`
+	Type        string  `json:"type" enums:"general,frozen,returns,staging,display,checkout"`
+	X           float64 `json:"x"`
+	Y           float64 `json:"y"`
+	Width       float64 `json:"width"`
+	Height      float64 `json:"height"`
+	Color       string  `json:"color"`
+	Capacity    int32   `json:"capacity"`
+	Constraints any     `json:"constraints" swaggertype:"object"`
 }
 
 func (r *zoneRequest) validate() error {
@@ -94,11 +117,15 @@ func orgIDFrom(c echo.Context) (uuid.UUID, error) {
 	return p.OrgID, nil
 }
 
-func constraintsOrDefault(raw json.RawMessage) []byte {
-	if len(raw) == 0 {
+func constraintsOrDefault(v any) []byte {
+	if v == nil {
 		return []byte(`{}`)
 	}
-	return []byte(raw)
+	b, err := json.Marshal(v)
+	if err != nil {
+		return []byte(`{}`)
+	}
+	return b
 }
 
 // List godoc
@@ -107,9 +134,9 @@ func constraintsOrDefault(raw json.RawMessage) []byte {
 //	@Tags			zones
 //	@Produce		json
 //	@Param			storeID	path		string		true	"Store UUID"
-//	@Success		200		{array}		store.Zone
-//	@Failure		400		{object}	echo.HTTPError
-//	@Failure		401		{object}	echo.HTTPError
+//	@Success		200		{array}		ZoneResponse
+//	@Failure		400		{object}	ErrorResponse
+//	@Failure		401		{object}	ErrorResponse
 //	@Router			/stores/{storeID}/zones [get]
 func (h *Handler) List(c echo.Context) error {
 	storeID, err := parseStoreID(c)
@@ -142,9 +169,9 @@ func (h *Handler) List(c echo.Context) error {
 //	@Produce		json
 //	@Param			storeID	path		string		true	"Store UUID"
 //	@Param			body	body		zoneRequest	true	"Zone body"
-//	@Success		201		{object}	store.Zone
-//	@Failure		400		{object}	echo.HTTPError
-//	@Failure		401		{object}	echo.HTTPError
+//	@Success		201		{object}	ZoneResponse
+//	@Failure		400		{object}	ErrorResponse
+//	@Failure		401		{object}	ErrorResponse
 //	@Router			/stores/{storeID}/zones [post]
 func (h *Handler) Create(c echo.Context) error {
 	storeID, err := parseStoreID(c)
@@ -168,7 +195,7 @@ func (h *Handler) Create(c echo.Context) error {
 		OrgID:       orgID,
 		StoreID:     storeID,
 		Name:        req.Name,
-		Type:        req.Type,
+		Type:        store.ZoneType(req.Type),
 		X:           req.X,
 		Y:           req.Y,
 		Width:       req.Width,
@@ -190,8 +217,8 @@ func (h *Handler) Create(c echo.Context) error {
 //	@Produce		json
 //	@Param			storeID	path		string	true	"Store UUID"
 //	@Param			id		path		string	true	"Zone UUID"
-//	@Success		200		{object}	store.Zone
-//	@Failure		404		{object}	echo.HTTPError
+//	@Success		200		{object}	ZoneResponse
+//	@Failure		404		{object}	ErrorResponse
 //	@Router			/stores/{storeID}/zones/{id} [get]
 func (h *Handler) Get(c echo.Context) error {
 	zoneID, err := parseZoneID(c)
@@ -222,9 +249,9 @@ func (h *Handler) Get(c echo.Context) error {
 //	@Param			storeID	path		string		true	"Store UUID"
 //	@Param			id		path		string		true	"Zone UUID"
 //	@Param			body	body		zoneRequest	true	"Zone body"
-//	@Success		200		{object}	store.Zone
-//	@Failure		400		{object}	echo.HTTPError
-//	@Failure		404		{object}	echo.HTTPError
+//	@Success		200		{object}	ZoneResponse
+//	@Failure		400		{object}	ErrorResponse
+//	@Failure		404		{object}	ErrorResponse
 //	@Router			/stores/{storeID}/zones/{id} [put]
 func (h *Handler) Update(c echo.Context) error {
 	zoneID, err := parseZoneID(c)
@@ -248,7 +275,7 @@ func (h *Handler) Update(c echo.Context) error {
 		ID:          zoneID,
 		OrgID:       orgID,
 		Name:        req.Name,
-		Type:        req.Type,
+		Type:        store.ZoneType(req.Type),
 		X:           req.X,
 		Y:           req.Y,
 		Width:       req.Width,
@@ -270,7 +297,7 @@ func (h *Handler) Update(c echo.Context) error {
 //	@Param			storeID	path	string	true	"Store UUID"
 //	@Param			id		path	string	true	"Zone UUID"
 //	@Success		204
-//	@Failure		404	{object}	echo.HTTPError
+//	@Failure		404	{object}	ErrorResponse
 //	@Router			/stores/{storeID}/zones/{id} [delete]
 func (h *Handler) Delete(c echo.Context) error {
 	zoneID, err := parseZoneID(c)

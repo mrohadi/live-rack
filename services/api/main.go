@@ -19,7 +19,9 @@ import (
 
 	pkgauth "github.com/live-rack/pkg/auth"
 	obs "github.com/live-rack/pkg/observability"
+	"github.com/live-rack/pkg/store"
 	apimw "github.com/live-rack/services/api/internal/middleware"
+	"github.com/live-rack/services/api/internal/zones"
 )
 
 func main() {
@@ -101,7 +103,9 @@ func main() {
 		pkgauth.NewClerkVerifier(mustEnv("CLERK_SECRET_KEY"), nil),
 		setOrgID,
 	))
-	_ = api
+
+	q := store.New(pool)
+	zones.New(q).Register(api.Group("/stores"))
 
 	port := envOr("PORT", "8080")
 	srv := &http.Server{

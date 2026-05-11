@@ -1,12 +1,13 @@
 module github.com/live-rack/services/api
 
-go 1.22
+go 1.23
 
 require (
 	github.com/jackc/pgx/v5 v5.6.0
 	github.com/labstack/echo/v4 v4.12.0
 	github.com/live-rack/pkg/auth v0.0.0
 	github.com/live-rack/pkg/observability v0.0.0
+	github.com/live-rack/pkg/store v0.0.0
 	github.com/prometheus/client_golang v1.19.1
 	github.com/svix/svix-webhooks v1.93.0
 	go.opentelemetry.io/contrib/instrumentation/github.com/labstack/echo/otelecho v0.52.0
@@ -60,4 +61,5 @@ replace (
 	github.com/live-rack/pkg/auth => ../../pkg/auth
 	github.com/live-rack/pkg/domain => ../../pkg/domain
 	github.com/live-rack/pkg/observability => ../../pkg/observability
+	github.com/live-rack/pkg/store => ../../pkg/store
 )

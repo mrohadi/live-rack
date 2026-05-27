@@ -87,13 +87,37 @@ references/               # Claude Design bundle (read-only reference)
 - Body must include: `Refs LR-{n}`
 - No direct push to `main` — always PR with ≥1 review + CI green
 
-## Workflow Rules (review-first)
+## Workflow Rules (guide-first — user writes the code)
 
-- **NEVER auto-commit or open a PR after implementing a feature.** Stop after code + tests pass locally and wait for user review.
-- After implementation: report what changed (file list + diff summary) and stop. Let user read the diff before any `git add` / `git commit` / `gh pr create`.
-- User says "commit" or "open PR" → only then run those commands.
-- Same rule for `git push`. Wait for explicit instruction.
-- Applies to every ticket, every refactor, every fix.
+User is learning Go + this codebase by writing code themselves. Claude **teaches and guides**, does not implement.
+
+### What Claude does
+
+For every ticket:
+1. Plan ordered steps
+2. Per step provide: exact bash commands, file paths (absolute), code as fenced blocks the user copies, plain-English explanation, learning URL when a new concept is introduced
+3. **Verify + test section** at the end — start command, manual smoke (curl/UI), expected output, automated test command, expected pass output
+4. **Suggest** commit message + PR body in fenced blocks; user runs `git add . && git commit / gh pr create` themselves
+5. After user reports it merged: refresh `code-review-graph` via the MCP tool
+
+### What Claude does NOT do
+
+- **No `Edit` or `Write` tool on source files** under `apps/`, `services/`, `pkg/`, `migrations/`, etc. User writes them.
+- **No `git commit`, `git push`, `gh pr create`** — user runs these
+- **No `make`, `go test`, `pnpm test`** to "verify" — user runs, reports back
+- Exceptions: meta-files like `.claude/`, `~/.claude/`, plan files, memory, skills, READMEs about workflow. Config / infra (docker-compose, .yml) is OK when user explicitly says "fix it".
+
+### Each new chat = one feature
+
+User opens a new chat per ticket. This base chat holds the workflow rules and overall plan. New chats inherit via this file + memory + plan.
+
+First action in a new chat:
+1. Read this file
+2. Read `~/.claude/projects/-Users-mrohadi-Projects-live-rack/memory/MEMORY.md` and the feedback files it links
+3. Read the ticket from Notion (LR-{n})
+4. Read the plan: `~/.claude/plans/you-are-senior-software-lexical-jellyfish.md`
+5. Build/refresh code-review-graph if not current
+6. Walk the user through, wait for confirmation between phases
 
 ## TDD Rules
 

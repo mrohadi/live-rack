@@ -30,6 +30,9 @@ func main() {
 
 	ctx := context.Background()
 
+	otel := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	log.Info("starting api service", "otel_endpoint", otel)
+
 	shutdown, err := obs.Setup(ctx, obs.Config{
 		ServiceName:    "api",
 		ServiceVersion: envOr("SERVICE_VERSION", "dev"),
@@ -82,7 +85,7 @@ func main() {
 		return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 	})
 
-	// Prometheus scrape endpoint — no auth.
+	// OpenMetrics endpoint (scraped by Elastic Metricbeat) — no auth.
 	e.GET("/metrics", echo.WrapHandler(promhttp.Handler()))
 
 	// Clerk webhook — signed by Svix, no JWT auth.

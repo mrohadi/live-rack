@@ -12,7 +12,7 @@
 | Cache | Redis 7 |
 | Auth | Clerk (multi-tenant, SSO, 2FA) |
 | Scanner PWA | @zxing/browser + WebHID + IndexedDB offline queue |
-| Observability | Grafana + Loki + Tempo + Prometheus + OpenTelemetry |
+| Observability | ELK Stack (Elasticsearch + Logstash + Kibana) + Filebeat + APM Server + OpenTelemetry |
 
 ## Commands
 
@@ -86,6 +86,14 @@ references/               # Claude Design bundle (read-only reference)
 - Commits: Conventional Commits (`feat:`, `fix:`, `chore:`, `test:`, `docs:`, `refactor:`, `perf:`, `build:`, `ci:`)
 - Body must include: `Refs LR-{n}`
 - No direct push to `main` — always PR with ≥1 review + CI green
+
+## Workflow Rules (review-first)
+
+- **NEVER auto-commit or open a PR after implementing a feature.** Stop after code + tests pass locally and wait for user review.
+- After implementation: report what changed (file list + diff summary) and stop. Let user read the diff before any `git add` / `git commit` / `gh pr create`.
+- User says "commit" or "open PR" → only then run those commands.
+- Same rule for `git push`. Wait for explicit instruction.
+- Applies to every ticket, every refactor, every fix.
 
 ## TDD Rules
 

@@ -1,0 +1,24 @@
+apm-server:
+  host: "0.0.0.0:8200"
+  # Standalone mode — don't block on the managed APM integration being installed via Fleet.
+  data_streams.wait_for_integration: false
+  # Accept OTLP from the OTel collector (gRPC + HTTP).
+  auth:
+    anonymous:
+      enabled: true
+      allow_agent: ["*"]
+      allow_service: ["*"]
+
+output.elasticsearch:
+  hosts: ["http://elasticsearch:9200"]
+  username: "elastic"
+  password: "changeme"
+
+setup.kibana:
+  host: "http://kibana:5601"
+  username: "elastic"
+  password: "changeme"
+
+logging:
+  level: info
+  to_stderr: true

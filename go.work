@@ -1,8 +1,9 @@
-go 1.22
+go 1.26.3
 
 use (
 	./pkg/auth
 	./pkg/domain
 	./pkg/observability
+	./pkg/store
 	./services/api
 )

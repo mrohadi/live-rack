@@ -8,7 +8,7 @@ pre-commit:
 
     golangci-lint:
       glob: "**/*.go"
-      run: golangci-lint run --config .golangci.yml --fix=false {staged_files}
+      run: bash scripts/ci/golangci-lint-staged.sh {staged_files}
       fail_text: "Fix golangci-lint errors before committing"
 
     eslint:

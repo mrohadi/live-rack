@@ -1,0 +1,287 @@
+openapi: "3.1.0"
+info:
+  title: live-rack API — Zones
+  version: "0.1.0"
+  description: |
+    Zone CRUD endpoints. All routes require a valid Clerk Bearer JWT
+    with an active organisation claim. RLS enforces `org_id` isolation
+    at the database layer; no cross-tenant leakage is possible even if
+    `storeID` is guessed.
+
+servers:
+  - url: https://api.live-rack.io/api/v1
+    description: Production
+  - url: http://localhost:8080/api/v1
+    description: Local dev
+
+security:
+  - BearerAuth: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT   # Clerk-issued JWT
+
+  schemas:
+    ZoneType:
+      type: string
+      enum: [general, frozen, returns, staging, display, checkout]
+      example: general
+
+    Zone:
+      type: object
+      required:
+        - id
+        - org_id
+        - store_id
+        - name
+        - type
+        - x
+        - y
+        - width
+        - height
+        - color
+        - capacity
+        - constraints
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+        org_id:
+          type: string
+          format: uuid
+        store_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 1
+          maxLength: 128
+          example: "Zone A — Frozen"
+        type:
+          $ref: "#/components/schemas/ZoneType"
+        x:
+          type: number
+          format: double
+          description: Left offset in canvas units
+        y:
+          type: number
+          format: double
+          description: Top offset in canvas units
+        width:
+          type: number
+          format: double
+          minimum: 0.01
+        height:
+          type: number
+          format: double
+          minimum: 0.01
+        color:
+          type: string
+          example: "#6366f1"
+        capacity:
+          type: integer
+          minimum: 0
+          example: 50
+        constraints:
+          type: object
+          description: Free-form JSON constraints (allowed item types, dwell rules, etc.)
+          example: { "allowed_types": ["frozen"] }
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ZoneRequest:
+      type: object
+      required: [name, type, x, y, width, height, color, capacity]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 128
+          example: "Zone A"
+        type:
+          $ref: "#/components/schemas/ZoneType"
+        x:
+          type: number
+          format: double
+          default: 0
+        y:
+          type: number
+          format: double
+          default: 0
+        width:
+          type: number
+          format: double
+          minimum: 0.01
+          example: 100
+        height:
+          type: number
+          format: double
+          minimum: 0.01
+          example: 80
+        color:
+          type: string
+          example: "#6366f1"
+        capacity:
+          type: integer
+          minimum: 0
+          default: 0
+        constraints:
+          type: object
+          default: {}
+
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+      required: [message]
+
+  parameters:
+    storeID:
+      name: storeID
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Store UUID
+    zoneID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Zone UUID
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid JWT
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: Zone not found (or belongs to a different org)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    BadRequest:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+paths:
+  /stores/{storeID}/zones:
+    parameters:
+      - $ref: "#/components/parameters/storeID"
+
+    get:
+      operationId: listZones
+      summary: List zones for a store
+      tags: [zones]
+      responses:
+        "200":
+          description: Array of zones (empty array when store has no zones)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Zone"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+    post:
+      operationId: createZone
+      summary: Create a zone
+      tags: [zones]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ZoneRequest"
+      responses:
+        "201":
+          description: Zone created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Zone"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /stores/{storeID}/zones/{id}:
+    parameters:
+      - $ref: "#/components/parameters/storeID"
+      - $ref: "#/components/parameters/zoneID"
+
+    get:
+      operationId: getZone
+      summary: Get a zone by ID
+      tags: [zones]
+      responses:
+        "200":
+          description: Zone
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Zone"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    put:
+      operationId: updateZone
+      summary: Update a zone
+      tags: [zones]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ZoneRequest"
+      responses:
+        "200":
+          description: Updated zone
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Zone"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    delete:
+      operationId: deleteZone
+      summary: Delete a zone
+      tags: [zones]
+      responses:
+        "204":
+          description: Zone deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"

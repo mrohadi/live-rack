@@ -1,4 +1,13 @@
 // Package main is the entry point for the live-rack API service.
+//
+//	@title			live-rack API
+//	@version		0.1.0
+//	@description	Warehouse zoning, scanning, and analytics API.
+//	@host			localhost:8080
+//	@BasePath		/api/v1
+//	@securityDefinitions.apikey	BearerAuth
+//	@in							header
+//	@name						Authorization
 package main
 
 import (
@@ -17,9 +26,14 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/labstack/echo/otelecho"
 
+	echoSwagger "github.com/swaggo/echo-swagger"
+
 	pkgauth "github.com/live-rack/pkg/auth"
 	obs "github.com/live-rack/pkg/observability"
+	"github.com/live-rack/pkg/store"
+	_ "github.com/live-rack/services/api/docs" // swaggo generated
 	apimw "github.com/live-rack/services/api/internal/middleware"
+	"github.com/live-rack/services/api/internal/zones"
 )
 
 func main() {
@@ -77,6 +91,9 @@ func main() {
 	e.Use(echomw.CORS())
 	e.Use(otelecho.Middleware("api"))
 
+	// Swagger UI — no auth, dev/staging only.
+	e.GET("/swagger/*", echoSwagger.WrapHandler)
+
 	// Health — no auth.
 	e.GET("/healthz", func(c echo.Context) error {
 		if err := pool.Ping(c.Request().Context()); err != nil {
@@ -104,7 +121,9 @@ func main() {
 		pkgauth.NewClerkVerifier(mustEnv("CLERK_SECRET_KEY"), nil),
 		setOrgID,
 	))
-	_ = api
+
+	q := store.New(pool)
+	zones.New(q).Register(api.Group("/stores"))
 
 	port := envOr("PORT", "8080")
 	srv := &http.Server{

@@ -24,8 +24,8 @@ import (
 type Config struct {
 	ServiceName    string
 	ServiceVersion string
-	// OTLPEndpoint is the gRPC endpoint for Tempo (e.g. "localhost:4317").
-	// If empty, tracing is disabled.
+	// OTLPEndpoint is the gRPC endpoint for the OTel collector / Elastic APM Server
+	// (e.g. "localhost:4317"). If empty, tracing is disabled.
 	OTLPEndpoint string
 }
 
@@ -35,8 +35,8 @@ func Tracer(name string) trace.Tracer { return otel.Tracer(name) }
 // Meter returns a named meter from the global provider.
 func Meter(name string) metric.Meter { return otel.Meter(name) }
 
-// Setup initialises OTel with OTLP trace export to Tempo and Prometheus metric export.
-// Returns a shutdown func that must be deferred.
+// Setup initialises OTel with OTLP trace export to the OTel collector / Elastic APM
+// and a Prometheus pull endpoint for metrics. Returns a shutdown func that must be deferred.
 func Setup(ctx context.Context, cfg Config) (shutdown func(context.Context) error, err error) {
 	res, err := resource.Merge(
 		resource.Default(),
@@ -52,7 +52,7 @@ func Setup(ctx context.Context, cfg Config) (shutdown func(context.Context) erro
 
 	var shutdowns []func(context.Context) error
 
-	// Tracing — OTLP gRPC to Tempo.
+	// Tracing — OTLP gRPC to OTel collector → Elastic APM.
 	if cfg.OTLPEndpoint != "" {
 		conn, err := grpc.NewClient(cfg.OTLPEndpoint,
 			grpc.WithTransportCredentials(insecure.NewCredentials()),

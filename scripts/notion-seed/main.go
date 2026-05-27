@@ -297,7 +297,7 @@ func allTickets() []ticket {
 		{ID: "LR-005", Title: "Clerk integration + tenant model (org → store hierarchy)", Phase: "P0", Epic: "Foundations", Priority: "P0-blocker", Type: "feat", Estimate: 5},
 		{ID: "LR-006", Title: "Tailwind tokens extracted from styles.css → tokens.css", Phase: "P0", Epic: "Foundations", Priority: "P1-high", Type: "feat", Estimate: 2},
 		{ID: "LR-007", Title: "app shell (sidebar, topbar, mobile tabbar) from shell.jsx", Phase: "P0", Epic: "Foundations", Priority: "P1-high", Type: "feat", Estimate: 3},
-		{ID: "LR-008", Title: "OTel + Loki + Tempo + Prom + Grafana wiring", Phase: "P0", Epic: "Foundations", Priority: "P1-high", Type: "feat", Estimate: 3},
+		{ID: "LR-008", Title: "OTel + Elasticsearch + Logstash + Kibana + APM + Filebeat wiring", Phase: "P0", Epic: "Foundations", Priority: "P1-high", Type: "feat", Estimate: 3},
 		{ID: "LR-009", Title: "CI gates (lint, type, test, coverage, security)", Phase: "P0", Epic: "Foundations", Priority: "P0-blocker", Type: "chore", Estimate: 3},
 		{ID: "LR-010", Title: "pre-commit hooks + conventional commits enforcement", Phase: "P0", Epic: "Foundations", Priority: "P1-high", Type: "chore", Estimate: 2},
 		{ID: "LR-011", Title: "create Notion DB and seed tickets", Phase: "P0", Epic: "Foundations", Priority: "P2-med", Type: "chore", Estimate: 2},
@@ -382,7 +382,7 @@ func allTickets() []ticket {
 
 		// P11 · Hardening & Launch
 		{ID: "LR-B01", Title: "k6 load suite (10k scans/min, 1k WS)", Phase: "P11", Epic: "Hardening", Priority: "P0-blocker", Type: "chore", Estimate: 5},
-		{ID: "LR-B02", Title: "Grafana dashboards as code", Phase: "P11", Epic: "Hardening", Priority: "P1-high", Type: "chore", Estimate: 3},
+		{ID: "LR-B02", Title: "Kibana dashboards / saved objects as code", Phase: "P11", Epic: "Hardening", Priority: "P1-high", Type: "chore", Estimate: 3},
 		{ID: "LR-B03", Title: "runbooks + on-call rotation", Phase: "P11", Epic: "Hardening", Priority: "P1-high", Type: "docs", Estimate: 3},
 		{ID: "LR-B04", Title: "Stripe billing + plans", Phase: "P11", Epic: "Hardening", Priority: "P0-blocker", Type: "feat", Estimate: 8},
 		{ID: "LR-B05", Title: "docs site (Mintlify or Astro)", Phase: "P11", Epic: "Hardening", Priority: "P2-med", Type: "docs", Estimate: 5},

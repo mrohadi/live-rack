@@ -70,7 +70,7 @@ CLERK_SECRET_KEY=sk_test_...          # Clerk Dashboard → API Keys → Secret 
 
 # Optional
 CLERK_WEBHOOK_SECRET=whsec_...        # only if using Clerk webhooks
-OTEL_EXPORTER_OTLP_ENDPOINT=localhost:4317  # enables tracing → Tempo
+OTEL_EXPORTER_OTLP_ENDPOINT=localhost:4317  # enables tracing → OTel collector → Elastic APM
 LOG_LEVEL=debug                       # debug | info | warn | error
 PORT=8080
 ```
@@ -122,17 +122,17 @@ make clean            # rm build artefacts + docker compose down -v
 | Web app | http://localhost:5173 | `pnpm -F web dev` |
 | API | http://localhost:8080 | `go run .` from `services/api/` |
 | API health | http://localhost:8080/healthz | |
-| API metrics | http://localhost:8080/metrics | Prometheus scrape |
+| API metrics | http://localhost:8080/metrics | OTel `/metrics` exposition |
 | Postgres | `localhost:5432` | user: postgres / pw: postgres / db: liverack |
 | NATS | `localhost:4222` | monitoring: http://localhost:8222 |
 | ClickHouse | http://localhost:8123 | HTTP interface |
 | Redis | `localhost:6379` | |
 | MinIO console | http://localhost:9001 | user: minioadmin / pw: minioadmin |
-| Grafana | http://localhost:3000 | anonymous admin |
-| Prometheus | http://localhost:9090 | |
-| Loki | http://localhost:3100 | |
-| Tempo | http://localhost:3200 | |
-| OTLP gRPC | `localhost:4317` | services → collector |
+| Kibana | http://localhost:5601 | logs, APM, dashboards |
+| Elasticsearch | http://localhost:9200 | data store |
+| Elastic APM | http://localhost:8200 | OTLP ingest (traces + metrics) |
+| Logstash | `localhost:5044` (beats), `localhost:5001` (tcp/json) | optional ingest |
+| OTLP gRPC | `localhost:4317` | services → otel-collector → APM Server |
 
 ---
 
@@ -221,11 +221,14 @@ LEFTHOOK=0 git commit ...
 
 ## Observability
 
-Grafana at http://localhost:3000 (anonymous admin).
+Kibana at http://localhost:5601 (no auth in dev).
 
-Provisioned datasources: Prometheus, Loki, Tempo — linked for trace↔log correlation.
+Stack: **Elasticsearch + Logstash + Kibana + Filebeat + Elastic APM Server + OpenTelemetry Collector**.
 
-Dashboard: `live-rack · API Overview` — req/s, p95 latency, error rate, traces.
+- Services emit OTLP (traces + metrics) → `otel-collector:4317` → Elastic APM Server → Elasticsearch.
+- Container stdout/stderr → Filebeat → Elasticsearch (`filebeat-*` index).
+- Optional Logstash pipeline on `:5044` (beats) / `:5001` (tcp/json) for custom ingest.
+- Open Kibana → **Observability → APM** for traces; **Discover** on `logs-*` / `filebeat-*` for logs.
 
 Enable tracing in API:
 ```bash
@@ -256,7 +259,7 @@ live-rack/
 │   └── observability/      OTel bootstrap
 ├── deploy/
 │   ├── docker/             docker-compose (infra + observability)
-│   ├── grafana/            Prometheus, Loki, Tempo, OTel collector configs + dashboards
+│   ├── elk/                Elasticsearch + Kibana + Logstash + APM + Filebeat + OTel collector configs
 │   └── terraform/          AWS modules — network, db, cache, bus, observability
 ├── migrations/             goose SQL files
 ├── scripts/
@@ -283,7 +286,7 @@ live-rack/
 | Object storage | MinIO (S3-compatible) |
 | Auth | Clerk — multi-tenant, SSO, 2FA |
 | Scanner PWA | @zxing/browser + WebHID + IndexedDB offline queue |
-| Observability | Grafana + Loki + Tempo + Prometheus + OpenTelemetry |
+| Observability | ELK Stack (Elasticsearch + Logstash + Kibana) + Filebeat + Elastic APM + OpenTelemetry |
 | IaC | Terraform (AWS) |
 | CI/CD | GitHub Actions |
 
@@ -325,10 +328,12 @@ flowchart LR
   end
 
   subgraph Obs[Observability]
-    PROM[Prometheus :9090]
-    LOKI[Loki :3100]
-    TEMPO[Tempo :3200]
-    GRAF[Grafana :3000]
+    OTEL[OTel Collector :4317]
+    APM[Elastic APM :8200]
+    LS[Logstash :5044]
+    FB[Filebeat]
+    ES[(Elasticsearch :9200)]
+    KIB[Kibana :5601]
   end
 
   WEB & PWA --> GW

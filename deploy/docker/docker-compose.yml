@@ -54,68 +54,107 @@ services:
     volumes:
       - minio_data:/data
 
-  # ── Observability stack ──────────────────────────────────────────────────────
+  # ── Observability stack (ELK + Elastic APM + OTel) ───────────────────────────
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "true"
+      ELASTIC_PASSWORD: "changeme"
+      ES_JAVA_OPTS: "-Xms1g -Xmx1g"
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS -u elastic:changeme http://localhost:9200/_cluster/health | grep -E 'yellow|green'"]
+      interval: 10s
+      retries: 15
+
+  # One-shot: set kibana_system password so Kibana can connect.
+  es-setup:
+    image: curlimages/curl:8.8.0
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        curl -fsS -u elastic:changeme -X POST \
+          'http://elasticsearch:9200/_security/user/kibana_system/_password' \
+          -H 'Content-Type: application/json' \
+          -d '{"password":"changeme"}'
+        echo " kibana_system password set"
+    restart: "no"
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.13.4
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      ELASTICSEARCH_USERNAME: kibana_system
+      ELASTICSEARCH_PASSWORD: changeme
+      # Dev-only static keys — DO NOT reuse in any other environment.
+      XPACK_SECURITY_ENCRYPTIONKEY: "live_rack_dev_security_key_32chr!"
+      XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY: "live_rack_dev_saved_obj_key_32chr"
+      XPACK_REPORTING_ENCRYPTIONKEY: "live_rack_dev_reporting_key_32chr"
+      # Pre-set Fleet server URL so APM integration installs cleanly.
+      XPACK_FLEET_AGENTS_ELASTICSEARCH_HOSTS: '["http://elasticsearch:9200"]'
+    ports:
+      - "5601:5601"
+    depends_on:
+      es-setup:
+        condition: service_completed_successfully
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.13.4
+    command: ["-f", "/usr/share/logstash/pipeline/logstash.conf"]
+    environment:
+      ELASTIC_USERNAME: elastic
+      ELASTIC_PASSWORD: changeme
+    volumes:
+      - ../elk/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+    ports:
+      - "5044:5044"   # beats input
+      - "5001:5001"   # tcp/json input
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+  apm-server:
+    image: docker.elastic.co/apm/apm-server:8.13.4
+    command: ["--strict.perms=false", "-e"]
+    user: apm-server
+    volumes:
+      - ../elk/apm-server.yml:/usr/share/apm-server/apm-server.yml:ro
+    ports:
+      - "8200:8200"   # OTLP / APM ingest
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.13.4
+    user: root
+    command: ["-strict.perms=false", "-e"]
+    volumes:
+      - ../elk/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.102.0
     command: ["--config=/etc/otel/config.yaml"]
     volumes:
-      - ../grafana/otel-collector.yaml:/etc/otel/config.yaml:ro
+      - ../elk/otel-collector.yaml:/etc/otel/config.yaml:ro
     ports:
       - "4317:4317"   # OTLP gRPC (services → collector)
       - "4318:4318"   # OTLP HTTP
-      - "8889:8889"   # Prometheus scrape of collector self-metrics
     depends_on:
-      - tempo
-      - prometheus
-
-  prometheus:
-    image: prom/prometheus:v2.52.0
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.path=/prometheus"
-      - "--web.enable-remote-write-receiver"
-    volumes:
-      - ../grafana/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus_data:/prometheus
-    ports:
-      - "9090:9090"
-
-  loki:
-    image: grafana/loki:3.0.0
-    command: ["-config.file=/etc/loki/local-config.yaml"]
-    ports:
-      - "3100:3100"
-    volumes:
-      - loki_data:/loki
-
-  tempo:
-    image: grafana/tempo:2.5.0
-    command: ["-config.file=/etc/tempo/tempo.yaml"]
-    volumes:
-      - ../grafana/tempo.yaml:/etc/tempo/tempo.yaml:ro
-      - tempo_data:/var/tempo
-    ports:
-      - "3200:3200"   # Tempo HTTP API
-      - "9095:9095"   # gRPC
-
-  grafana:
-    image: grafana/grafana:11.0.0
-    environment:
-      GF_AUTH_ANONYMOUS_ENABLED: "true"
-      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
-      GF_FEATURE_TOGGLES_ENABLE: traceqlEditor
-    volumes:
-      - ../grafana/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
-      - ../grafana/grafana-dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml:ro
-      - ../grafana/dashboards:/var/lib/grafana/dashboards:ro
-      - grafana_data:/var/lib/grafana
-    ports:
-      - "3000:3000"
-    depends_on:
-      - prometheus
-      - loki
-      - tempo
+      - apm-server
 
 volumes:
   postgres_data:
@@ -123,7 +162,4 @@ volumes:
   clickhouse_data:
   redis_data:
   minio_data:
-  prometheus_data:
-  loki_data:
-  tempo_data:
-  grafana_data:
+  elasticsearch_data:

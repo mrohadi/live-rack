@@ -1,6 +1,9 @@
 package domain
 
-import "errors"
+import (
+	"encoding/json"
+	"errors"
+)
 
 // Sentinel errors for ZoneConstraints validation
 var (
@@ -61,5 +64,40 @@ func validateCategoryList(cats []string) error {
 		seen[cat] = struct{}{}
 	}
 
+	return nil
+}
+
+// Sentinel errors for Zone.CanAcceptItem decisions.
+var (
+	ErrCategoryNotAllowed = errors.New("zone: item category not in allowed list")
+	ErrCategoryDenied     = errors.New("zone: item category is denied")
+	ErrCapacityExceeded   = errors.New("zone: capacity exceeded")
+	ErrMaxPerSKUExceeded  = errors.New("zone: max units per SKU exceeded")
+	ErrInvalidScanQty     = errors.New("zone: scan quantity must be > 0")
+)
+
+// MarshalConstraints encodes a typed ZoneConstraints int the []byte form
+// stored on Zone.Constraints. Exposed for test setup and API layer use.
+func MarshalConstraints(c ZoneConstraints) ([]byte, error) {
+	return json.Marshal(c)
+}
+
+// UnmarshalConstraints decodes the bytes stored on Zone.Constraints.
+// Empty/nil bytes decode to a zero-value (no constraints)
+func UnmarshalConstraints(b []byte) (ZoneConstraints, error) {
+	var c ZoneConstraints
+	if len(b) == 0 {
+		return c, nil
+	}
+	if err := json.Unmarshal(b, &c); err != nil {
+		return c, nil
+	}
+	return c, nil
+}
+
+// CanAcceptItem decides whether the zone may accept scanQty units of itemCategory,
+// given currentQty already present (of that SKU, for the per-SKU check; total for capacity).
+// STUB - to be implemented in step 3c.
+func (z Zone) CanAcceptItem(itemCategory string, currentQty int, scanQty int) error {
 	return nil
 }

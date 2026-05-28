@@ -3,6 +3,7 @@ package domain
 import (
 	"encoding/json"
 	"errors"
+	"slices"
 )
 
 // Sentinel errors for ZoneConstraints validation
@@ -99,5 +100,38 @@ func UnmarshalConstraints(b []byte) (ZoneConstraints, error) {
 // given currentQty already present (of that SKU, for the per-SKU check; total for capacity).
 // STUB - to be implemented in step 3c.
 func (z Zone) CanAcceptItem(itemCategory string, currentQty int, scanQty int) error {
+	if scanQty <= 0 {
+		return ErrInvalidScanQty
+	}
+
+	c, err := UnmarshalConstraints(z.Constraints)
+	if err != nil {
+		// Treat malformed stored constraints as "no constraints" rather than
+		// blocking scans; bad data is surfaced via the API validate path on write.
+		c = ZoneConstraints{}
+	}
+
+	// Denied list takes precedence over allowed.
+	if itemCategory != "" {
+		if slices.Contains(c.DeniedCategories, itemCategory) {
+			return ErrCategoryDenied
+		}
+		if len(c.AllowedCategories) > 0 {
+			ok := slices.Contains(c.AllowedCategories, itemCategory)
+			if !ok {
+				return ErrCategoryNotAllowed
+			}
+		}
+	}
+
+	// Capacity = 0 means unlimited (matches existing DB default).
+	if z.Capacity > 0 && currentQty+scanQty > z.Capacity {
+		return ErrCapacityExceeded
+	}
+
+	if c.MaxUnitsPerSKU != nil && currentQty+scanQty > *c.MaxUnitsPerSKU {
+		return ErrMaxPerSKUExceeded
+	}
+
 	return nil
 }

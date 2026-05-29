@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { KonvaZoneCanvas } from "./renderers/KonvaZoneCanvas";
-import type { Zone, ZoneUpdate, ViewMode } from "./types";
+import type { ViewMode, Zone, ZoneUpdate } from "./types";
+import { ZoneDetailSidebar } from "./ZoneDetailSidebar";
 
 const seedZones: Zone[] = [
   {
@@ -14,6 +15,11 @@ const seedZones: Zone[] = [
     type: "general",
     items: 140,
     capacity: 200,
+    sales: 4320,
+    misplaced: 3,
+    lastScan: "14:23:08",
+    dwell: "2d 4h",
+    constraints: { allowedCategories: ["Apparel"], maxSKUs: 480, climate: "ambient" },
   },
   {
     id: "z2",
@@ -26,6 +32,11 @@ const seedZones: Zone[] = [
     type: "frozen",
     items: 60,
     capacity: 200,
+    sales: 1890,
+    misplaced: 0,
+    lastScan: "14:20:42",
+    dwell: "1d 2h",
+    constraints: { climate: "refrigerated" },
   },
   {
     id: "z3",
@@ -38,6 +49,10 @@ const seedZones: Zone[] = [
     type: "staging",
     items: 280,
     capacity: 320,
+    sales: 0,
+    misplaced: 2,
+    lastScan: "14:18:55",
+    dwell: "4h",
   },
 ];
 
@@ -63,6 +78,9 @@ export function MapPage() {
     { label: "Heat", value: "heat" },
     { label: "Items", value: "items" },
   ];
+
+  const selectedZone =
+    selectedIds.length === 1 ? (zones.find((z) => z.id === selectedIds[0]) ?? null) : null;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
@@ -104,14 +122,17 @@ export function MapPage() {
           ))}
         </div>
       </header>
-      <div style={{ flex: 1, position: "relative", background: "#0f172a" }}>
-        <KonvaZoneCanvas
-          zones={zones}
-          selectedIds={selectedIds}
-          onSelect={setSelectedIds}
-          onChange={handleChange}
-          viewMode={view}
-        />
+      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+        <div style={{ flex: 1, position: "relative", background: "#0f172a" }}>
+          <KonvaZoneCanvas
+            zones={zones}
+            selectedIds={selectedIds}
+            onSelect={setSelectedIds}
+            onChange={handleChange}
+            viewMode={view}
+          />
+        </div>
+        <ZoneDetailSidebar zone={selectedZone} />
       </div>
     </div>
   );

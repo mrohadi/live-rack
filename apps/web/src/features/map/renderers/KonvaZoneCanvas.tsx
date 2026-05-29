@@ -8,6 +8,7 @@ export function KonvaZoneCanvas({
   onSelect,
   onChange,
   gridSize = 10,
+  viewMode = "zones",
 }: ZoneCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage | null>(null);

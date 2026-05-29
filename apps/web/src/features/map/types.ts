@@ -1,6 +1,12 @@
 export type ZoneType = "general" | "frozen" | "returns" | "staging" | "display" | "checkout";
 export type ViewMode = "zones" | "heat" | "items";
 
+export interface ZoneConstraints {
+  allowedCategories?: string[];
+  maxSKUs?: number;
+  climate?: string;
+}
+
 export interface Zone {
   id: string;
   name: string;
@@ -12,6 +18,11 @@ export interface Zone {
   type: ZoneType;
   items?: number;
   capacity?: number;
+  sales?: number;
+  misplaced?: number;
+  lastScan?: string;
+  dwell?: string;
+  constraints?: ZoneConstraints;
 }
 
 /* Partial zone update emitted by the editor on drag/resize */

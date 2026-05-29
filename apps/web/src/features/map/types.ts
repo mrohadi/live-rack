@@ -1,4 +1,5 @@
 export type ZoneType = "general" | "frozen" | "returns" | "staging" | "display" | "checkout";
+export type ViewMode = "zones" | "heat" | "items";
 
 export interface Zone {
   id: string;
@@ -9,7 +10,10 @@ export interface Zone {
   height: number;
   color: string;
   type: ZoneType;
+  items?: number;
+  capacity?: number;
 }
+
 /* Partial zone update emitted by the editor on drag/resize */
 export interface ZoneUpdate {
   id: string;
@@ -30,4 +34,5 @@ export interface ZoneCanvasProps {
   gridSize?: number;
   /** Show grid background. Default true when onChange present. */
   showGrid?: boolean;
+  viewMode?: ViewMode;
 }

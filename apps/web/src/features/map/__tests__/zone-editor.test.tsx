@@ -37,3 +37,41 @@ describe("KonvaZoneCanvas — editor mode", () => {
     ).not.toThrow();
   });
 });
+
+describe("KonvaZoneCanvas — view modes", () => {
+  const filledZones: Zone[] = [
+    {
+      id: "a",
+      name: "A",
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      color: "#6366f1",
+      type: "general",
+      items: 80,
+      capacity: 100,
+    },
+  ];
+
+  it("renders heat mode without throwing", () => {
+    expect(() =>
+      render(
+        <KonvaZoneCanvas zones={filledZones} selectedIds={[]} onSelect={vi.fn()} viewMode="heat" />,
+      ),
+    ).not.toThrow();
+  });
+
+  it("renders items mode without throwing", () => {
+    expect(() =>
+      render(
+        <KonvaZoneCanvas
+          zones={filledZones}
+          selectedIds={[]}
+          onSelect={vi.fn()}
+          viewMode="items"
+        />,
+      ),
+    ).not.toThrow();
+  });
+});

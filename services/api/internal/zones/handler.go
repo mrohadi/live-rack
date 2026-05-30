@@ -3,7 +3,9 @@ package zones
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -128,6 +130,27 @@ func marshalConstraints(c domain.ZoneConstraints) []byte {
 	return b
 }
 
+func toResponse(z store.Zone) ZoneResponse {
+	var constraints domain.ZoneConstraints
+	_ = json.Unmarshal(z.Constraints, &constraints)
+	return ZoneResponse{
+		ID:          z.ID.String(),
+		OrgID:       z.OrgID.String(),
+		StoreID:     z.StoreID.String(),
+		Name:        z.Name,
+		Type:        string(z.Type),
+		X:           z.X,
+		Y:           z.Y,
+		Width:       z.Width,
+		Height:      z.Height,
+		Color:       z.Color,
+		Capacity:    z.Capacity,
+		Constraints: constraints,
+		CreatedAt:   z.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:   z.UpdatedAt.Format(time.RFC3339),
+	}
+}
+
 // List godoc
 //
 //	@Summary		List zones by store
@@ -158,7 +181,12 @@ func (h *Handler) List(c echo.Context) error {
 	if list == nil {
 		list = []store.Zone{}
 	}
-	return c.JSON(http.StatusOK, list)
+
+	out := make([]ZoneResponse, len(list))
+	for i, z := range list {
+		out[i] = toResponse(z)
+	}
+	return c.JSON(http.StatusOK, out)
 }
 
 // Create godoc
@@ -207,7 +235,7 @@ func (h *Handler) Create(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
-	return c.JSON(http.StatusCreated, z)
+	return c.JSON(http.StatusCreated, toResponse(z))
 }
 
 // Get godoc
@@ -237,7 +265,7 @@ func (h *Handler) Get(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, "zone not found")
 	}
-	return c.JSON(http.StatusOK, z)
+	return c.JSON(http.StatusOK, toResponse(z))
 }
 
 // Update godoc
@@ -287,7 +315,7 @@ func (h *Handler) Update(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, "zone not found")
 	}
-	return c.JSON(http.StatusOK, z)
+	return c.JSON(http.StatusOK, toResponse(z))
 }
 
 // Delete godoc

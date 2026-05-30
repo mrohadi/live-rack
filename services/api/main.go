@@ -38,6 +38,7 @@ import (
 	"github.com/live-rack/services/api/internal/authadapter"
 	apimw "github.com/live-rack/services/api/internal/middleware"
 	"github.com/live-rack/services/api/internal/scans"
+	"github.com/live-rack/services/api/internal/ws"
 	"github.com/live-rack/services/api/internal/zones"
 )
 
@@ -165,6 +166,16 @@ func main() {
 
 	zones.New(q).Register(api.Group("/stores"))
 	scans.New(q, q, publisher).Register(api.Group("/stores"))
+
+	hub := ws.NewHub(log)
+	if _, err := nc.Subscribe("lr.*.>", func(m *nats.Msg) {
+		hub.Broadcast(events.ExtractOrgID(m.Subject), m.Data)
+	}); err != nil {
+		log.Error("ws nats subscribe", "err", err)
+		os.Exit(1)
+	}
+	wsVerifier := pkgauth.NewClerkVerifier(mustEnv("CLERK_SECRET_KEY"), pkgauth.NewDBResolver(authadapter.New(q)))
+	ws.NewHandler(hub, wsVerifier).Register(e)
 
 	port := envOr("PORT", "8080")
 	srv := &http.Server{

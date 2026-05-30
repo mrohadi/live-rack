@@ -6,6 +6,16 @@ dev:
 .PHONY: dev-status
 dev-status:
 	docker compose -f deploy/docker/docker-compose.yml ps
+	
+.PHONY: sync
+sync:
+	go work sync
+
+.PHONY: build-go
+build-go:
+	for d in pkg/auth pkg/domain pkg/events pkg/observability pkg/store services/api; do \
+		(cd $$d && go build ./...) || exit 1; \
+	done
 
 # Load fixture data from references/live-rack/project/data.jsx
 .PHONY: seed
@@ -28,6 +38,7 @@ test:
 lint:
 	golangci-lint run --config .golangci.yml ./services/api/...
 	golangci-lint run --config .golangci.yml ./pkg/auth/...
+	golangci-lint run --config .golangci.yml ./pkg/events/...
 	golangci-lint run --config .golangci.yml ./pkg/domain/...
 	golangci-lint run --config .golangci.yml ./pkg/observability/...
 	golangci-lint run --config .golangci.yml ./pkg/store/...

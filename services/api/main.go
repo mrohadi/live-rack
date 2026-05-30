@@ -12,6 +12,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -23,18 +24,21 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 	echomw "github.com/labstack/echo/v4/middleware"
+	"github.com/nats-io/nats.go"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/labstack/echo/otelecho"
 
 	echoSwagger "github.com/swaggo/echo-swagger"
 
 	pkgauth "github.com/live-rack/pkg/auth"
+	"github.com/live-rack/pkg/events"
 	obs "github.com/live-rack/pkg/observability"
 	"github.com/live-rack/pkg/store"
 	_ "github.com/live-rack/services/api/docs" // swaggo generated
 	"github.com/live-rack/services/api/internal/authadapter"
 	apimw "github.com/live-rack/services/api/internal/middleware"
 	"github.com/live-rack/services/api/internal/scans"
+	"github.com/live-rack/services/api/internal/ws"
 	"github.com/live-rack/services/api/internal/zones"
 )
 
@@ -71,6 +75,40 @@ func main() {
 		os.Exit(1)
 	}
 	defer pool.Close()
+
+	natsURL := envOr("NATS_URL", "nats://localhost:4222")
+	nc, err := nats.Connect(natsURL,
+		nats.Name("api"),
+		nats.MaxReconnects(-1),
+		nats.ReconnectWait(2*time.Second),
+	)
+	if err != nil {
+		log.Error("connect nats", "err", err)
+		os.Exit(1)
+	}
+	defer func() {
+		if err := nc.Drain(); err != nil {
+			log.Error("drain nats connection", "err", err)
+		}
+	}()
+
+	js, err := nc.JetStream()
+	if err != nil {
+		log.Error("jetstream", "err", err)
+		os.Exit(1)
+	}
+	if _, err := js.AddStream(&nats.StreamConfig{
+		Name:      "LIVE_RACK",
+		Subjects:  []string{"lr.>"},
+		MaxAge:    24 * time.Hour,
+		Storage:   nats.FileStorage,
+		Retention: nats.LimitsPolicy,
+	}); err != nil && !errors.Is(err, nats.ErrStreamNameAlreadyInUse) {
+		log.Error("add stream", "err", err)
+		os.Exit(1)
+	}
+
+	publisher := events.NewNATSPublisher(js)
 
 	// setOrgID executes SET LOCAL app.org_id = '<id>' on the acquired connection.
 	setOrgID := func(orgID string) error {
@@ -127,7 +165,17 @@ func main() {
 	))
 
 	zones.New(q).Register(api.Group("/stores"))
-	scans.New(q).Register(api.Group("/stores"))
+	scans.New(q, q, publisher).Register(api.Group("/stores"))
+
+	hub := ws.NewHub(log)
+	if _, err := nc.Subscribe("lr.*.>", func(m *nats.Msg) {
+		hub.Broadcast(events.ExtractOrgID(m.Subject), m.Data)
+	}); err != nil {
+		log.Error("ws nats subscribe", "err", err)
+		os.Exit(1)
+	}
+	wsVerifier := pkgauth.NewClerkVerifier(mustEnv("CLERK_SECRET_KEY"), pkgauth.NewDBResolver(authadapter.New(q)))
+	ws.NewHandler(hub, wsVerifier).Register(e)
 
 	port := envOr("PORT", "8080")
 	srv := &http.Server{

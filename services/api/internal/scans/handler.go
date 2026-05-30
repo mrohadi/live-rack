@@ -12,6 +12,7 @@ import (
 
 	pkgauth "github.com/live-rack/pkg/auth"
 	"github.com/live-rack/pkg/domain"
+	"github.com/live-rack/pkg/events"
 	"github.com/live-rack/pkg/store"
 )
 
@@ -20,11 +21,22 @@ type ZoneGetter interface {
 	GetZone(ctx context.Context, arg store.GetZoneParams) (store.Zone, error)
 }
 
-// Handler handles scan validation endpoints.
-type Handler struct{ q ZoneGetter }
+// ScanRecorder persists scan events.
+type ScanRecorder interface {
+	CreateScanEvent(ctx context.Context, arg store.CreateScanEventParams) (store.ScanEvent, error)
+}
 
-// New creates a Handler backed by q.
-func New(q ZoneGetter) *Handler { return &Handler{q: q} }
+// Handler handles scan validation endpoints.
+type Handler struct {
+	q   ZoneGetter
+	rec ScanRecorder
+	pub events.Publisher
+}
+
+// New creates a Handler.
+func New(q ZoneGetter, rec ScanRecorder, pub events.Publisher) *Handler {
+	return &Handler{q: q, rec: rec, pub: pub}
+}
 
 // Register mounts scan routes onto g (expected: /api/v1/stores).
 func (h *Handler) Register(g *echo.Group) {
@@ -33,10 +45,13 @@ func (h *Handler) Register(g *echo.Group) {
 
 type validateRequest struct {
 	ZoneID            uuid.UUID `json:"zone_id"`
+	ScannerID         string    `json:"scanner_id"`
+	SKU               string    `json:"sku"`
+	Action            string    `json:"action"`
 	Category          string    `json:"category"`
 	CurrentQty        int       `json:"current_qty"`
 	ScanQty           int       `json:"scan_qty"`
-	LastScanAt        time.Time `json:"last_scan_at"` // TODO LR-205: source from scan_events server-side
+	LastScanAt        time.Time `json:"last_scan_at"`
 	DualScanConfirmed bool      `json:"dual_scan_confirmed"`
 }
 
@@ -88,10 +103,48 @@ func (h *Handler) Validate(c echo.Context) error {
 		Now:               time.Now(),
 		DualScanConfirmed: req.DualScanConfirmed,
 	})
-	if verr == nil {
-		return c.JSON(http.StatusOK, ValidateResponse{Valid: true})
+
+	resp := ValidateResponse{Valid: true}
+	if verr != nil {
+		resp = decision(verr)
 	}
-	return c.JSON(http.StatusOK, decision(verr))
+
+	storeID, err := uuid.Parse(c.Param("storeID"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid store id")
+	}
+
+	ctx := c.Request().Context()
+	now := time.Now().UTC()
+	if _, err := h.rec.CreateScanEvent(ctx, store.CreateScanEventParams{
+		Ts:        now,
+		OrgID:     orgID,
+		StoreID:   storeID,
+		ZoneID:    req.ZoneID,
+		ScannerID: req.ScannerID,
+		Sku:       req.SKU,
+		Action:    req.Action,
+		Valid:     resp.Valid,
+		Reason:    resp.Reason,
+	}); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "persist scan")
+	}
+
+	if err := h.pub.Publish(ctx, events.ScanSubject(orgID), events.ScanRecorded{
+		OrgID:     orgID,
+		StoreID:   storeID,
+		ZoneID:    req.ZoneID,
+		ScannerID: req.ScannerID,
+		SKU:       req.SKU,
+		Action:    req.Action,
+		Valid:     resp.Valid,
+		Reason:    resp.Reason,
+		TS:        now,
+	}); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "publish scan")
+	}
+
+	return c.JSON(http.StatusOK, resp)
 }
 
 func decision(err error) ValidateResponse {

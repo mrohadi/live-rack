@@ -1,15 +1,38 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { KonvaZoneCanvas } from "./renderers/KonvaZoneCanvas";
-import type { ViewMode, ZoneUpdate } from "./types";
+import type { ViewMode, Zone, ZoneUpdate } from "./types";
 import { useCurrentStore } from "./useCurrentStore";
-import { useCreateZone, useUpdateZone, useZones } from "./useZones";
+import { useCreateZone, useUpdateZone, useZones, zoneKeys } from "./useZones";
 import { ZoneDetailSidebar } from "./ZoneDetailSidebar";
+import { useScanStream } from "../../lib/useScanStream";
+import type { ScanRecorded } from "../../lib/ws";
 
 export function MapPage() {
   const storeId = useCurrentStore();
   const { data: zones = [], isLoading } = useZones(storeId);
   const createZone = useCreateZone(storeId);
   const updateZone = useUpdateZone(storeId);
+
+  const qc = useQueryClient();
+  const onScan = useCallback(
+    (ev: ScanRecorded) => {
+      qc.setQueryData<Zone[]>(zoneKeys.list(storeId), (prev) =>
+        prev?.map((z) =>
+          z.id === ev.zone_id
+            ? {
+                ...z,
+                lastScan: ev.ts,
+                items: ev.valid && ev.action === "place" ? (z.items ?? 0) + 1 : z.items,
+                misplaced: ev.valid ? z.misplaced : (z.misplaced ?? 0) + 1,
+              }
+            : z,
+        ),
+      );
+    },
+    [qc, storeId],
+  );
+  useScanStream(onScan);
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [view, setView] = useState<ViewMode>("zones");

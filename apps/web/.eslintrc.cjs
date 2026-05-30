@@ -29,5 +29,6 @@ module.exports = {
     "*.config.cjs",
     "*.config.ts",
     "e2e/",
+    "src/test/",
   ],
 };

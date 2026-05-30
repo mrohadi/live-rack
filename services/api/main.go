@@ -32,6 +32,7 @@ import (
 	obs "github.com/live-rack/pkg/observability"
 	"github.com/live-rack/pkg/store"
 	_ "github.com/live-rack/services/api/docs" // swaggo generated
+	"github.com/live-rack/services/api/internal/authadapter"
 	apimw "github.com/live-rack/services/api/internal/middleware"
 	"github.com/live-rack/services/api/internal/zones"
 )
@@ -81,7 +82,7 @@ func main() {
 		return err
 	}
 
-	_ = pkgauth.NewClerkVerifier(mustEnv("CLERK_SECRET_KEY"), nil)
+	// _ = pkgauth.NewClerkVerifier(mustEnv("CLERK_SECRET_KEY"), nil)
 
 	e := echo.New()
 	e.HideBanner = true
@@ -116,13 +117,14 @@ func main() {
 		e.POST("/webhooks/clerk", echo.WrapHandler(http.HandlerFunc(whHandler.ServeHTTP)))
 	}
 
+	q := store.New(pool)
+
 	// Authenticated API group.
 	api := e.Group("/api/v1", apimw.Auth(
-		pkgauth.NewClerkVerifier(mustEnv("CLERK_SECRET_KEY"), nil),
+		pkgauth.NewClerkVerifier(mustEnv("CLERK_SECRET_KEY"), pkgauth.NewDBResolver(authadapter.New(q))),
 		setOrgID,
 	))
 
-	q := store.New(pool)
 	zones.New(q).Register(api.Group("/stores"))
 
 	port := envOr("PORT", "8080")

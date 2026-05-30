@@ -12,6 +12,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -23,12 +24,14 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 	echomw "github.com/labstack/echo/v4/middleware"
+	"github.com/nats-io/nats.go"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/labstack/echo/otelecho"
 
 	echoSwagger "github.com/swaggo/echo-swagger"
 
 	pkgauth "github.com/live-rack/pkg/auth"
+	"github.com/live-rack/pkg/events"
 	obs "github.com/live-rack/pkg/observability"
 	"github.com/live-rack/pkg/store"
 	_ "github.com/live-rack/services/api/docs" // swaggo generated
@@ -71,6 +74,41 @@ func main() {
 		os.Exit(1)
 	}
 	defer pool.Close()
+
+	natsURL := envOr("NATS_URL", "nats://localhost:4222")
+	nc, err := nats.Connect(natsURL,
+		nats.Name("api"),
+		nats.MaxReconnects(-1),
+		nats.ReconnectWait(2*time.Second),
+	)
+	if err != nil {
+		log.Error("connect nats", "err", err)
+		os.Exit(1)
+	}
+	defer func() {
+		if err := nc.Drain(); err != nil {
+			log.Error("drain nats connection", "err", err)
+		}
+	}()
+
+	js, err := nc.JetStream()
+	if err != nil {
+		log.Error("jetstream", "err", err)
+		os.Exit(1)
+	}
+	if _, err := js.AddStream(&nats.StreamConfig{
+		Name:      "LIVE_RACK",
+		Subjects:  []string{"lr.>"},
+		MaxAge:    24 * time.Hour,
+		Storage:   nats.FileStorage,
+		Retention: nats.LimitsPolicy,
+	}); err != nil && !errors.Is(err, nats.ErrStreamNameAlreadyInUse) {
+		log.Error("add stream", "err", err)
+		os.Exit(1)
+	}
+
+	publisher := events.NewNATSPublisher(js)
+	_ = publisher // TODO: inject into handlers that emit events
 
 	// setOrgID executes SET LOCAL app.org_id = '<id>' on the acquired connection.
 	setOrgID := func(orgID string) error {

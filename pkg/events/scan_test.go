@@ -12,10 +12,10 @@ import (
 func TestScanSubject(t *testing.T) {
 	org := uuid.MustParse("11111111-1111-1111-1111-111111111111")
 	got := events.ScanSubject(org)
-	assert.Equal(t, "11111111-1111-1111-1111-111111111111.scan.recorded", got)
+	assert.Equal(t, "lr.11111111-1111-1111-1111-111111111111.scan.recorded", got)
 }
 
 func TestExtractOrgID(t *testing.T) {
-	got := events.ExtractOrgID("11111111-1111-1111-1111-111111111111.scan.recorded")
+	got := events.ExtractOrgID("lr.11111111-1111-1111-1111-111111111111.scan.recorded")
 	assert.Equal(t, "11111111-1111-1111-1111-111111111111", got)
 }

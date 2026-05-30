@@ -22,14 +22,18 @@ type ScanRecorded struct {
 	TS        time.Time `json:"ts"`
 }
 
-const subjectScanRecorded = "%s.scan.recorded"
+const subjectScanRecorded = "lr.%s.scan.recorded"
 
 // ScanSubject returns the per-org scan.recorded subject.
 func ScanSubject(orgID uuid.UUID) string {
 	return fmt.Sprintf(subjectScanRecorded, orgID)
 }
 
-// ExtractOrgID pulls the org segment from a "{org}.{domain}.{action}" subject.
+// ExtractOrgID pulls the org segment from "lr.{org}.{domain}.{action}".
 func ExtractOrgID(subject string) string {
-	return strings.SplitN(subject, ".", 2)[0]
+	parts := strings.SplitN(subject, ".", 3)
+	if len(parts) < 2 {
+		return ""
+	}
+	return parts[1]
 }

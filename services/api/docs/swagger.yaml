@@ -1,5 +1,32 @@
 basePath: /api/v1
 definitions:
+  scans.ValidateResponse:
+    properties:
+      code:
+        type: string
+      reason:
+        type: string
+      requires_dual_scan:
+        type: boolean
+      valid:
+        type: boolean
+    type: object
+  scans.validateRequest:
+    properties:
+      category:
+        type: string
+      current_qty:
+        type: integer
+      dual_scan_confirmed:
+        type: boolean
+      last_scan_at:
+        description: 'TODO LR-205: source from scan_events server-side'
+        type: string
+      scan_qty:
+        type: integer
+      zone_id:
+        type: string
+    type: object
   zones.ErrorResponse:
     properties:
       message:
@@ -54,32 +81,6 @@ definitions:
         type: number
     type: object
   zones.zoneRequest:
-    properties:
-      capacity:
-        type: integer
-      color:
-        type: string
-      constraints:
-        type: object
-      height:
-        type: number
-      name:
-        type: string
-      type:
-        enum:
-        - general
-        - frozen
-        - returns
-        - staging
-        - display
-        - checkout
-        type: string
-      width:
-        type: number
-      x:
-        type: number
-      "y":
-        type: number
     type: object
 host: localhost:8080
 info:
@@ -88,6 +89,40 @@ info:
   title: live-rack API
   version: 0.1.0
 paths:
+  /stores/{storeID}/scan/validate:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Store UUID
+        in: path
+        name: storeID
+        required: true
+        type: string
+      - description: Scan body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/scans.validateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/scans.ValidateResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/scans.ValidateResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/scans.ValidateResponse'
+      summary: Validate a scan against zone rules
+      tags:
+      - scans
   /stores/{storeID}/zones:
     get:
       parameters:

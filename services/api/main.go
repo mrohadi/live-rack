@@ -34,6 +34,7 @@ import (
 	_ "github.com/live-rack/services/api/docs" // swaggo generated
 	"github.com/live-rack/services/api/internal/authadapter"
 	apimw "github.com/live-rack/services/api/internal/middleware"
+	"github.com/live-rack/services/api/internal/scans"
 	"github.com/live-rack/services/api/internal/zones"
 )
 
@@ -126,6 +127,7 @@ func main() {
 	))
 
 	zones.New(q).Register(api.Group("/stores"))
+	scans.New(q).Register(api.Group("/stores"))
 
 	port := envOr("PORT", "8080")
 	srv := &http.Server{

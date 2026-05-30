@@ -1,0 +1,26 @@
+{
+  "Profile Name": "live-rack",
+  "Profile enabled": "true",
+  "Data Output": {
+    "Keystroke output": {
+      "Enabled": "true",
+      "Action key character": "ENTER"
+    },
+    "USB HID output": {
+      "Enabled": "false"
+    }
+  },
+  "BarcodeInput": {
+    "Enabled": "true",
+    "Decoders": {
+      "Code128": "true",
+      "QRCode": "true",
+      "EAN13": "true",
+      "UPCA": "true"
+    }
+  },
+  "App association": [
+    { "Package name": "com.android.chrome" },
+    { "Package name": "org.mozilla.firefox" }
+  ]
+}

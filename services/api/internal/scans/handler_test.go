@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 
 	pkgauth "github.com/live-rack/pkg/auth"
 	"github.com/live-rack/pkg/domain"
+	"github.com/live-rack/pkg/events"
 	"github.com/live-rack/pkg/store"
 	"github.com/live-rack/services/api/internal/scans"
 )
@@ -31,6 +33,32 @@ func (f *fakeZoneGetter) GetZone(_ context.Context, arg store.GetZoneParams) (st
 		return store.Zone{}, errNotFound
 	}
 	return z, nil
+}
+
+type fakeRecorder struct {
+	mu     sync.Mutex
+	events []store.CreateScanEventParams
+}
+
+func (f *fakeRecorder) CreateScanEvent(_ context.Context, arg store.CreateScanEventParams) (store.ScanEvent, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.events = append(f.events, arg)
+	return store.ScanEvent{ID: uuid.New()}, nil
+}
+
+type fakePublisher struct {
+	mu       sync.Mutex
+	subjects []string
+	payloads []any
+}
+
+func (f *fakePublisher) Publish(_ context.Context, subject string, v any) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.subjects = append(f.subjects, subject)
+	f.payloads = append(f.payloads, v)
+	return nil
 }
 
 var errNotFound = &notFoundError{}
@@ -59,11 +87,13 @@ func mustConstraints(t *testing.T, c domain.ZoneConstraints) []byte {
 }
 
 // run wires one validate request and returns the recorder.
-func run(t *testing.T, getter *fakeZoneGetter, orgID, storeID uuid.UUID, body map[string]any) (*httptest.ResponseRecorder, error) {
+func run(t *testing.T, getter *fakeZoneGetter, orgID, storeID uuid.UUID, body map[string]any) (*httptest.ResponseRecorder, *fakeRecorder, *fakePublisher, error) {
 	t.Helper()
 	e := echo.New()
 	e.HideBanner = true
-	h := scans.New(getter)
+	rec0 := &fakeRecorder{}
+	pub := &fakePublisher{}
+	h := scans.New(getter, rec0, pub)
 	h.Register(e.Group("/api/v1/stores"))
 
 	raw, _ := json.Marshal(body)
@@ -75,7 +105,7 @@ func run(t *testing.T, getter *fakeZoneGetter, orgID, storeID uuid.UUID, body ma
 	c.SetParamNames("storeID")
 	c.SetParamValues(storeID.String())
 	withPrincipal(c, orgID, storeID)
-	return rec, h.Validate(c)
+	return rec, rec0, pub, h.Validate(c)
 }
 
 func TestScanHandler_Validate(t *testing.T) {
@@ -110,41 +140,47 @@ func TestScanHandler_Validate(t *testing.T) {
 	}{
 		{
 			name:      "denied category",
-			body:      map[string]any{"zone_id": zoneID, "category": "hazmat", "scan_qty": 1, "dual_scan_confirmed": true},
+			body:      map[string]any{"zone_id": zoneID, "category": "hazmat", "scan_qty": 1, "dual_scan_confirmed": true, "scanner_id": "scn-1", "sku": "SKU1", "action": "place"},
 			wantValid: false,
 			wantCode:  "category_denied",
 		},
 		{
 			name:      "capacity exceeded",
-			body:      map[string]any{"zone_id": zoneID, "category": "frozen", "current_qty": 10, "scan_qty": 1, "dual_scan_confirmed": true},
+			body:      map[string]any{"zone_id": zoneID, "category": "frozen", "current_qty": 10, "scan_qty": 1, "dual_scan_confirmed": true, "scanner_id": "scn-1", "sku": "SKU1", "action": "place"},
 			wantValid: false,
 			wantCode:  "capacity_exceeded",
 		},
 		{
 			name:      "dwell violation",
-			body:      map[string]any{"zone_id": zoneID, "category": "frozen", "scan_qty": 1, "last_scan_at": now.Add(-10 * time.Second), "dual_scan_confirmed": true},
+			body:      map[string]any{"zone_id": zoneID, "category": "frozen", "scan_qty": 1, "last_scan_at": now.Add(-10 * time.Second), "dual_scan_confirmed": true, "scanner_id": "scn-1", "sku": "SKU1", "action": "place"},
 			wantValid: false,
 			wantCode:  "dwell_violation",
 		},
 		{
 			name:             "dual-scan unconfirmed",
-			body:             map[string]any{"zone_id": zoneID, "category": "frozen", "scan_qty": 1},
+			body:             map[string]any{"zone_id": zoneID, "category": "frozen", "scan_qty": 1, "scanner_id": "scn-1", "sku": "SKU1", "action": "place"},
 			wantValid:        false,
 			wantCode:         "dual_scan_required",
 			wantRequiresDual: true,
 		},
 		{
 			name:      "valid scan",
-			body:      map[string]any{"zone_id": zoneID, "category": "frozen", "scan_qty": 1, "dual_scan_confirmed": true},
+			body:      map[string]any{"zone_id": zoneID, "category": "frozen", "scan_qty": 1, "dual_scan_confirmed": true, "scanner_id": "scn-1", "sku": "SKU1", "action": "place"},
 			wantValid: true,
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			rec, err := run(t, getter, orgID, storeID, tc.body)
+			rec, recorder, pub, err := run(t, getter, orgID, storeID, tc.body)
 			require.NoError(t, err)
 			assert.Equal(t, http.StatusOK, rec.Code)
+			// every scan persisted + published once
+			assert.Len(t, recorder.events, 1)
+			require.Len(t, pub.subjects, 1)
+			assert.Equal(t, events.ScanSubject(orgID), pub.subjects[0])
+			ev := pub.payloads[0].(events.ScanRecorded)
+			assert.Equal(t, tc.wantValid, ev.Valid)
 
 			var resp struct {
 				Valid            bool   `json:"valid"`
@@ -164,8 +200,8 @@ func TestScanHandler_Validate_ZoneNotFound(t *testing.T) {
 	storeID := uuid.New()
 	getter := &fakeZoneGetter{rows: map[uuid.UUID]store.Zone{}}
 
-	_, err := run(t, getter, orgID, storeID, map[string]any{
-		"zone_id": uuid.New(), "category": "frozen", "scan_qty": 1,
+	_, _, _, err := run(t, getter, orgID, storeID, map[string]any{
+		"zone_id": uuid.New(), "category": "frozen", "scan_qty": 1, "scanner_id": "scn-1", "sku": "SKU1", "action": "place",
 	})
 	var he *echo.HTTPError
 	require.ErrorAs(t, err, &he)
@@ -177,8 +213,8 @@ func TestScanHandler_Validate_BadScanQty(t *testing.T) {
 	storeID := uuid.New()
 	getter := &fakeZoneGetter{rows: map[uuid.UUID]store.Zone{}}
 
-	_, err := run(t, getter, orgID, storeID, map[string]any{
-		"zone_id": uuid.New(), "category": "frozen", "scan_qty": 0,
+	_, _, _, err := run(t, getter, orgID, storeID, map[string]any{
+		"zone_id": uuid.New(), "category": "frozen", "scan_qty": 0, "scanner_id": "scn-1", "sku": "SKU1", "action": "place",
 	})
 	var he *echo.HTTPError
 	require.ErrorAs(t, err, &he)

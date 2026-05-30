@@ -108,7 +108,6 @@ func main() {
 	}
 
 	publisher := events.NewNATSPublisher(js)
-	_ = publisher // TODO: inject into handlers that emit events
 
 	// setOrgID executes SET LOCAL app.org_id = '<id>' on the acquired connection.
 	setOrgID := func(orgID string) error {
@@ -165,7 +164,7 @@ func main() {
 	))
 
 	zones.New(q).Register(api.Group("/stores"))
-	scans.New(q).Register(api.Group("/stores"))
+	scans.New(q, q, publisher).Register(api.Group("/stores"))
 
 	port := envOr("PORT", "8080")
 	srv := &http.Server{

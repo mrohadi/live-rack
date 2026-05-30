@@ -8,7 +8,7 @@
  *   - Re-render with changed selection must not error
  */
 import { cleanup, fireEvent, render } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { KonvaZoneCanvas } from "../renderers/KonvaZoneCanvas";
 import { SvgZoneCanvas } from "../renderers/SvgZoneCanvas";
 import type { Zone } from "../types";
@@ -34,34 +34,34 @@ const zones = makeZones(ZONE_COUNT);
 describe("SvgZoneCanvas", () => {
   it("renders 500 zones without throwing", () => {
     const { container } = render(
-      <SvgZoneCanvas zones={zones} selectedId={null} onSelect={() => {}} />,
+      <SvgZoneCanvas zones={zones} selectedIds={[]} onSelect={() => {}} />,
     );
     const rects = container.querySelectorAll("[data-zone-id]");
     expect(rects).toHaveLength(ZONE_COUNT);
   });
 
   it("marks the selected zone", () => {
-    render(<SvgZoneCanvas zones={zones} selectedId="zone-42" onSelect={() => {}} />);
+    render(<SvgZoneCanvas zones={zones} selectedIds={["zone-42"]} onSelect={() => {}} />);
     const selected = document.querySelector('[data-zone-id="zone-42"][data-selected="true"]');
     expect(selected).not.toBeNull();
   });
 
-  it("calls onSelect with zone id on click", async () => {
+  it("calls onSelect with zone id wrapped in an array on click", () => {
     const onSelect = vi.fn();
     const { container } = render(
-      <SvgZoneCanvas zones={zones} selectedId={null} onSelect={onSelect} />,
+      <SvgZoneCanvas zones={zones} selectedIds={[]} onSelect={onSelect} />,
     );
     const first = container.querySelector('[data-zone-id="zone-0"]') as Element;
     fireEvent.click(first);
-    expect(onSelect).toHaveBeenCalledWith("zone-0");
+    expect(onSelect).toHaveBeenCalledWith(["zone-0"]);
   });
 
   it("re-renders changed selection without mounting new zones", () => {
     const { rerender, container } = render(
-      <SvgZoneCanvas zones={zones} selectedId={null} onSelect={() => {}} />,
+      <SvgZoneCanvas zones={zones} selectedIds={[]} onSelect={() => {}} />,
     );
     const beforeCount = container.querySelectorAll("[data-zone-id]").length;
-    rerender(<SvgZoneCanvas zones={zones} selectedId="zone-10" onSelect={() => {}} />);
+    rerender(<SvgZoneCanvas zones={zones} selectedIds={["zone-10"]} onSelect={() => {}} />);
     const afterCount = container.querySelectorAll("[data-zone-id]").length;
     expect(afterCount).toBe(beforeCount);
   });
@@ -70,24 +70,24 @@ describe("SvgZoneCanvas", () => {
 describe("KonvaZoneCanvas", () => {
   it("renders 500 zones without throwing", () => {
     const { container } = render(
-      <KonvaZoneCanvas zones={zones} selectedId={null} onSelect={() => {}} />,
+      <KonvaZoneCanvas zones={zones} selectedIds={[]} onSelect={() => {}} />,
     );
     expect(container.querySelector("canvas")).not.toBeNull();
   });
 
-  it("accepts selectedId and onSelect props", () => {
+  it("accepts selectedIds and onSelect props", () => {
     const onSelect = vi.fn();
     expect(() =>
-      render(<KonvaZoneCanvas zones={zones} selectedId="zone-42" onSelect={onSelect} />),
+      render(<KonvaZoneCanvas zones={zones} selectedIds={["zone-42"]} onSelect={onSelect} />),
     ).not.toThrow();
   });
 
   it("re-renders selection change without throwing", () => {
     const { rerender } = render(
-      <KonvaZoneCanvas zones={zones} selectedId={null} onSelect={() => {}} />,
+      <KonvaZoneCanvas zones={zones} selectedIds={[]} onSelect={() => {}} />,
     );
     expect(() =>
-      rerender(<KonvaZoneCanvas zones={zones} selectedId="zone-10" onSelect={() => {}} />),
+      rerender(<KonvaZoneCanvas zones={zones} selectedIds={["zone-10"]} onSelect={() => {}} />),
     ).not.toThrow();
   });
 });

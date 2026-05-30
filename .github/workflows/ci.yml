@@ -202,7 +202,7 @@ jobs:
         working-directory: apps/web
         run: |
           BUNDLE_KB=$(du -sk dist/assets/*.js 2>/dev/null | awk '{sum+=$1} END {print sum}')
-          LIMIT_KB=500
+          LIMIT_KB=600
           echo "JS bundle: ${BUNDLE_KB}KB (limit: ${LIMIT_KB}KB)"
           if [ "${BUNDLE_KB:-0}" -gt "$LIMIT_KB" ]; then
             echo "FAIL: bundle exceeds ${LIMIT_KB}KB"

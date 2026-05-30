@@ -5,11 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 
 	pkgauth "github.com/live-rack/pkg/auth"
+	"github.com/live-rack/pkg/domain"
 	"github.com/live-rack/pkg/store"
 )
 
@@ -66,15 +68,15 @@ func (h *Handler) Register(g *echo.Group) {
 
 // zoneRequest is the JSON body for create/update.
 type zoneRequest struct {
-	Name        string  `json:"name"`
-	Type        string  `json:"type" enums:"general,frozen,returns,staging,display,checkout"`
-	X           float64 `json:"x"`
-	Y           float64 `json:"y"`
-	Width       float64 `json:"width"`
-	Height      float64 `json:"height"`
-	Color       string  `json:"color"`
-	Capacity    int32   `json:"capacity"`
-	Constraints any     `json:"constraints" swaggertype:"object"`
+	Name        string                 `json:"name"`
+	Type        string                 `json:"type" enums:"general,frozen,returns,staging,display,checkout"`
+	X           float64                `json:"x"`
+	Y           float64                `json:"y"`
+	Width       float64                `json:"width"`
+	Height      float64                `json:"height"`
+	Color       string                 `json:"color"`
+	Capacity    int32                  `json:"capacity"`
+	Constraints domain.ZoneConstraints `json:"constraints"`
 }
 
 func (r *zoneRequest) validate() error {
@@ -89,6 +91,9 @@ func (r *zoneRequest) validate() error {
 	}
 	if r.Capacity < 0 {
 		return echo.NewHTTPError(http.StatusBadRequest, "capacity must be non-negative")
+	}
+	if err := r.Constraints.Validate(); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 	return nil
 }
@@ -117,15 +122,33 @@ func orgIDFrom(c echo.Context) (uuid.UUID, error) {
 	return p.OrgID, nil
 }
 
-func constraintsOrDefault(v any) []byte {
-	if v == nil {
-		return []byte(`{}`)
-	}
-	b, err := json.Marshal(v)
+func marshalConstraints(c domain.ZoneConstraints) []byte {
+	b, err := domain.MarshalConstraints(c)
 	if err != nil {
 		return []byte(`{}`)
 	}
 	return b
+}
+
+func toResponse(z store.Zone) ZoneResponse {
+	var constraints domain.ZoneConstraints
+	_ = json.Unmarshal(z.Constraints, &constraints)
+	return ZoneResponse{
+		ID:          z.ID.String(),
+		OrgID:       z.OrgID.String(),
+		StoreID:     z.StoreID.String(),
+		Name:        z.Name,
+		Type:        string(z.Type),
+		X:           z.X,
+		Y:           z.Y,
+		Width:       z.Width,
+		Height:      z.Height,
+		Color:       z.Color,
+		Capacity:    z.Capacity,
+		Constraints: constraints,
+		CreatedAt:   z.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:   z.UpdatedAt.Format(time.RFC3339),
+	}
 }
 
 // List godoc
@@ -158,7 +181,12 @@ func (h *Handler) List(c echo.Context) error {
 	if list == nil {
 		list = []store.Zone{}
 	}
-	return c.JSON(http.StatusOK, list)
+
+	out := make([]ZoneResponse, len(list))
+	for i, z := range list {
+		out[i] = toResponse(z)
+	}
+	return c.JSON(http.StatusOK, out)
 }
 
 // Create godoc
@@ -202,12 +230,12 @@ func (h *Handler) Create(c echo.Context) error {
 		Height:      req.Height,
 		Color:       req.Color,
 		Capacity:    req.Capacity,
-		Constraints: constraintsOrDefault(req.Constraints),
+		Constraints: marshalConstraints(req.Constraints),
 	})
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
-	return c.JSON(http.StatusCreated, z)
+	return c.JSON(http.StatusCreated, toResponse(z))
 }
 
 // Get godoc
@@ -237,7 +265,7 @@ func (h *Handler) Get(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, "zone not found")
 	}
-	return c.JSON(http.StatusOK, z)
+	return c.JSON(http.StatusOK, toResponse(z))
 }
 
 // Update godoc
@@ -282,12 +310,12 @@ func (h *Handler) Update(c echo.Context) error {
 		Height:      req.Height,
 		Color:       req.Color,
 		Capacity:    req.Capacity,
-		Constraints: constraintsOrDefault(req.Constraints),
+		Constraints: marshalConstraints(req.Constraints),
 	})
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, "zone not found")
 	}
-	return c.JSON(http.StatusOK, z)
+	return c.JSON(http.StatusOK, toResponse(z))
 }
 
 // Delete godoc

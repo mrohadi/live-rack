@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/live-rack/pkg/domain"
 	"github.com/live-rack/pkg/store"
 	"github.com/live-rack/pkg/store/internal/testhelper"
 )
@@ -182,5 +183,41 @@ func TestZonesCRUD(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.Equal(t, int64(0), count)
+	})
+
+	t.Run("constraints round-trip through JSONB", func(t *testing.T) {
+		max := 25
+		original := domain.ZoneConstraints{
+			AllowedCategories: []string{"frozen", "dairy"},
+			DeniedCategories:  []string{"hazmat"},
+			MaxUnitsPerSKU:    &max,
+			RequireDualScan:   true,
+		}
+		raw, err := domain.MarshalConstraints(original)
+		require.NoError(t, err)
+
+		created, err := q.CreateZone(ctx, store.CreateZoneParams{
+			OrgID: orgID, StoreID: storeID,
+			Name: "Constraint Zone", Type: store.ZoneTypeFrozen,
+			X: 0, Y: 0, Width: 80, Height: 80,
+			Color: "#0ea5e9", Capacity: 200,
+			Constraints: raw,
+		})
+		require.NoError(t, err)
+
+		got, err := q.GetZone(ctx, store.GetZoneParams{ID: created.ID, OrgID: orgID})
+		require.NoError(t, err)
+
+		parsed, err := domain.UnmarshalConstraints(got.Constraints)
+		require.NoError(t, err)
+		assert.Equal(t, original.AllowedCategories, parsed.AllowedCategories)
+		assert.Equal(t, original.DeniedCategories, parsed.DeniedCategories)
+		require.NotNil(t, parsed.MaxUnitsPerSKU)
+		assert.Equal(t, max, *parsed.MaxUnitsPerSKU)
+		assert.True(t, parsed.RequireDualScan)
+
+		// Domain rule using stored bytes — proves the wire→DB→domain loop is intact.
+		err = got.AsDomainZone().CanAcceptItem("hazmat", 0, 1)
+		assert.ErrorIs(t, err, domain.ErrCategoryDenied)
 	})
 }

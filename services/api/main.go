@@ -43,6 +43,7 @@ import (
 	"github.com/live-rack/services/api/internal/inventory"
 	apimw "github.com/live-rack/services/api/internal/middleware"
 	"github.com/live-rack/services/api/internal/pipelines"
+	"github.com/live-rack/services/api/internal/recommendations"
 	"github.com/live-rack/services/api/internal/sales"
 	"github.com/live-rack/services/api/internal/scans"
 	"github.com/live-rack/services/api/internal/search"
@@ -185,6 +186,7 @@ func main() {
 		os.Exit(1)
 	}
 	analytics.New(chstore.New(chCfg)).Register(api)
+	recommendations.New(q).Register(api)
 
 	hub := ws.NewHub(log)
 	if _, err := nc.Subscribe("lr.*.>", func(m *nats.Msg) {

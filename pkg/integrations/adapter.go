@@ -31,10 +31,14 @@ type Sale struct {
 type Adapter interface {
 	// Kind returns the connector identifier ("shopify", "square").
 	Kind() string
+	// AccountHandle extracts the vendor account id used to route the webhook to
+	// an org (Shopify shop domain from a header, Square merchant_id from the body).
+	AccountHandle(body []byte, r *http.Request) string
 	// EventID extracts the vendor's unique delivery id for idempotency, or "".
-	EventID(headers http.Header) string
-	// Verify checks the webhook signature against the shared secret.
-	Verify(secret string, body []byte, headers http.Header) error
+	EventID(body []byte, r *http.Request) string
+	// Verify checks the webhook signature against the shared secret. The request
+	// is passed whole because some vendors sign the URL alongside the body.
+	Verify(secret string, body []byte, r *http.Request) error
 	// ParseSales normalises a verified webhook body into canonical sales.
 	ParseSales(body []byte) ([]Sale, error)
 }

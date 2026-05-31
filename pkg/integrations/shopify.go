@@ -27,14 +27,16 @@ func NewShopify() Shopify { return Shopify{} }
 
 func (Shopify) Kind() string { return "shopify" }
 
-// ShopDomain returns the shop handle used to route the webhook to an org.
-func (Shopify) ShopDomain(h http.Header) string { return h.Get(headerShopifyShop) }
+// AccountHandle returns the shop domain header used to route the webhook.
+func (Shopify) AccountHandle(_ []byte, r *http.Request) string {
+	return r.Header.Get(headerShopifyShop)
+}
 
-func (Shopify) EventID(h http.Header) string { return h.Get(headerShopifyEventID) }
+func (Shopify) EventID(_ []byte, r *http.Request) string { return r.Header.Get(headerShopifyEventID) }
 
 // Verify checks the X-Shopify-Hmac-Sha256 base64 digest against secret.
-func (Shopify) Verify(secret string, body []byte, h http.Header) error {
-	got := h.Get(headerShopifyHMAC)
+func (Shopify) Verify(secret string, body []byte, r *http.Request) error {
+	got := r.Header.Get(headerShopifyHMAC)
 	if got == "" {
 		return ErrInvalidSignature
 	}

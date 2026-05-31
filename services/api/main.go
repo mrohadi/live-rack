@@ -160,7 +160,7 @@ func main() {
 	e.GET("/metrics", echo.WrapHandler(promhttp.Handler()))
 
 	// Inbound POS webhooks — unauthenticated, verified by per-vendor signature.
-	webhooks.New(q, publisher, integrations.NewShopify()).Register(e)
+	webhooks.New(q, publisher, integrations.NewShopify(), integrations.NewSquare()).Register(e)
 
 	// Authenticated API group.
 	api := e.Group("/api/v1", apimw.Auth(verifier, setOrgID))

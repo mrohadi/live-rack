@@ -1,10 +1,12 @@
 package integrations_test
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -31,26 +33,32 @@ const shopifyOrderJSON = `{
   ]
 }`
 
+func shopifyReq(headers map[string]string) *http.Request {
+	r := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/webhooks/shopify", nil)
+	for k, v := range headers {
+		r.Header.Set(k, v)
+	}
+	return r
+}
+
 func TestShopify_Verify(t *testing.T) {
 	a := integrations.NewShopify()
 	body := []byte(shopifyOrderJSON)
-	h := http.Header{}
-	h.Set("X-Shopify-Hmac-Sha256", shopifySig("topsecret", body))
+	r := shopifyReq(map[string]string{"X-Shopify-Hmac-Sha256": shopifySig("topsecret", body)})
 
-	require.NoError(t, a.Verify("topsecret", body, h))
-	assert.ErrorIs(t, a.Verify("wrong", body, h), integrations.ErrInvalidSignature)
-
-	empty := http.Header{}
-	assert.ErrorIs(t, a.Verify("topsecret", body, empty), integrations.ErrInvalidSignature)
+	require.NoError(t, a.Verify("topsecret", body, r))
+	assert.ErrorIs(t, a.Verify("wrong", body, r), integrations.ErrInvalidSignature)
+	assert.ErrorIs(t, a.Verify("topsecret", body, shopifyReq(nil)), integrations.ErrInvalidSignature)
 }
 
 func TestShopify_HeaderHelpers(t *testing.T) {
 	a := integrations.NewShopify()
-	h := http.Header{}
-	h.Set("X-Shopify-Webhook-Id", "evt-9")
-	h.Set("X-Shopify-Shop-Domain", "demo.myshopify.com")
-	assert.Equal(t, "evt-9", a.EventID(h))
-	assert.Equal(t, "demo.myshopify.com", a.ShopDomain(h))
+	r := shopifyReq(map[string]string{
+		"X-Shopify-Webhook-Id":  "evt-9",
+		"X-Shopify-Shop-Domain": "demo.myshopify.com",
+	})
+	assert.Equal(t, "evt-9", a.EventID(nil, r))
+	assert.Equal(t, "demo.myshopify.com", a.AccountHandle(nil, r))
 }
 
 func TestShopify_ParseSales(t *testing.T) {

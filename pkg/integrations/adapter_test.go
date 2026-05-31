@@ -13,8 +13,9 @@ import (
 type stubAdapter struct{ kind string }
 
 func (s stubAdapter) Kind() string                                   { return s.kind }
-func (s stubAdapter) EventID(http.Header) string                     { return "" }
-func (s stubAdapter) Verify(string, []byte, http.Header) error       { return nil }
+func (s stubAdapter) AccountHandle([]byte, *http.Request) string     { return "" }
+func (s stubAdapter) EventID([]byte, *http.Request) string           { return "" }
+func (s stubAdapter) Verify(string, []byte, *http.Request) error     { return nil }
 func (s stubAdapter) ParseSales([]byte) ([]integrations.Sale, error) { return nil, nil }
 
 func TestRegistry_GetKnownAndUnknown(t *testing.T) {

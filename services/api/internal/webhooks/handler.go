@@ -18,17 +18,6 @@ import (
 
 const maxWebhookBody = 1 << 20 // 1 MiB
 
-// router extracts the vendor account handle used to resolve the org.
-type router interface {
-	integrations.Adapter
-	ShopRouter
-}
-
-// ShopRouter exposes the vendor account handle from request headers.
-type ShopRouter interface {
-	ShopDomain(h http.Header) string
-}
-
 // Store is the narrow store dependency the handler needs.
 type Store interface {
 	ResolveWebhookIntegration(ctx context.Context, arg store.ResolveWebhookIntegrationParams) (store.ResolveWebhookIntegrationRow, error)
@@ -38,18 +27,18 @@ type Store interface {
 
 // Handler serves inbound webhook routes.
 type Handler struct {
-	stores  Store
-	routers map[string]router
-	pub     events.Publisher
+	stores   Store
+	adapters map[string]integrations.Adapter
+	pub      events.Publisher
 }
 
-// New builds a Handler from the given routing adapters.
-func New(stores Store, pub events.Publisher, routers ...router) *Handler {
-	m := make(map[string]router, len(routers))
-	for _, r := range routers {
-		m[r.Kind()] = r
+// New builds a Handler from the given adapters.
+func New(stores Store, pub events.Publisher, adapters ...integrations.Adapter) *Handler {
+	m := make(map[string]integrations.Adapter, len(adapters))
+	for _, a := range adapters {
+		m[a.Kind()] = a
 	}
-	return &Handler{stores: stores, routers: m, pub: pub}
+	return &Handler{stores: stores, adapters: m, pub: pub}
 }
 
 // Register mounts webhook routes on e (no auth — verified by signature).
@@ -60,34 +49,34 @@ func (h *Handler) Register(e *echo.Echo) {
 // Receive verifies, deduplicates, and fans out one inbound webhook.
 func (h *Handler) Receive(c echo.Context) error {
 	provider := c.Param("provider")
-	r, ok := h.routers[provider]
+	a, ok := h.adapters[provider]
 	if !ok {
 		return echo.NewHTTPError(http.StatusNotFound, "unknown provider")
 	}
 
-	body, err := io.ReadAll(io.LimitReader(c.Request().Body, maxWebhookBody))
+	req := c.Request()
+	body, err := io.ReadAll(io.LimitReader(req.Body, maxWebhookBody))
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "read body")
 	}
-	headers := c.Request().Header
-	ctx := c.Request().Context()
+	ctx := req.Context()
 
-	shop := r.ShopDomain(headers)
-	if shop == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing shop handle")
+	handle := a.AccountHandle(body, req)
+	if handle == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing account handle")
 	}
 	res, err := h.stores.ResolveWebhookIntegration(ctx, store.ResolveWebhookIntegrationParams{
-		Kind: provider, ExternalID: shop,
+		Kind: provider, ExternalID: handle,
 	})
 	if err != nil {
 		return echo.NewHTTPError(http.StatusUnauthorized, "unknown integration")
 	}
 
-	if err := r.Verify(res.Secret, body, headers); err != nil {
+	if err := a.Verify(res.Secret, body, req); err != nil {
 		return echo.NewHTTPError(http.StatusUnauthorized, "invalid signature")
 	}
 
-	eventID := r.EventID(headers)
+	eventID := a.EventID(body, req)
 	if eventID == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "missing event id")
 	}
@@ -101,7 +90,7 @@ func (h *Handler) Receive(c echo.Context) error {
 		return c.JSON(http.StatusOK, map[string]string{"status": "duplicate"})
 	}
 
-	sales, err := r.ParseSales(body)
+	sales, err := a.ParseSales(body)
 	if err != nil {
 		_ = h.stores.MarkWebhookStatus(ctx, store.MarkWebhookStatusParams{OrgID: res.OrgID, ID: rec.ID, Status: "rejected"})
 		return echo.NewHTTPError(http.StatusBadRequest, "parse payload")

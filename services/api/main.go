@@ -40,6 +40,7 @@ import (
 	"github.com/live-rack/services/api/internal/inventory"
 	apimw "github.com/live-rack/services/api/internal/middleware"
 	"github.com/live-rack/services/api/internal/pipelines"
+	"github.com/live-rack/services/api/internal/sales"
 	"github.com/live-rack/services/api/internal/scans"
 	"github.com/live-rack/services/api/internal/search"
 	"github.com/live-rack/services/api/internal/tasks"
@@ -170,6 +171,7 @@ func main() {
 	inventory.New(q).Register(api.Group("/stores"))
 	tasks.New(q, publisher).Register(api.Group("/stores"))
 	pipelines.New(q, publisher).Register(api.Group("/stores"))
+	sales.New(q).Register(api)
 	search.New(q).Register(api)
 
 	hub := ws.NewHub(log)

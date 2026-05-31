@@ -34,6 +34,7 @@ func New(ch Reader) *Handler {
 // Register mounts analytics routes on the authenticated API group.
 func (h *Handler) Register(g *echo.Group) {
 	g.GET("/analytics/heatmap", h.Heatmap)
+	g.GET("/analytics/zones", h.Zones)
 }
 
 // chResult is the envelope ClickHouse returns for FORMAT JSON.
@@ -122,4 +123,91 @@ func (h *Handler) Heatmap(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "heatmap parse")
 	}
 	return c.JSON(http.StatusOK, buildHeatGrid(rows))
+}
+
+type zoneTotalRow struct {
+	ZoneID  string `json:"zone_id"`
+	Scans   int64  `json:"scans"`
+	Picks   int64  `json:"picks"`
+	Invalid int64  `json:"invalid"`
+}
+
+type zoneSeriesRow struct {
+	ZoneID string `json:"zone_id"`
+	Scans  int64  `json:"scans"`
+}
+
+// ZonePerf is one zone's rolled-up performance plus a recent hourly sparkline.
+type ZonePerf struct {
+	ZoneID  string  `json:"zone_id"`
+	Scans   int64   `json:"scans"`
+	Picks   int64   `json:"picks"`
+	Invalid int64   `json:"invalid"`
+	Spark   []int64 `json:"spark"`
+}
+
+// ZonesResponse powers the zone-performance bars on the Analytics screen.
+type ZonesResponse struct {
+	Zones []ZonePerf `json:"zones"`
+}
+
+// buildZonePerf joins per-zone totals (ordered, e.g. by scans desc) with their
+// recent hourly series into sparkline arrays. Order follows totals. Pure.
+func buildZonePerf(totals []zoneTotalRow, series []zoneSeriesRow) []ZonePerf {
+	spark := make(map[string][]int64, len(totals))
+	for _, s := range series {
+		spark[s.ZoneID] = append(spark[s.ZoneID], s.Scans)
+	}
+	out := make([]ZonePerf, 0, len(totals))
+	for _, t := range totals {
+		sp := spark[t.ZoneID]
+		if sp == nil {
+			sp = []int64{}
+		}
+		out = append(out, ZonePerf{
+			ZoneID: t.ZoneID, Scans: t.Scans, Picks: t.Picks, Invalid: t.Invalid, Spark: sp,
+		})
+	}
+	return out
+}
+
+// Zones godoc
+//
+//	@Summary	Per-zone scan performance with recent hourly sparklines
+//	@Tags		analytics
+//	@Produce	json
+//	@Success	200	{object}	ZonesResponse
+//	@Router		/analytics/zones [get]
+func (h *Handler) Zones(c echo.Context) error {
+	p, err := pkgauth.PrincipalFrom(c.Request().Context())
+	if err != nil {
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
+	}
+	ctx := c.Request().Context()
+	org := "org_id = '" + p.OrgID.String() + "'"
+
+	totalsBody, err := h.ch.Query(ctx, "SELECT toString(zone_id) AS zone_id, "+
+		"toInt64(sum(scans)) AS scans, toInt64(sum(picks)) AS picks, toInt64(sum(invalid)) AS invalid "+
+		"FROM zone_perf_5m WHERE "+org+" GROUP BY zone_id ORDER BY scans DESC LIMIT 50 FORMAT JSON")
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "zones query")
+	}
+	totals, err := parseCH[zoneTotalRow](totalsBody)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "zones parse")
+	}
+
+	seriesBody, err := h.ch.Query(ctx, "SELECT toString(zone_id) AS zone_id, "+
+		"toInt64(sum(scans)) AS scans FROM zone_perf_5m WHERE "+org+
+		" AND bucket >= now() - INTERVAL 24 HOUR GROUP BY zone_id, toStartOfHour(bucket) AS hb "+
+		"ORDER BY zone_id, hb FORMAT JSON")
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "zone series query")
+	}
+	series, err := parseCH[zoneSeriesRow](seriesBody)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "zone series parse")
+	}
+
+	return c.JSON(http.StatusOK, ZonesResponse{Zones: buildZonePerf(totals, series)})
 }

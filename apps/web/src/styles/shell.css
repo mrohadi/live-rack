@@ -224,8 +224,7 @@ button.search {
   color: var(--text-3);
 }
 
-/* ⌘K command palette (LR-303). Concrete values with token fallbacks so it
-   renders correctly even though Tailwind utilities are not compiled here. */
+/* ⌘K command palette (LR-303). */
 .cmdk-overlay {
   position: fixed;
   inset: 0;
@@ -239,8 +238,8 @@ button.search {
 .cmdk-panel {
   width: 100%;
   max-width: 560px;
-  background: var(--panel, #ffffff);
-  border: 1px solid var(--border, #e2e8f0);
+  background: var(--panel);
+  border: 1px solid var(--border);
   border-radius: 12px;
   box-shadow: 0 20px 50px rgba(15, 23, 42, 0.25);
   overflow: hidden;
@@ -249,14 +248,14 @@ button.search {
   width: 100%;
   padding: 14px 16px;
   border: none;
-  border-bottom: 1px solid var(--border, #e2e8f0);
+  border-bottom: 1px solid var(--border);
   background: transparent;
-  color: var(--text, #0f172a);
+  color: var(--text);
   font-size: 14px;
   outline: none;
 }
 .cmdk-input::placeholder {
-  color: var(--text-3, #94a3b8);
+  color: var(--text-3);
 }
 .cmdk-list {
   list-style: none;
@@ -277,11 +276,11 @@ button.search {
   border-radius: 8px;
   text-align: left;
   font-size: 14px;
-  color: var(--text, #0f172a);
+  color: var(--text);
 }
 .cmdk-item.active,
 .cmdk-item:hover {
-  background: var(--accent-soft, #eff2f7);
+  background: var(--accent-soft);
 }
 .cmdk-label {
   overflow: hidden;
@@ -292,21 +291,21 @@ button.search {
   margin-left: 8px;
   font-family: var(--mono);
   font-size: 12px;
-  color: var(--text-3, #64748b);
+  color: var(--text-3);
 }
 .cmdk-kind {
   flex: none;
   font-size: 11px;
-  color: var(--text-3, #64748b);
-  background: var(--bg, #f1f5f9);
-  border: 1px solid var(--border, #e2e8f0);
+  color: var(--text-3);
+  background: var(--bg);
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 2px 6px;
 }
 .cmdk-empty {
   padding: 24px;
   text-align: center;
-  color: var(--text-3, #64748b);
+  color: var(--text-3);
   font-size: 14px;
 }
 .topbar-actions {
@@ -493,6 +492,56 @@ button.search {
     height: 6px;
     border-radius: 50%;
     background: var(--danger);
+  }
+}
+
+/* Branded loading screen (LoadingScreen.tsx) */
+.lr-loader {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+}
+.lr-loader-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  animation: lr-spin 0.8s linear infinite;
+}
+.lr-loader-mark {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  animation: lr-pulse 1.6s ease-in-out infinite;
+}
+.lr-loader-mark .brand-mark {
+  width: 40px;
+  height: 40px;
+}
+@keyframes lr-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes lr-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(0.88);
+    opacity: 0.75;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lr-loader-ring,
+  .lr-loader-mark {
+    animation: none;
   }
 }
 

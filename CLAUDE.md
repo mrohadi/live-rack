@@ -19,7 +19,7 @@
 ```bash
 # Dev
 make dev          # docker compose up (PG+TS, NATS, ClickHouse, Redis, MinIO)
-make seed         # Load fixtures from references/live-rack/project/data.jsx
+make seed         # Load fixtures from ui-references/live-rack/data.jsx
 make test         # Run all tests (Go + Vitest)
 make lint         # golangci-lint + eslint + prettier
 make typecheck    # tsc --noEmit

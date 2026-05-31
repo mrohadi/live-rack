@@ -127,6 +127,20 @@ type Store struct {
 	UpdatedAt time.Time     `json:"updated_at"`
 }
 
+type Task struct {
+	ID         uuid.UUID          `json:"id"`
+	OrgID      uuid.UUID          `json:"org_id"`
+	StoreID    uuid.UUID          `json:"store_id"`
+	ZoneID     pgtype.UUID        `json:"zone_id"`
+	Title      string             `json:"title"`
+	Status     string             `json:"status"`
+	Priority   string             `json:"priority"`
+	AssigneeID pgtype.UUID        `json:"assignee_id"`
+	DueAt      pgtype.Timestamptz `json:"due_at"`
+	CreatedAt  time.Time          `json:"created_at"`
+	UpdatedAt  time.Time          `json:"updated_at"`
+}
+
 type User struct {
 	ID          uuid.UUID   `json:"id"`
 	OrgID       uuid.UUID   `json:"org_id"`

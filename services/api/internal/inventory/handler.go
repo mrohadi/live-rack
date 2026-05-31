@@ -9,6 +9,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	pkgauth "github.com/live-rack/pkg/auth"
+	"github.com/live-rack/pkg/domain"
 	"github.com/live-rack/pkg/store"
 )
 
@@ -42,6 +43,7 @@ type Row struct {
 	Status    string    `json:"status"`
 	Qty       int32     `json:"qty"`
 	UpdatedAt string    `json:"updated_at"`
+	Velocity  string    `json:"velocity"`
 }
 
 // List godoc
@@ -83,6 +85,7 @@ func (h *Handler) List(c echo.Context) error {
 			Status:    r.Status,
 			Qty:       r.Qty,
 			UpdatedAt: r.UpdatedAt.UTC().Format("2006-01-02T15:04:05Z07:00"),
+			Velocity:  string(domain.VelocityFromPicks(int(r.Picks7d), int(r.Picks30d))),
 		})
 	}
 	return c.JSON(http.StatusOK, out)

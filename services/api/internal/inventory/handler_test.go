@@ -39,6 +39,7 @@ func TestInventoryHandler_List(t *testing.T) {
 	lister := &fakeLister{rows: []store.ListInventoryByStoreRow{{
 		ID: uuid.New(), OrgID: orgID, StoreID: storeID, ZoneID: zoneID,
 		Sku: "SKU-1", Qty: 7, Name: "Widget", Category: "frozen", Status: "active",
+		Picks7d: 8, Picks30d: 20,
 		UpdatedAt: time.Now().UTC(),
 	}}}
 
@@ -68,4 +69,5 @@ func TestInventoryHandler_List(t *testing.T) {
 	assert.Equal(t, "SKU-1", out[0].SKU)
 	assert.EqualValues(t, 7, out[0].Qty)
 	assert.Equal(t, "Widget", out[0].Name)
+	assert.Equal(t, "hot", out[0].Velocity)
 }

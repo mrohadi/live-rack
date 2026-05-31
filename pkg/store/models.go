@@ -147,6 +147,20 @@ type RoleBinding struct {
 	RoleID uuid.UUID `json:"role_id"`
 }
 
+type SalesEvent struct {
+	ID          uuid.UUID   `json:"id"`
+	Ts          time.Time   `json:"ts"`
+	OrgID       uuid.UUID   `json:"org_id"`
+	StoreID     pgtype.UUID `json:"store_id"`
+	Source      string      `json:"source"`
+	OrderID     string      `json:"order_id"`
+	Sku         string      `json:"sku"`
+	Qty         int32       `json:"qty"`
+	AmountCents int64       `json:"amount_cents"`
+	Currency    string      `json:"currency"`
+	Channel     string      `json:"channel"`
+}
+
 type ScanEvent struct {
 	ID        uuid.UUID `json:"id"`
 	Ts        time.Time `json:"ts"`

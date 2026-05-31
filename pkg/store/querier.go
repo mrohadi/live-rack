@@ -17,6 +17,7 @@ type Querier interface {
 	CountZonesByStore(ctx context.Context, arg CountZonesByStoreParams) (int64, error)
 	CreateCard(ctx context.Context, arg CreateCardParams) (PipelineCard, error)
 	CreatePipeline(ctx context.Context, arg CreatePipelineParams) (Pipeline, error)
+	CreateSaleEvent(ctx context.Context, arg CreateSaleEventParams) (SalesEvent, error)
 	CreateScanEvent(ctx context.Context, arg CreateScanEventParams) (ScanEvent, error)
 	CreateStage(ctx context.Context, arg CreateStageParams) (PipelineStage, error)
 	CreateStore(ctx context.Context, arg CreateStoreParams) (Store, error)
@@ -50,6 +51,8 @@ type Querier interface {
 	ListZonesByStore(ctx context.Context, arg ListZonesByStoreParams) ([]Zone, error)
 	MarkWebhookStatus(ctx context.Context, arg MarkWebhookStatusParams) error
 	MoveCard(ctx context.Context, arg MoveCardParams) (PipelineCard, error)
+	SalesByDay(ctx context.Context, arg SalesByDayParams) ([]SalesByDayRow, error)
+	SalesSummary(ctx context.Context, arg SalesSummaryParams) (SalesSummaryRow, error)
 	// Fuzzy ⌘K search across items (sku + name) and zones (name) for one org.
 	// Trigram similarity ranks fuzzy hits; ILIKE catches short substrings GIN trigram
 	// can still serve. Results ordered by best score, capped by max_results.

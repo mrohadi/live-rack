@@ -1,15 +1,7 @@
 import { Navigate, type RouteObject } from "react-router-dom";
 import { AuthGuard } from "./components/AuthGuard";
+import { CallbackPage } from "./components/CallbackPage";
 import { AppShell } from "./components/shell";
-
-// AuthProvider processes the OIDC redirect automatically; this just shows a spinner.
-function CallbackPage() {
-  return (
-    <div className="flex h-screen items-center justify-center">
-      <span className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-    </div>
-  );
-}
 
 export const routes: RouteObject[] = [
   {

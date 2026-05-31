@@ -206,6 +206,14 @@ textarea {
   flex: 1;
   font-size: 13px;
 }
+button.search {
+  cursor: pointer;
+  text-align: left;
+}
+.search-placeholder {
+  flex: 1;
+  color: var(--text-3);
+}
 .search kbd {
   font-family: var(--mono);
   font-size: 10.5px;
@@ -214,6 +222,92 @@ textarea {
   padding: 1px 5px;
   border-radius: 4px;
   color: var(--text-3);
+}
+
+/* ⌘K command palette (LR-303). Concrete values with token fallbacks so it
+   renders correctly even though Tailwind utilities are not compiled here. */
+.cmdk-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 15vh;
+  background: rgba(15, 23, 42, 0.45);
+}
+.cmdk-panel {
+  width: 100%;
+  max-width: 560px;
+  background: var(--panel, #ffffff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 12px;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.25);
+  overflow: hidden;
+}
+.cmdk-input {
+  width: 100%;
+  padding: 14px 16px;
+  border: none;
+  border-bottom: 1px solid var(--border, #e2e8f0);
+  background: transparent;
+  color: var(--text, #0f172a);
+  font-size: 14px;
+  outline: none;
+}
+.cmdk-input::placeholder {
+  color: var(--text-3, #94a3b8);
+}
+.cmdk-list {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+.cmdk-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 12px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  text-align: left;
+  font-size: 14px;
+  color: var(--text, #0f172a);
+}
+.cmdk-item.active,
+.cmdk-item:hover {
+  background: var(--accent-soft, #eff2f7);
+}
+.cmdk-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cmdk-sku {
+  margin-left: 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-3, #64748b);
+}
+.cmdk-kind {
+  flex: none;
+  font-size: 11px;
+  color: var(--text-3, #64748b);
+  background: var(--bg, #f1f5f9);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 6px;
+  padding: 2px 6px;
+}
+.cmdk-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--text-3, #64748b);
+  font-size: 14px;
 }
 .topbar-actions {
   margin-left: auto;

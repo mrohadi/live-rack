@@ -31,6 +31,10 @@ type Querier interface {
 	ListScanEventsByZone(ctx context.Context, arg ListScanEventsByZoneParams) ([]ScanEvent, error)
 	ListStoresByOrg(ctx context.Context, orgID uuid.UUID) ([]Store, error)
 	ListZonesByStore(ctx context.Context, arg ListZonesByStoreParams) ([]Zone, error)
+	// Fuzzy ⌘K search across items (sku + name) and zones (name) for one org.
+	// Trigram similarity ranks fuzzy hits; ILIKE catches short substrings GIN trigram
+	// can still serve. Results ordered by best score, capped by max_results.
+	SearchEntities(ctx context.Context, arg SearchEntitiesParams) ([]SearchEntitiesRow, error)
 	UpdateZone(ctx context.Context, arg UpdateZoneParams) (Zone, error)
 	UpsertItem(ctx context.Context, arg UpsertItemParams) (Item, error)
 	UpsertOrg(ctx context.Context, arg UpsertOrgParams) (Org, error)

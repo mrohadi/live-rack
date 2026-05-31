@@ -25,6 +25,7 @@ type Querier interface {
 	DeleteTask(ctx context.Context, arg DeleteTaskParams) error
 	DeleteZone(ctx context.Context, arg DeleteZoneParams) error
 	GetCard(ctx context.Context, arg GetCardParams) (PipelineCard, error)
+	GetIntegration(ctx context.Context, arg GetIntegrationParams) (Integration, error)
 	GetItemBySKU(ctx context.Context, arg GetItemBySKUParams) (Item, error)
 	GetLastScanForSKU(ctx context.Context, arg GetLastScanForSKUParams) (ScanEvent, error)
 	GetOrgByIdpID(ctx context.Context, idpOrgID string) (Org, error)
@@ -35,7 +36,10 @@ type Querier interface {
 	GetUserRole(ctx context.Context, arg GetUserRoleParams) (string, error)
 	GetUserStoreIDs(ctx context.Context, arg GetUserStoreIDsParams) ([]uuid.UUID, error)
 	GetZone(ctx context.Context, arg GetZoneParams) (Zone, error)
+	InsertInboundWebhook(ctx context.Context, arg InsertInboundWebhookParams) (WebhooksInbound, error)
 	ListCardsByPipeline(ctx context.Context, arg ListCardsByPipelineParams) ([]PipelineCard, error)
+	ListInboundWebhooks(ctx context.Context, arg ListInboundWebhooksParams) ([]WebhooksInbound, error)
+	ListIntegrations(ctx context.Context, orgID uuid.UUID) ([]ListIntegrationsRow, error)
 	ListInventoryByStore(ctx context.Context, arg ListInventoryByStoreParams) ([]ListInventoryByStoreRow, error)
 	ListItems(ctx context.Context, orgID uuid.UUID) ([]Item, error)
 	ListPipelinesByStore(ctx context.Context, arg ListPipelinesByStoreParams) ([]Pipeline, error)
@@ -44,6 +48,7 @@ type Querier interface {
 	ListStoresByOrg(ctx context.Context, orgID uuid.UUID) ([]Store, error)
 	ListTasksByStore(ctx context.Context, arg ListTasksByStoreParams) ([]Task, error)
 	ListZonesByStore(ctx context.Context, arg ListZonesByStoreParams) ([]Zone, error)
+	MarkWebhookStatus(ctx context.Context, arg MarkWebhookStatusParams) error
 	MoveCard(ctx context.Context, arg MoveCardParams) (PipelineCard, error)
 	// Fuzzy ⌘K search across items (sku + name) and zones (name) for one org.
 	// Trigram similarity ranks fuzzy hits; ILIKE catches short substrings GIN trigram
@@ -51,6 +56,7 @@ type Querier interface {
 	SearchEntities(ctx context.Context, arg SearchEntitiesParams) ([]SearchEntitiesRow, error)
 	UpdateTaskStatus(ctx context.Context, arg UpdateTaskStatusParams) (Task, error)
 	UpdateZone(ctx context.Context, arg UpdateZoneParams) (Zone, error)
+	UpsertIntegration(ctx context.Context, arg UpsertIntegrationParams) (Integration, error)
 	UpsertItem(ctx context.Context, arg UpsertItemParams) (Item, error)
 	UpsertOrg(ctx context.Context, arg UpsertOrgParams) (Org, error)
 	UpsertUser(ctx context.Context, arg UpsertUserParams) (User, error)

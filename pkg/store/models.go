@@ -59,6 +59,18 @@ func (ns NullZoneType) Value() (driver.Value, error) {
 	return string(ns.ZoneType), nil
 }
 
+type Integration struct {
+	ID         uuid.UUID `json:"id"`
+	OrgID      uuid.UUID `json:"org_id"`
+	Kind       string    `json:"kind"`
+	Status     string    `json:"status"`
+	ExternalID string    `json:"external_id"`
+	Secret     string    `json:"secret"`
+	Config     []byte    `json:"config"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
+
 type Item struct {
 	ID        uuid.UUID `json:"id"`
 	OrgID     uuid.UUID `json:"org_id"`
@@ -183,6 +195,16 @@ type User struct {
 	AvatarUrl   pgtype.Text `json:"avatar_url"`
 	CreatedAt   time.Time   `json:"created_at"`
 	UpdatedAt   time.Time   `json:"updated_at"`
+}
+
+type WebhooksInbound struct {
+	ID         uuid.UUID `json:"id"`
+	OrgID      uuid.UUID `json:"org_id"`
+	Provider   string    `json:"provider"`
+	EventID    string    `json:"event_id"`
+	Topic      string    `json:"topic"`
+	Status     string    `json:"status"`
+	ReceivedAt time.Time `json:"received_at"`
 }
 
 type Zone struct {

@@ -89,6 +89,39 @@ type Org struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+type Pipeline struct {
+	ID        uuid.UUID `json:"id"`
+	OrgID     uuid.UUID `json:"org_id"`
+	StoreID   uuid.UUID `json:"store_id"`
+	Key       string    `json:"key"`
+	Name      string    `json:"name"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type PipelineCard struct {
+	ID             uuid.UUID   `json:"id"`
+	OrgID          uuid.UUID   `json:"org_id"`
+	PipelineID     uuid.UUID   `json:"pipeline_id"`
+	StagePosition  int32       `json:"stage_position"`
+	Title          string      `json:"title"`
+	Sku            string      `json:"sku"`
+	Priority       string      `json:"priority"`
+	OwnerID        pgtype.UUID `json:"owner_id"`
+	EnteredStageAt time.Time   `json:"entered_stage_at"`
+	CreatedAt      time.Time   `json:"created_at"`
+	UpdatedAt      time.Time   `json:"updated_at"`
+}
+
+type PipelineStage struct {
+	ID         uuid.UUID `json:"id"`
+	OrgID      uuid.UUID `json:"org_id"`
+	PipelineID uuid.UUID `json:"pipeline_id"`
+	Position   int32     `json:"position"`
+	Name       string    `json:"name"`
+	SlaSeconds int64     `json:"sla_seconds"`
+}
+
 type Role struct {
 	ID    uuid.UUID `json:"id"`
 	OrgID uuid.UUID `json:"org_id"`

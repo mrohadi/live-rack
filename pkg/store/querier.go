@@ -15,27 +15,36 @@ type Querier interface {
 	AssignTask(ctx context.Context, arg AssignTaskParams) (Task, error)
 	BindUserRole(ctx context.Context, arg BindUserRoleParams) error
 	CountZonesByStore(ctx context.Context, arg CountZonesByStoreParams) (int64, error)
+	CreateCard(ctx context.Context, arg CreateCardParams) (PipelineCard, error)
+	CreatePipeline(ctx context.Context, arg CreatePipelineParams) (Pipeline, error)
 	CreateScanEvent(ctx context.Context, arg CreateScanEventParams) (ScanEvent, error)
+	CreateStage(ctx context.Context, arg CreateStageParams) (PipelineStage, error)
 	CreateStore(ctx context.Context, arg CreateStoreParams) (Store, error)
 	CreateTask(ctx context.Context, arg CreateTaskParams) (Task, error)
 	CreateZone(ctx context.Context, arg CreateZoneParams) (Zone, error)
 	DeleteTask(ctx context.Context, arg DeleteTaskParams) error
 	DeleteZone(ctx context.Context, arg DeleteZoneParams) error
+	GetCard(ctx context.Context, arg GetCardParams) (PipelineCard, error)
 	GetItemBySKU(ctx context.Context, arg GetItemBySKUParams) (Item, error)
 	GetLastScanForSKU(ctx context.Context, arg GetLastScanForSKUParams) (ScanEvent, error)
 	GetOrgByIdpID(ctx context.Context, idpOrgID string) (Org, error)
+	GetPipeline(ctx context.Context, arg GetPipelineParams) (Pipeline, error)
 	GetStore(ctx context.Context, arg GetStoreParams) (Store, error)
 	GetTask(ctx context.Context, arg GetTaskParams) (Task, error)
 	GetUserByIdpID(ctx context.Context, idpUserID string) (User, error)
 	GetUserRole(ctx context.Context, arg GetUserRoleParams) (string, error)
 	GetUserStoreIDs(ctx context.Context, arg GetUserStoreIDsParams) ([]uuid.UUID, error)
 	GetZone(ctx context.Context, arg GetZoneParams) (Zone, error)
+	ListCardsByPipeline(ctx context.Context, arg ListCardsByPipelineParams) ([]PipelineCard, error)
 	ListInventoryByStore(ctx context.Context, arg ListInventoryByStoreParams) ([]ListInventoryByStoreRow, error)
 	ListItems(ctx context.Context, orgID uuid.UUID) ([]Item, error)
+	ListPipelinesByStore(ctx context.Context, arg ListPipelinesByStoreParams) ([]Pipeline, error)
 	ListScanEventsByZone(ctx context.Context, arg ListScanEventsByZoneParams) ([]ScanEvent, error)
+	ListStagesByPipeline(ctx context.Context, arg ListStagesByPipelineParams) ([]PipelineStage, error)
 	ListStoresByOrg(ctx context.Context, orgID uuid.UUID) ([]Store, error)
 	ListTasksByStore(ctx context.Context, arg ListTasksByStoreParams) ([]Task, error)
 	ListZonesByStore(ctx context.Context, arg ListZonesByStoreParams) ([]Zone, error)
+	MoveCard(ctx context.Context, arg MoveCardParams) (PipelineCard, error)
 	// Fuzzy ⌘K search across items (sku + name) and zones (name) for one org.
 	// Trigram similarity ranks fuzzy hits; ILIKE catches short substrings GIN trigram
 	// can still serve. Results ordered by best score, capped by max_results.

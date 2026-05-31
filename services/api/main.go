@@ -162,7 +162,7 @@ func main() {
 	zones.New(q).Register(api.Group("/stores"))
 	scans.New(q, q, q, publisher).Register(api.Group("/stores"))
 	inventory.New(q).Register(api.Group("/stores"))
-	tasks.New(q).Register(api.Group("/stores"))
+	tasks.New(q, publisher).Register(api.Group("/stores"))
 	search.New(q).Register(api)
 
 	hub := ws.NewHub(log)

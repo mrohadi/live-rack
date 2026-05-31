@@ -14,18 +14,23 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/jackc/pgx/v5/pgtype"
+
 	pkgauth "github.com/live-rack/pkg/auth"
 	"github.com/live-rack/pkg/domain"
+	"github.com/live-rack/pkg/events"
 	"github.com/live-rack/pkg/store"
 	"github.com/live-rack/services/api/internal/tasks"
 )
 
 type fakeStore struct {
-	gotOrg    uuid.UUID
-	gotStore  uuid.UUID
-	gotStatus string
-	rows      []store.Task
-	updated   store.Task
+	gotOrg      uuid.UUID
+	gotStore    uuid.UUID
+	gotStatus   string
+	gotAssignee uuid.UUID
+	rows        []store.Task
+	updated     store.Task
+	assigned    store.Task
 }
 
 func (f *fakeStore) ListTasksByStore(_ context.Context, arg store.ListTasksByStoreParams) ([]store.Task, error) {
@@ -39,6 +44,24 @@ func (f *fakeStore) UpdateTaskStatus(_ context.Context, arg store.UpdateTaskStat
 	f.gotStatus = arg.Status
 	f.updated.Status = arg.Status
 	return f.updated, nil
+}
+
+func (f *fakeStore) AssignTask(_ context.Context, arg store.AssignTaskParams) (store.Task, error) {
+	f.gotOrg = arg.OrgID
+	f.gotAssignee = uuid.UUID(arg.AssigneeID.Bytes)
+	f.assigned.AssigneeID = arg.AssigneeID
+	return f.assigned, nil
+}
+
+type fakePublisher struct {
+	subjects []string
+	payloads []any
+}
+
+func (p *fakePublisher) Publish(_ context.Context, subject string, v any) error {
+	p.subjects = append(p.subjects, subject)
+	p.payloads = append(p.payloads, v)
+	return nil
 }
 
 func newContext(t *testing.T, e *echo.Echo, method, target, body string, p *domain.Principal) (echo.Context, *httptest.ResponseRecorder) {
@@ -69,7 +92,7 @@ func TestTasksHandler_List(t *testing.T) {
 	fs := &fakeStore{rows: []store.Task{row}}
 	e := echo.New()
 	e.HideBanner = true
-	h := tasks.New(fs)
+	h := tasks.New(fs, &fakePublisher{})
 	h.Register(e.Group("/api/v1/stores"))
 
 	p := &domain.Principal{UserID: uuid.New(), OrgID: orgID, Role: domain.RoleStaff}
@@ -96,7 +119,7 @@ func TestTasksHandler_UpdateStatus(t *testing.T) {
 	fs := &fakeStore{updated: store.Task{ID: taskID, OrgID: orgID, StoreID: storeID, Title: "Move me", Priority: "med", UpdatedAt: time.Now().UTC()}}
 	e := echo.New()
 	e.HideBanner = true
-	h := tasks.New(fs)
+	h := tasks.New(fs, &fakePublisher{})
 
 	p := &domain.Principal{UserID: uuid.New(), OrgID: orgID, Role: domain.RoleStaff}
 	c, rec := newContext(t, e, http.MethodPatch,
@@ -117,7 +140,7 @@ func TestTasksHandler_UpdateStatus_InvalidStatus(t *testing.T) {
 	orgID, storeID, taskID := uuid.New(), uuid.New(), uuid.New()
 	fs := &fakeStore{}
 	e := echo.New()
-	h := tasks.New(fs)
+	h := tasks.New(fs, &fakePublisher{})
 
 	p := &domain.Principal{UserID: uuid.New(), OrgID: orgID, Role: domain.RoleStaff}
 	c, _ := newContext(t, e, http.MethodPatch,
@@ -133,11 +156,90 @@ func TestTasksHandler_UpdateStatus_InvalidStatus(t *testing.T) {
 	assert.Empty(t, fs.gotStatus)
 }
 
+func TestTasksHandler_Assign_NotifiesAssignee(t *testing.T) {
+	orgID, storeID, taskID, userID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	due := time.Now().UTC().Add(3 * time.Hour) // within deadline window
+	fs := &fakeStore{assigned: store.Task{
+		ID: taskID, OrgID: orgID, StoreID: storeID, Title: "Restock A1",
+		Priority: "high", DueAt: pgtype.Timestamptz{Time: due, Valid: true},
+		UpdatedAt: time.Now().UTC(),
+	}}
+	pub := &fakePublisher{}
+	e := echo.New()
+	h := tasks.New(fs, pub)
+
+	p := &domain.Principal{UserID: uuid.New(), OrgID: orgID, Role: domain.RoleManager}
+	c, rec := newContext(t, e, http.MethodPatch,
+		"/api/v1/stores/"+storeID.String()+"/tasks/"+taskID.String()+"/assignee",
+		`{"assignee_id":"`+userID.String()+`"}`, p)
+	c.SetParamNames("storeID", "id")
+	c.SetParamValues(storeID.String(), taskID.String())
+
+	require.NoError(t, h.Assign(c))
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, userID, fs.gotAssignee)
+
+	// Due soon → both assigned and deadline notifications fire.
+	require.Len(t, pub.payloads, 2)
+	assert.Equal(t, events.TaskSubject(orgID), pub.subjects[0])
+	n0 := pub.payloads[0].(events.TaskNotified)
+	assert.Equal(t, events.TaskNotifyAssigned, n0.Kind)
+	assert.Equal(t, userID, n0.AssigneeID)
+	n1 := pub.payloads[1].(events.TaskNotified)
+	assert.Equal(t, events.TaskNotifyDeadline, n1.Kind)
+}
+
+func TestTasksHandler_Assign_NoDeadlineWhenFarOff(t *testing.T) {
+	orgID, storeID, taskID, userID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	due := time.Now().UTC().Add(72 * time.Hour) // outside window
+	fs := &fakeStore{assigned: store.Task{
+		ID: taskID, OrgID: orgID, StoreID: storeID, Title: "Later",
+		Priority: "low", DueAt: pgtype.Timestamptz{Time: due, Valid: true},
+		UpdatedAt: time.Now().UTC(),
+	}}
+	pub := &fakePublisher{}
+	e := echo.New()
+	h := tasks.New(fs, pub)
+
+	p := &domain.Principal{UserID: uuid.New(), OrgID: orgID, Role: domain.RoleManager}
+	c, _ := newContext(t, e, http.MethodPatch,
+		"/api/v1/stores/"+storeID.String()+"/tasks/"+taskID.String()+"/assignee",
+		`{"assignee_id":"`+userID.String()+`"}`, p)
+	c.SetParamNames("storeID", "id")
+	c.SetParamValues(storeID.String(), taskID.String())
+
+	require.NoError(t, h.Assign(c))
+	require.Len(t, pub.payloads, 1)
+	assert.Equal(t, events.TaskNotifyAssigned, pub.payloads[0].(events.TaskNotified).Kind)
+}
+
+func TestTasksHandler_Assign_ReadonlyForbidden(t *testing.T) {
+	orgID, storeID, taskID, userID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	fs := &fakeStore{}
+	pub := &fakePublisher{}
+	e := echo.New()
+	h := tasks.New(fs, pub)
+
+	p := &domain.Principal{UserID: uuid.New(), OrgID: orgID, Role: domain.RoleReadonly}
+	c, _ := newContext(t, e, http.MethodPatch,
+		"/api/v1/stores/"+storeID.String()+"/tasks/"+taskID.String()+"/assignee",
+		`{"assignee_id":"`+userID.String()+`"}`, p)
+	c.SetParamNames("storeID", "id")
+	c.SetParamValues(storeID.String(), taskID.String())
+
+	err := h.Assign(c)
+	require.Error(t, err)
+	he, ok := err.(*echo.HTTPError)
+	require.True(t, ok)
+	assert.Equal(t, http.StatusForbidden, he.Code)
+	assert.Empty(t, pub.payloads)
+}
+
 func TestTasksHandler_UpdateStatus_ReadonlyForbidden(t *testing.T) {
 	orgID, storeID, taskID := uuid.New(), uuid.New(), uuid.New()
 	fs := &fakeStore{}
 	e := echo.New()
-	h := tasks.New(fs)
+	h := tasks.New(fs, &fakePublisher{})
 
 	p := &domain.Principal{UserID: uuid.New(), OrgID: orgID, Role: domain.RoleReadonly}
 	c, _ := newContext(t, e, http.MethodPatch,

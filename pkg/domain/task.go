@@ -54,3 +54,13 @@ type Task struct {
 func CanMutateTask(p *Principal) bool {
 	return p.HasRole(RoleAdmin, RoleManager, RoleStaff)
 }
+
+// DueSoon reports whether the task has a deadline falling within `within` of now.
+// Tasks with no due date, or already past, are not "soon".
+func (t Task) DueSoon(now time.Time, within time.Duration) bool {
+	if t.DueAt == nil {
+		return false
+	}
+	d := t.DueAt.Sub(now)
+	return d >= 0 && d <= within
+}

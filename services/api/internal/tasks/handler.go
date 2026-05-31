@@ -4,35 +4,44 @@ package tasks
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/labstack/echo/v4"
 
 	pkgauth "github.com/live-rack/pkg/auth"
 	"github.com/live-rack/pkg/domain"
+	"github.com/live-rack/pkg/events"
 	"github.com/live-rack/pkg/store"
 )
+
+// deadlineWindow is how close a due date must be to trigger a deadline notification.
+const deadlineWindow = 24 * time.Hour
 
 // Store is the narrow store dependency the handler needs.
 type Store interface {
 	ListTasksByStore(ctx context.Context, arg store.ListTasksByStoreParams) ([]store.Task, error)
 	UpdateTaskStatus(ctx context.Context, arg store.UpdateTaskStatusParams) (store.Task, error)
+	AssignTask(ctx context.Context, arg store.AssignTaskParams) (store.Task, error)
 }
 
 // Handler serves task board endpoints.
 type Handler struct {
-	q Store
+	q   Store
+	pub events.Publisher
 }
 
 // New creates a Handler.
-func New(q Store) *Handler {
-	return &Handler{q: q}
+func New(q Store, pub events.Publisher) *Handler {
+	return &Handler{q: q, pub: pub}
 }
 
 // Register mounts task routes onto g (expected: /api/v1/stores).
 func (h *Handler) Register(g *echo.Group) {
 	g.GET("/:storeID/tasks", h.List)
 	g.PATCH("/:storeID/tasks/:id", h.UpdateStatus)
+	g.PATCH("/:storeID/tasks/:id/assignee", h.Assign)
 }
 
 // Row is one kanban card returned to the client.
@@ -155,4 +164,93 @@ func (h *Handler) UpdateStatus(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusNotFound, "task not found")
 	}
 	return c.JSON(http.StatusOK, toRow(t))
+}
+
+type assignRequest struct {
+	AssigneeID uuid.UUID `json:"assignee_id"`
+}
+
+// Assign godoc
+//
+//	@Summary		Assign a task and notify the assignee over NATS
+//	@Tags			tasks
+//	@Accept			json
+//	@Produce		json
+//	@Param			storeID	path		string			true	"Store UUID"
+//	@Param			id		path		string			true	"Task UUID"
+//	@Param			body	body		assignRequest	true	"Assignee"
+//	@Success		200		{object}	Row
+//	@Failure		400		{object}	map[string]string
+//	@Failure		403		{object}	map[string]string
+//	@Failure		404		{object}	map[string]string
+//	@Router			/stores/{storeID}/tasks/{id}/assignee [patch]
+func (h *Handler) Assign(c echo.Context) error {
+	p, err := pkgauth.PrincipalFrom(c.Request().Context())
+	if err != nil {
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
+	}
+	if !domain.CanMutateTask(p) {
+		return echo.NewHTTPError(http.StatusForbidden, "forbidden")
+	}
+
+	taskID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid task id")
+	}
+
+	var req assignRequest
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
+	}
+	if req.AssigneeID == uuid.Nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "assignee_id required")
+	}
+
+	ctx := c.Request().Context()
+	t, err := h.q.AssignTask(ctx, store.AssignTaskParams{
+		OrgID:      p.OrgID,
+		ID:         taskID,
+		AssigneeID: pgtype.UUID{Bytes: req.AssigneeID, Valid: true},
+	})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "task not found")
+	}
+
+	if err := h.notify(ctx, t); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "publish notification")
+	}
+	return c.JSON(http.StatusOK, toRow(t))
+}
+
+// notify publishes an "assigned" event, plus a "deadline" event when the task is due soon.
+func (h *Handler) notify(ctx context.Context, t store.Task) error {
+	var due *time.Time
+	if t.DueAt.Valid {
+		v := t.DueAt.Time.UTC()
+		due = &v
+	}
+	base := events.TaskNotified{
+		OrgID:      t.OrgID,
+		StoreID:    t.StoreID,
+		TaskID:     t.ID,
+		AssigneeID: uuid.UUID(t.AssigneeID.Bytes),
+		Title:      t.Title,
+		DueAt:      due,
+		TS:         time.Now().UTC(),
+	}
+
+	assigned := base
+	assigned.Kind = events.TaskNotifyAssigned
+	if err := h.pub.Publish(ctx, events.TaskSubject(t.OrgID), assigned); err != nil {
+		return err
+	}
+
+	if (domain.Task{DueAt: due}).DueSoon(time.Now().UTC(), deadlineWindow) {
+		deadline := base
+		deadline.Kind = events.TaskNotifyDeadline
+		if err := h.pub.Publish(ctx, events.TaskSubject(t.OrgID), deadline); err != nil {
+			return err
+		}
+	}
+	return nil
 }

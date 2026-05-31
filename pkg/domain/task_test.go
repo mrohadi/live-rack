@@ -2,6 +2,7 @@ package domain_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -33,5 +34,30 @@ func TestTaskStatusValid(t *testing.T) {
 	}
 	if domain.TaskStatus("bogus").Valid() {
 		t.Error("bogus should be invalid")
+	}
+}
+
+func TestTaskDueSoon(t *testing.T) {
+	now := time.Date(2026, 5, 31, 12, 0, 0, 0, time.UTC)
+	within := 24 * time.Hour
+	in6h := now.Add(6 * time.Hour)
+	in2d := now.Add(48 * time.Hour)
+	past := now.Add(-time.Hour)
+
+	cases := []struct {
+		name string
+		due  *time.Time
+		want bool
+	}{
+		{"no due date", nil, false},
+		{"due in 6h", &in6h, true},
+		{"due in 2d", &in2d, false},
+		{"already past", &past, false},
+	}
+	for _, c := range cases {
+		got := domain.Task{DueAt: c.due}.DueSoon(now, within)
+		if got != c.want {
+			t.Errorf("%s: got %v want %v", c.name, got, c.want)
+		}
 	}
 }

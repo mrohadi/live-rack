@@ -52,7 +52,7 @@ type Task struct {
 // CanMutateTask reports whether the principal may create/update/delete tasks.
 // Read-only and service principals are denied.
 func CanMutateTask(p *Principal) bool {
-	return p.HasRole(RoleAdmin, RoleManager, RoleStaff)
+	return Can(p.Role, PermManageTasksOwn)
 }
 
 // DueSoon reports whether the task has a deadline falling within `within` of now.

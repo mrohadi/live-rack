@@ -2,6 +2,8 @@ import { useEffect } from "react";
 import { useAuth } from "react-oidc-context";
 import { Outlet } from "react-router-dom";
 
+import { LoadingScreen } from "./LoadingScreen";
+
 // Zitadel project-roles claim: { roleName: { orgId: orgDomain } }. Org id = inner key.
 const ROLES_CLAIM = "urn:zitadel:iam:org:project:roles";
 
@@ -10,22 +12,6 @@ function orgIdFromRoles(profile?: Record<string, unknown>): string | undefined {
   if (!roles) return undefined;
   const firstRole = Object.values(roles)[0];
   return firstRole ? Object.keys(firstRole)[0] : undefined;
-}
-
-function Spinner({ label }: { label: string }) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        height: "100vh",
-        alignItems: "center",
-        justifyContent: "center",
-        color: "#94a3b8",
-      }}
-    >
-      {label}
-    </div>
-  );
 }
 
 export function AuthGuard() {
@@ -38,8 +24,7 @@ export function AuthGuard() {
     }
   }, [auth]);
 
-  if (auth.isLoading || auth.activeNavigator)
-    return <Spinner label={`Loading… (${auth.activeNavigator ?? "init"})`} />;
+  if (auth.isLoading || auth.activeNavigator) return <LoadingScreen />;
 
   if (auth.error) {
     return (
@@ -49,7 +34,7 @@ export function AuthGuard() {
     );
   }
 
-  if (!auth.isAuthenticated) return <Spinner label="Redirecting to sign-in…" />;
+  if (!auth.isAuthenticated) return <LoadingScreen label="Redirecting to sign-in…" />;
 
   // Every user must belong to an org (tenant).
   const orgId = orgIdFromRoles(auth.user?.profile);

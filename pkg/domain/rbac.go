@@ -46,9 +46,27 @@ var rolePermissions = map[RoleName]map[Permission]bool{
 	},
 }
 
+// mfaRequired are high-impact permissions that demand a second factor.
+var mfaRequired = map[Permission]bool{
+	PermEditUsers:          true,
+	PermManageIntegrations: true,
+}
+
+// RequiresMFA reports whether a permission demands a verified second factor. Pure.
+func RequiresMFA(perm Permission) bool { return mfaRequired[perm] }
+
 // Can reports whether a role holds a permission. Pure.
 func Can(role RoleName, perm Permission) bool {
 	return rolePermissions[role][perm]
+}
+
+// CanWithMFA reports whether the principal may exercise a permission, enforcing
+// a second factor for MFA-required permissions. Pure.
+func (p *Principal) CanWithMFA(perm Permission) bool {
+	if !Can(p.Role, perm) {
+		return false
+	}
+	return !RequiresMFA(perm) || p.MFAVerified
 }
 
 // Permissions returns the sorted permissions granted to a role. Pure.

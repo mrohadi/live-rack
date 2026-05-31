@@ -29,12 +29,13 @@ type User struct {
 
 // Principal carries verified identity after auth middleware.
 type Principal struct {
-	UserID   uuid.UUID
-	OrgID    uuid.UUID
-	IDPOrgID string
-	Role     RoleName
-	StoreIDs []uuid.UUID // empty = all stores
-	ZoneIDs  []uuid.UUID // empty = all zones (org-wide)
+	UserID      uuid.UUID
+	OrgID       uuid.UUID
+	IDPOrgID    string
+	Role        RoleName
+	StoreIDs    []uuid.UUID // empty = all stores
+	ZoneIDs     []uuid.UUID // empty = all zones (org-wide)
+	MFAVerified bool        // a second factor was used this session
 }
 
 func (p *Principal) HasRole(roles ...RoleName) bool {

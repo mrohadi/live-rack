@@ -5,11 +5,14 @@ use (
 	./pkg/chstore
 	./pkg/domain
 	./pkg/events
+	./pkg/insight
 	./pkg/integrations
 	./pkg/observability
 	./pkg/store
 	./scripts/seed
 	./services/api
 	./services/ingest
+	./services/insight
 	./services/rollup
+	./services/signals
 )

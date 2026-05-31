@@ -27,8 +27,17 @@ export interface Card {
   ageing: boolean;
 }
 
+export interface Bottleneck {
+  position: number;
+  name: string;
+  ageing_count: number;
+  /** Worst dwell time among breaching cards, in nanoseconds (Go time.Duration). */
+  oldest_age: number;
+}
+
 export interface Board {
   pipeline: Pipeline;
   stages: Stage[];
   cards: Card[];
+  bottleneck?: Bottleneck;
 }

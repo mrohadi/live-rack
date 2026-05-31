@@ -11,6 +11,7 @@ import (
 
 	pkgauth "github.com/live-rack/pkg/auth"
 	"github.com/live-rack/pkg/domain"
+	"github.com/live-rack/pkg/events"
 	"github.com/live-rack/pkg/store"
 )
 
@@ -25,12 +26,37 @@ type Store interface {
 
 // Handler serves pipeline endpoints.
 type Handler struct {
-	q Store
+	q   Store
+	pub events.Publisher
 }
 
 // New creates a Handler.
-func New(q Store) *Handler {
-	return &Handler{q: q}
+func New(q Store, pub events.Publisher) *Handler {
+	return &Handler{q: q, pub: pub}
+}
+
+// stageDefs builds the domain stage definitions from stored stage rows.
+func stageDefs(stages []store.PipelineStage) []domain.StageDef {
+	defs := make([]domain.StageDef, len(stages))
+	for _, s := range stages {
+		if int(s.Position) < len(defs) {
+			defs[s.Position] = domain.StageDef{Name: s.Name, SLA: time.Duration(s.SlaSeconds) * time.Second}
+		}
+	}
+	return defs
+}
+
+// detectBottleneck computes the worst SLA-breaching stage for a board.
+func detectBottleneck(stages []store.PipelineStage, cards []store.PipelineCard, now time.Time) *domain.Bottleneck {
+	defs := stageDefs(stages)
+	ages := make([]domain.CardAge, 0, len(cards))
+	for _, cd := range cards {
+		ages = append(ages, domain.CardAge{
+			StagePosition: int(cd.StagePosition),
+			Age:           now.Sub(cd.EnteredStageAt),
+		})
+	}
+	return domain.DetectBottleneck(defs, ages)
 }
 
 // Register mounts pipeline routes onto g (expected: /api/v1/stores).
@@ -68,11 +94,13 @@ type CardRow struct {
 	Ageing         bool      `json:"ageing"`
 }
 
-// BoardResponse is the full board for one pipeline.
+// BoardResponse is the full board for one pipeline. Bottleneck is non-nil when a
+// stage is breaching its SLA.
 type BoardResponse struct {
-	Pipeline PipelineRow `json:"pipeline"`
-	Stages   []StageRow  `json:"stages"`
-	Cards    []CardRow   `json:"cards"`
+	Pipeline   PipelineRow        `json:"pipeline"`
+	Stages     []StageRow         `json:"stages"`
+	Cards      []CardRow          `json:"cards"`
+	Bottleneck *domain.Bottleneck `json:"bottleneck,omitempty"`
 }
 
 func rfc3339(t time.Time) string {
@@ -182,9 +210,10 @@ func buildBoard(pipe store.Pipeline, stages []store.PipelineStage, cards []store
 	}
 
 	return BoardResponse{
-		Pipeline: PipelineRow{ID: pipe.ID, Key: pipe.Key, Name: pipe.Name},
-		Stages:   stageRows,
-		Cards:    cardRows,
+		Pipeline:   PipelineRow{ID: pipe.ID, Key: pipe.Key, Name: pipe.Name},
+		Stages:     stageRows,
+		Cards:      cardRows,
+		Bottleneck: detectBottleneck(stages, cards, now),
 	}
 }
 
@@ -215,6 +244,10 @@ func (h *Handler) MoveCard(c echo.Context) error {
 	if !domain.CanMutatePipeline(p) {
 		return echo.NewHTTPError(http.StatusForbidden, "forbidden")
 	}
+	pipeID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid pipeline id")
+	}
 	cardID, err := uuid.Parse(c.Param("cardID"))
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid card id")
@@ -227,11 +260,16 @@ func (h *Handler) MoveCard(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "stage_position must be >= 0")
 	}
 
-	cd, err := h.q.MoveCard(c.Request().Context(), store.MoveCardParams{
+	ctx := c.Request().Context()
+	cd, err := h.q.MoveCard(ctx, store.MoveCardParams{
 		OrgID: p.OrgID, ID: cardID, StagePosition: req.StagePosition,
 	})
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, "card not found")
+	}
+
+	if err := h.publishBottleneck(ctx, p.OrgID, pipeID); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "publish bottleneck")
 	}
 
 	row := CardRow{
@@ -249,4 +287,36 @@ func (h *Handler) MoveCard(c echo.Context) error {
 		row.OwnerID = &s
 	}
 	return c.JSON(http.StatusOK, row)
+}
+
+// publishBottleneck recomputes the pipeline's bottleneck after a move and emits
+// a PipelineBottleneck event when a stage is breaching its SLA.
+func (h *Handler) publishBottleneck(ctx context.Context, orgID, pipeID uuid.UUID) error {
+	pipe, err := h.q.GetPipeline(ctx, store.GetPipelineParams{OrgID: orgID, ID: pipeID})
+	if err != nil {
+		return err
+	}
+	stages, err := h.q.ListStagesByPipeline(ctx, store.ListStagesByPipelineParams{OrgID: orgID, PipelineID: pipeID})
+	if err != nil {
+		return err
+	}
+	cards, err := h.q.ListCardsByPipeline(ctx, store.ListCardsByPipelineParams{OrgID: orgID, PipelineID: pipeID})
+	if err != nil {
+		return err
+	}
+
+	b := detectBottleneck(stages, cards, time.Now().UTC())
+	if b == nil {
+		return nil
+	}
+	return h.pub.Publish(ctx, events.PipelineBottleneckSubject(orgID), events.PipelineBottleneck{
+		OrgID:       orgID,
+		StoreID:     pipe.StoreID,
+		PipelineID:  pipeID,
+		StagePos:    b.Position,
+		StageName:   b.Name,
+		AgeingCount: b.AgeingCount,
+		OldestAgeS:  int64(b.OldestAge.Seconds()),
+		TS:          time.Now().UTC(),
+	})
 }

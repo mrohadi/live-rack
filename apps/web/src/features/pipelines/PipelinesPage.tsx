@@ -71,6 +71,18 @@ export function PipelinesPage() {
       </header>
 
       <div className="flex-1 overflow-auto p-4">
+        {board?.bottleneck && (
+          <div
+            role="alert"
+            className="mb-3 flex items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+          >
+            <span className="font-semibold">Bottleneck · {board.bottleneck.name}</span>
+            <span className="text-destructive/80">
+              {board.bottleneck.ageing_count} card
+              {board.bottleneck.ageing_count === 1 ? "" : "s"} past SLA
+            </span>
+          </div>
+        )}
         {loadingBoard || !board ? (
           <div className="text-sm text-muted-foreground">Loading board…</div>
         ) : (

@@ -164,7 +164,7 @@ func main() {
 	scans.New(q, q, q, publisher).Register(api.Group("/stores"))
 	inventory.New(q).Register(api.Group("/stores"))
 	tasks.New(q, publisher).Register(api.Group("/stores"))
-	pipelines.New(q).Register(api.Group("/stores"))
+	pipelines.New(q, publisher).Register(api.Group("/stores"))
 	search.New(q).Register(api)
 
 	hub := ws.NewHub(log)

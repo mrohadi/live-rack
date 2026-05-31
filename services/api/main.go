@@ -121,14 +121,16 @@ func main() {
 
 	publisher := events.NewNATSPublisher(js)
 
-	// setOrgID executes SET LOCAL app.org_id = '<id>' on the acquired connection.
-	setOrgID := func(orgID string) error {
+	// setSession sets app.org_id + app.user_id on the acquired connection; RLS
+	// policies read both to enforce tenant and zone scope.
+	setSession := func(orgID, userID string) error {
 		conn, err := pool.Acquire(context.Background())
 		if err != nil {
 			return fmt.Errorf("acquire conn: %w", err)
 		}
 		defer conn.Release()
-		_, err = conn.Exec(context.Background(), fmt.Sprintf("SET LOCAL app.org_id = '%s'", orgID))
+		_, err = conn.Exec(context.Background(),
+			fmt.Sprintf("SET LOCAL app.org_id = '%s'; SET LOCAL app.user_id = '%s'", orgID, userID))
 		return err
 	}
 
@@ -168,7 +170,7 @@ func main() {
 	webhooks.New(q, publisher, integrations.NewShopify(), integrations.NewSquare()).Register(e)
 
 	// Authenticated API group.
-	api := e.Group("/api/v1", apimw.Auth(verifier, setOrgID))
+	api := e.Group("/api/v1", apimw.Auth(verifier, setSession))
 
 	zones.New(q).Register(api.Group("/stores"))
 	scans.New(q, q, q, publisher).Register(api.Group("/stores"))

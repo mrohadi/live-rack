@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -85,5 +86,29 @@ func TestItemsRepo(t *testing.T) {
 		assert.Equal(t, "SKU-1", rows[0].Sku)
 		assert.Equal(t, "Widget v2", rows[0].Name)
 		assert.Equal(t, "frozen", rows[0].Category)
+	})
+
+	t.Run("velocity counts reflect rolling pick scans", func(t *testing.T) {
+		now := time.Now()
+		mk := func(action string, ts time.Time, valid bool) {
+			_, err := q.CreateScanEvent(ctx, store.CreateScanEventParams{
+				Ts: ts, OrgID: orgID, StoreID: storeID, ZoneID: zoneID,
+				ScannerID: "s1", Sku: "SKU-1", Action: action, Valid: valid,
+			})
+			require.NoError(t, err)
+		}
+		mk("pick", now.Add(-1*time.Hour), true)     // in 7d
+		mk("pick", now.Add(-2*24*time.Hour), true)  // in 7d
+		mk("pick", now.Add(-20*24*time.Hour), true) // in 30d only
+		mk("pick", now.Add(-2*time.Hour), false)    // invalid, ignored
+		mk("place", now.Add(-1*time.Hour), true)    // not a pick, ignored
+
+		rows, err := q.ListInventoryByStore(ctx, store.ListInventoryByStoreParams{
+			OrgID: orgID, StoreID: storeID,
+		})
+		require.NoError(t, err)
+		require.Len(t, rows, 1)
+		assert.EqualValues(t, 2, rows[0].Picks7d)
+		assert.EqualValues(t, 3, rows[0].Picks30d)
 	})
 }

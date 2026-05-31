@@ -16,7 +16,19 @@ SELECT
     il.updated_at,
     COALESCE(i.name, '')     AS name,
     COALESCE(i.category, '') AS category,
-    COALESCE(i.status, '')   AS status
+    COALESCE(i.status, '')   AS status,
+    COALESCE((
+        SELECT count(*) FROM scan_events se
+        WHERE se.org_id = il.org_id AND se.zone_id = il.zone_id AND se.sku = il.sku
+          AND se.action = 'pick' AND se.valid
+          AND se.ts >= NOW() - INTERVAL '7 days'
+    ), 0)::int  AS picks_7d,
+    COALESCE((
+        SELECT count(*) FROM scan_events se
+        WHERE se.org_id = il.org_id AND se.zone_id = il.zone_id AND se.sku = il.sku
+          AND se.action = 'pick' AND se.valid
+          AND se.ts >= NOW() - INTERVAL '30 days'
+    ), 0)::int  AS picks_30d
 FROM item_locations il
 LEFT JOIN items i ON i.org_id = il.org_id AND i.sku = il.sku
 WHERE il.org_id = $1 AND il.store_id = $2

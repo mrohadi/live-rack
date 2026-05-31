@@ -35,6 +35,7 @@ func main() {
 	runner := jobs.NewRunner(ch,
 		jobs.TimeToSell{},
 		jobs.SellThrough{},
+		jobs.CombosLift{},
 	)
 
 	interval := envDuration("ROLLUP_INTERVAL", 24*time.Hour)

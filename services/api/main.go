@@ -37,6 +37,7 @@ import (
 	"github.com/live-rack/pkg/store"
 	_ "github.com/live-rack/services/api/docs" // swaggo generated
 	"github.com/live-rack/services/api/internal/authadapter"
+	integrationsapi "github.com/live-rack/services/api/internal/integrations"
 	"github.com/live-rack/services/api/internal/inventory"
 	apimw "github.com/live-rack/services/api/internal/middleware"
 	"github.com/live-rack/services/api/internal/pipelines"
@@ -172,6 +173,7 @@ func main() {
 	tasks.New(q, publisher).Register(api.Group("/stores"))
 	pipelines.New(q, publisher).Register(api.Group("/stores"))
 	sales.New(q).Register(api)
+	integrationsapi.New(q).Register(api)
 	search.New(q).Register(api)
 
 	hub := ws.NewHub(log)

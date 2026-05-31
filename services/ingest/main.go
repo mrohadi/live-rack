@@ -103,7 +103,18 @@ func main() {
 	}
 	defer func() { _ = scanSub.Unsubscribe() }()
 
-	log.Info("ingest worker listening", "subjects", "lr.*.pos.sale, lr.*.scan.recorded")
+	demoSub, err := nc.QueueSubscribe("lr.*.demographics.snapshot", "ingest", func(m *nats.Msg) {
+		if err := sink.HandleDemographics(context.Background(), m.Data); err != nil {
+			log.Error("sink demographics.snapshot", "err", err, "subject", m.Subject)
+		}
+	})
+	if err != nil {
+		log.Error("subscribe demographics.snapshot", "err", err)
+		os.Exit(1)
+	}
+	defer func() { _ = demoSub.Unsubscribe() }()
+
+	log.Info("ingest worker listening", "subjects", "lr.*.pos.sale, lr.*.scan.recorded, lr.*.demographics.snapshot")
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)

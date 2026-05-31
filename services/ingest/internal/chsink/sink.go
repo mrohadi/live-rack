@@ -15,8 +15,10 @@ import (
 )
 
 const (
-	scanTable = "scan_events_raw"
-	saleTable = "sales_events_raw"
+	scanTable   = "scan_events_raw"
+	saleTable   = "sales_events_raw"
+	demoTable   = "demographics"
+	chDayLayout = "2006-01-02"
 	// chTimeLayout matches ClickHouse DateTime64(3) text parsing.
 	chTimeLayout = "2006-01-02 15:04:05.000"
 )
@@ -82,6 +84,34 @@ func DecodeSale(data []byte) (map[string]any, error) {
 	}, nil
 }
 
+// DecodeDemographics maps a demographics.snapshot payload to a demographics
+// row. Day defaults to today (UTC) when absent. Pure.
+func DecodeDemographics(data []byte) (map[string]any, error) {
+	var d events.Demographics
+	if err := json.Unmarshal(data, &d); err != nil {
+		return nil, fmt.Errorf("chsink: decode demographics.snapshot: %w", err)
+	}
+	if d.OrgID == uuid.Nil {
+		return nil, fmt.Errorf("chsink: demographics.snapshot missing org_id")
+	}
+	if d.Metric == "" {
+		return nil, fmt.Errorf("chsink: demographics.snapshot missing metric")
+	}
+	day := d.Day
+	if day == "" {
+		day = time.Now().UTC().Format(chDayLayout)
+	}
+	return map[string]any{
+		"org_id":   d.OrgID.String(),
+		"store_id": d.StoreID.String(),
+		"zone_id":  d.ZoneID.String(),
+		"segment":  d.Segment,
+		"metric":   d.Metric,
+		"value":    d.Value,
+		"day":      day,
+	}, nil
+}
+
 // Sink writes decoded events into ClickHouse.
 type Sink struct {
 	ch Inserter
@@ -108,4 +138,13 @@ func (s *Sink) HandleSale(ctx context.Context, data []byte) error {
 		return err
 	}
 	return s.ch.Insert(ctx, saleTable, []map[string]any{row})
+}
+
+// HandleDemographics decodes and inserts one demographics.snapshot event.
+func (s *Sink) HandleDemographics(ctx context.Context, data []byte) error {
+	row, err := DecodeDemographics(data)
+	if err != nil {
+		return err
+	}
+	return s.ch.Insert(ctx, demoTable, []map[string]any{row})
 }

@@ -12,6 +12,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -32,6 +33,7 @@ import (
 
 	pkgauth "github.com/live-rack/pkg/auth"
 	"github.com/live-rack/pkg/chstore"
+	"github.com/live-rack/pkg/domain"
 	"github.com/live-rack/pkg/events"
 	"github.com/live-rack/pkg/integrations"
 	obs "github.com/live-rack/pkg/observability"
@@ -39,6 +41,7 @@ import (
 	_ "github.com/live-rack/services/api/docs" // swaggo generated
 	"github.com/live-rack/services/api/internal/analytics"
 	"github.com/live-rack/services/api/internal/authadapter"
+	"github.com/live-rack/services/api/internal/billing"
 	integrationsapi "github.com/live-rack/services/api/internal/integrations"
 	"github.com/live-rack/services/api/internal/inventory"
 	apimw "github.com/live-rack/services/api/internal/middleware"
@@ -175,6 +178,9 @@ func main() {
 	// Inbound POS webhooks — unauthenticated, verified by per-vendor signature.
 	webhooks.New(q, publisher, integrations.NewShopify(), integrations.NewSquare(), integrations.NewStripe()).Register(e)
 
+	// Stripe billing webhook → org plan changes. Price→plan map from env (JSON).
+	billing.New(q, envOr("STRIPE_BILLING_SECRET", ""), parsePricePlans(os.Getenv("STRIPE_PRICE_PLANS"))).Register(e)
+
 	// Authenticated API group.
 	api := e.Group("/api/v1", apimw.Auth(verifier, setSession))
 
@@ -247,6 +253,25 @@ func envOr(key, def string) string {
 		return v
 	}
 	return def
+}
+
+// parsePricePlans decodes a JSON map of Stripe price id -> plan name into a
+// domain plan map. Invalid/empty input yields an empty map (all unknown prices
+// fall back to free).
+func parsePricePlans(raw string) map[string]domain.Plan {
+	out := map[string]domain.Plan{}
+	if raw == "" {
+		return out
+	}
+	var m map[string]string
+	if err := json.Unmarshal([]byte(raw), &m); err != nil {
+		slog.Error("parse STRIPE_PRICE_PLANS", "err", err)
+		return out
+	}
+	for price, plan := range m {
+		out[price] = domain.PlanFromString(plan)
+	}
+	return out
 }
 
 func slogLevel(level string) slog.Level {

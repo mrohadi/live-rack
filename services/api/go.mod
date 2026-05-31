@@ -15,7 +15,6 @@ require (
 	github.com/nats-io/nats.go v1.52.0
 	github.com/prometheus/client_golang v1.19.1
 	github.com/stretchr/testify v1.11.1
-	github.com/svix/svix-webhooks v1.93.0
 	github.com/swaggo/echo-swagger v1.5.2
 	github.com/swaggo/swag v1.16.6
 	go.opentelemetry.io/contrib/instrumentation/github.com/labstack/echo/otelecho v0.52.0
@@ -26,9 +25,9 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/clerk/clerk-sdk-go/v2 v2.3.0 // indirect
+	github.com/coreos/go-oidc/v3 v3.18.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/go-jose/go-jose/v3 v3.0.3 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-logr/logr v1.4.1 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/jsonpointer v0.19.6 // indirect
@@ -70,6 +69,7 @@ require (
 	golang.org/x/crypto v0.49.0 // indirect
 	golang.org/x/mod v0.33.0 // indirect
 	golang.org/x/net v0.51.0 // indirect
+	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/sys v0.42.0 // indirect
 	golang.org/x/text v0.35.0 // indirect

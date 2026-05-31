@@ -19,7 +19,7 @@ const (
 type User struct {
 	ID          uuid.UUID `json:"id"`
 	OrgID       uuid.UUID `json:"org_id"`
-	ClerkUserID string    `json:"clerk_user_id"`
+	IDPUserID   string    `json:"idp_user_id"`
 	Email       string    `json:"email"`
 	DisplayName string    `json:"display_name"`
 	AvatarURL   string    `json:"avatar_url,omitempty"`
@@ -29,11 +29,11 @@ type User struct {
 
 // Principal carries verified identity after auth middleware.
 type Principal struct {
-	UserID     uuid.UUID
-	OrgID      uuid.UUID
-	ClerkOrgID string
-	Role       RoleName
-	StoreIDs   []uuid.UUID // empty = all stores
+	UserID   uuid.UUID
+	OrgID    uuid.UUID
+	IDPOrgID string
+	Role     RoleName
+	StoreIDs []uuid.UUID // empty = all stores
 }
 
 func (p *Principal) HasRole(roles ...RoleName) bool {

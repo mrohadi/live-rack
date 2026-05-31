@@ -103,11 +103,11 @@ func (e *notFoundError) Error() string { return "zone not found: " + e.id.String
 // withPrincipal injects a Principal into the Echo request context.
 func withPrincipal(c echo.Context, orgID, storeID uuid.UUID) {
 	p := &domain.Principal{
-		UserID:     uuid.New(),
-		OrgID:      orgID,
-		ClerkOrgID: "clerk_" + orgID.String(),
-		Role:       domain.RoleAdmin,
-		StoreIDs:   []uuid.UUID{storeID},
+		UserID:   uuid.New(),
+		OrgID:    orgID,
+		IDPOrgID: "idp_" + orgID.String(),
+		Role:     domain.RoleAdmin,
+		StoreIDs: []uuid.UUID{storeID},
 	}
 	ctx := pkgauth.WithPrincipal(c.Request().Context(), p)
 	c.SetRequest(c.Request().WithContext(ctx))

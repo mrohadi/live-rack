@@ -68,16 +68,16 @@ func (q *Queries) CreateStore(ctx context.Context, arg CreateStoreParams) (Store
 	return i, err
 }
 
-const getOrgByClerkID = `-- name: GetOrgByClerkID :one
-SELECT id, clerk_org_id, name, plan, created_at, updated_at FROM orgs WHERE clerk_org_id = $1
+const getOrgByIdpID = `-- name: GetOrgByIdpID :one
+SELECT id, idp_org_id, name, plan, created_at, updated_at FROM orgs WHERE idp_org_id = $1
 `
 
-func (q *Queries) GetOrgByClerkID(ctx context.Context, clerkOrgID string) (Org, error) {
-	row := q.db.QueryRow(ctx, getOrgByClerkID, clerkOrgID)
+func (q *Queries) GetOrgByIdpID(ctx context.Context, idpOrgID string) (Org, error) {
+	row := q.db.QueryRow(ctx, getOrgByIdpID, idpOrgID)
 	var i Org
 	err := row.Scan(
 		&i.ID,
-		&i.ClerkOrgID,
+		&i.IdpOrgID,
 		&i.Name,
 		&i.Plan,
 		&i.CreatedAt,
@@ -112,17 +112,17 @@ func (q *Queries) GetStore(ctx context.Context, arg GetStoreParams) (Store, erro
 	return i, err
 }
 
-const getUserByClerkID = `-- name: GetUserByClerkID :one
-SELECT id, org_id, clerk_user_id, email, display_name, avatar_url, created_at, updated_at FROM users WHERE clerk_user_id = $1
+const getUserByIdpID = `-- name: GetUserByIdpID :one
+SELECT id, org_id, idp_user_id, email, display_name, avatar_url, created_at, updated_at FROM users WHERE idp_user_id = $1
 `
 
-func (q *Queries) GetUserByClerkID(ctx context.Context, clerkUserID string) (User, error) {
-	row := q.db.QueryRow(ctx, getUserByClerkID, clerkUserID)
+func (q *Queries) GetUserByIdpID(ctx context.Context, idpUserID string) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByIdpID, idpUserID)
 	var i User
 	err := row.Scan(
 		&i.ID,
 		&i.OrgID,
-		&i.ClerkUserID,
+		&i.IdpUserID,
 		&i.Email,
 		&i.DisplayName,
 		&i.AvatarUrl,
@@ -216,25 +216,25 @@ func (q *Queries) ListStoresByOrg(ctx context.Context, orgID uuid.UUID) ([]Store
 }
 
 const upsertOrg = `-- name: UpsertOrg :one
-INSERT INTO orgs (clerk_org_id, name, plan)
+INSERT INTO orgs (idp_org_id, name, plan)
 VALUES ($1, $2, $3)
-ON CONFLICT (clerk_org_id) DO UPDATE
+ON CONFLICT (idp_org_id) DO UPDATE
     SET name = EXCLUDED.name, updated_at = NOW()
-RETURNING id, clerk_org_id, name, plan, created_at, updated_at
+RETURNING id, idp_org_id, name, plan, created_at, updated_at
 `
 
 type UpsertOrgParams struct {
-	ClerkOrgID string `json:"clerk_org_id"`
-	Name       string `json:"name"`
-	Plan       string `json:"plan"`
+	IdpOrgID string `json:"idp_org_id"`
+	Name     string `json:"name"`
+	Plan     string `json:"plan"`
 }
 
 func (q *Queries) UpsertOrg(ctx context.Context, arg UpsertOrgParams) (Org, error) {
-	row := q.db.QueryRow(ctx, upsertOrg, arg.ClerkOrgID, arg.Name, arg.Plan)
+	row := q.db.QueryRow(ctx, upsertOrg, arg.IdpOrgID, arg.Name, arg.Plan)
 	var i Org
 	err := row.Scan(
 		&i.ID,
-		&i.ClerkOrgID,
+		&i.IdpOrgID,
 		&i.Name,
 		&i.Plan,
 		&i.CreatedAt,
@@ -244,19 +244,19 @@ func (q *Queries) UpsertOrg(ctx context.Context, arg UpsertOrgParams) (Org, erro
 }
 
 const upsertUser = `-- name: UpsertUser :one
-INSERT INTO users (org_id, clerk_user_id, email, display_name, avatar_url)
+INSERT INTO users (org_id, idp_user_id, email, display_name, avatar_url)
 VALUES ($1, $2, $3, $4, $5)
-ON CONFLICT (clerk_user_id) DO UPDATE
+ON CONFLICT (idp_user_id) DO UPDATE
     SET email        = EXCLUDED.email,
         display_name = EXCLUDED.display_name,
         avatar_url   = EXCLUDED.avatar_url,
         updated_at   = NOW()
-RETURNING id, org_id, clerk_user_id, email, display_name, avatar_url, created_at, updated_at
+RETURNING id, org_id, idp_user_id, email, display_name, avatar_url, created_at, updated_at
 `
 
 type UpsertUserParams struct {
 	OrgID       uuid.UUID   `json:"org_id"`
-	ClerkUserID string      `json:"clerk_user_id"`
+	IdpUserID   string      `json:"idp_user_id"`
 	Email       string      `json:"email"`
 	DisplayName string      `json:"display_name"`
 	AvatarUrl   pgtype.Text `json:"avatar_url"`
@@ -265,7 +265,7 @@ type UpsertUserParams struct {
 func (q *Queries) UpsertUser(ctx context.Context, arg UpsertUserParams) (User, error) {
 	row := q.db.QueryRow(ctx, upsertUser,
 		arg.OrgID,
-		arg.ClerkUserID,
+		arg.IdpUserID,
 		arg.Email,
 		arg.DisplayName,
 		arg.AvatarUrl,
@@ -274,7 +274,7 @@ func (q *Queries) UpsertUser(ctx context.Context, arg UpsertUserParams) (User, e
 	err := row.Scan(
 		&i.ID,
 		&i.OrgID,
-		&i.ClerkUserID,
+		&i.IdpUserID,
 		&i.Email,
 		&i.DisplayName,
 		&i.AvatarUrl,

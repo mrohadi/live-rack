@@ -72,3 +72,43 @@ func TestHeatmap_BadZone(t *testing.T) {
 	rec := serve(t, fr, uuid.New(), "/api/v1/analytics/heatmap?zone_id=not-a-uuid")
 	require.Equal(t, http.StatusBadRequest, rec.Code)
 }
+
+// seqReader returns a different body per Query call, in order.
+type seqReader struct {
+	bodies [][]byte
+	n      int
+}
+
+func (s *seqReader) Query(_ context.Context, _ string) ([]byte, error) {
+	b := s.bodies[s.n]
+	if s.n < len(s.bodies)-1 {
+		s.n++
+	}
+	return b, nil
+}
+
+func TestZones_JoinsTotalsAndSpark(t *testing.T) {
+	org := uuid.New()
+	za, zb := uuid.New().String(), uuid.New().String()
+	sr := &seqReader{bodies: [][]byte{
+		[]byte(`{"data":[{"zone_id":"` + za + `","scans":30,"picks":20,"invalid":2},{"zone_id":"` + zb + `","scans":5,"picks":1,"invalid":0}]}`),
+		[]byte(`{"data":[{"zone_id":"` + za + `","scans":10},{"zone_id":"` + za + `","scans":20},{"zone_id":"` + zb + `","scans":5}]}`),
+	}}
+
+	e := echo.New()
+	analytics.New(sr).Register(e.Group("/api/v1"))
+	p := &domain.Principal{UserID: uuid.New(), OrgID: org, Role: domain.RoleReadonly}
+	req := httptest.NewRequestWithContext(
+		pkgauth.WithPrincipal(context.Background(), p), http.MethodGet, "/api/v1/analytics/zones", nil)
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	var out analytics.ZonesResponse
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &out))
+	require.Len(t, out.Zones, 2)
+	assert.Equal(t, za, out.Zones[0].ZoneID) // ordered by scans desc
+	assert.Equal(t, int64(30), out.Zones[0].Scans)
+	assert.Equal(t, []int64{10, 20}, out.Zones[0].Spark)
+	assert.Equal(t, []int64{5}, out.Zones[1].Spark)
+}

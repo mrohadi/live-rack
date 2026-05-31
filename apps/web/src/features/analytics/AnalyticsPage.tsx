@@ -1,8 +1,10 @@
 import { Heatmap } from "./Heatmap";
-import { useHeatmap } from "./useAnalytics";
+import { ZonePerfBars } from "./ZonePerfBars";
+import { useHeatmap, useZonePerf } from "./useAnalytics";
 
 export function AnalyticsPage() {
-  const { data, isLoading } = useHeatmap();
+  const heatmap = useHeatmap();
+  const zones = useZonePerf();
 
   return (
     <div className="flex h-full flex-col">
@@ -11,15 +13,26 @@ export function AnalyticsPage() {
         <p className="text-xs text-muted-foreground">Scan activity · last 7 days</p>
       </header>
 
-      <div className="flex-1 overflow-auto p-4">
+      <div className="flex-1 space-y-4 overflow-auto p-4">
+        <div className="rounded-lg border border-border bg-surface p-4">
+          <div className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Zone performance · scans
+          </div>
+          {zones.isLoading || !zones.data ? (
+            <div className="text-sm text-muted-foreground">Loading zones…</div>
+          ) : (
+            <ZonePerfBars zones={zones.data.zones} />
+          )}
+        </div>
+
         <div className="rounded-lg border border-border bg-surface p-4">
           <div className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Activity heatmap · 7×24
           </div>
-          {isLoading || !data ? (
+          {heatmap.isLoading || !heatmap.data ? (
             <div className="text-sm text-muted-foreground">Loading heatmap…</div>
           ) : (
-            <Heatmap data={data} />
+            <Heatmap data={heatmap.data} />
           )}
         </div>
       </div>

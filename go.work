@@ -4,8 +4,10 @@ use (
 	./pkg/auth
 	./pkg/domain
 	./pkg/events
+	./pkg/integrations
 	./pkg/observability
 	./pkg/store
 	./scripts/seed
 	./services/api
+	./services/ingest
 )

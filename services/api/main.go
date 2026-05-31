@@ -32,16 +32,20 @@ import (
 
 	pkgauth "github.com/live-rack/pkg/auth"
 	"github.com/live-rack/pkg/events"
+	"github.com/live-rack/pkg/integrations"
 	obs "github.com/live-rack/pkg/observability"
 	"github.com/live-rack/pkg/store"
 	_ "github.com/live-rack/services/api/docs" // swaggo generated
 	"github.com/live-rack/services/api/internal/authadapter"
+	integrationsapi "github.com/live-rack/services/api/internal/integrations"
 	"github.com/live-rack/services/api/internal/inventory"
 	apimw "github.com/live-rack/services/api/internal/middleware"
 	"github.com/live-rack/services/api/internal/pipelines"
+	"github.com/live-rack/services/api/internal/sales"
 	"github.com/live-rack/services/api/internal/scans"
 	"github.com/live-rack/services/api/internal/search"
 	"github.com/live-rack/services/api/internal/tasks"
+	"github.com/live-rack/services/api/internal/webhooks"
 	"github.com/live-rack/services/api/internal/ws"
 	"github.com/live-rack/services/api/internal/zones"
 )
@@ -157,6 +161,9 @@ func main() {
 	// OpenMetrics endpoint (scraped by Elastic Metricbeat) — no auth.
 	e.GET("/metrics", echo.WrapHandler(promhttp.Handler()))
 
+	// Inbound POS webhooks — unauthenticated, verified by per-vendor signature.
+	webhooks.New(q, publisher, integrations.NewShopify(), integrations.NewSquare()).Register(e)
+
 	// Authenticated API group.
 	api := e.Group("/api/v1", apimw.Auth(verifier, setOrgID))
 
@@ -165,6 +172,8 @@ func main() {
 	inventory.New(q).Register(api.Group("/stores"))
 	tasks.New(q, publisher).Register(api.Group("/stores"))
 	pipelines.New(q, publisher).Register(api.Group("/stores"))
+	sales.New(q).Register(api)
+	integrationsapi.New(q).Register(api)
 	search.New(q).Register(api)
 
 	hub := ws.NewHub(log)

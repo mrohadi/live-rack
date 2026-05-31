@@ -42,6 +42,7 @@ require (
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/klauspost/compress v1.18.5 // indirect
 	github.com/labstack/gommon v0.4.2 // indirect
+	github.com/live-rack/pkg/integrations v0.0.0
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
@@ -91,3 +92,5 @@ replace (
 	github.com/live-rack/pkg/observability => ../../pkg/observability
 	github.com/live-rack/pkg/store => ../../pkg/store
 )
+
+replace github.com/live-rack/pkg/integrations => ../../pkg/integrations

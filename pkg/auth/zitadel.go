@@ -26,6 +26,24 @@ type Claims struct {
 	DisplayName string
 	AvatarURL   string
 	Role        domain.RoleName
+	MFA         bool
+}
+
+// mfaMethods are amr (Authentication Methods References) values that indicate a
+// second factor was used. "mfa" is the aggregate marker; the rest are concrete
+// second factors Zitadel may report.
+var mfaMethods = map[string]bool{
+	"mfa": true, "otp": true, "totp": true, "hwk": true, "webauthn": true, "u2f": true,
+}
+
+// amrIndicatesMFA reports whether an amr claim array contains a second factor. Pure.
+func amrIndicatesMFA(amr []any) bool {
+	for _, v := range amr {
+		if s, ok := v.(string); ok && mfaMethods[strings.ToLower(s)] {
+			return true
+		}
+	}
+	return false
 }
 
 // OrgResolver looks up internal org + user records and provisions them on first login.
@@ -119,11 +137,12 @@ func (v *ZitadelVerifier) VerifyRequest(r *http.Request) (*domain.Principal, err
 	}
 
 	return &domain.Principal{
-		UserID:   user.ID,
-		OrgID:    org.ID,
-		IDPOrgID: claims.IDPOrgID,
-		Role:     role,
-		StoreIDs: storeIDs,
+		UserID:      user.ID,
+		OrgID:       org.ID,
+		IDPOrgID:    claims.IDPOrgID,
+		Role:        role,
+		StoreIDs:    storeIDs,
+		MFAVerified: claims.MFA,
 	}, nil
 }
 
@@ -145,7 +164,17 @@ func (v *ZitadelVerifier) parseClaims(subject string, raw map[string]any) Claims
 		DisplayName: stringClaim(raw, "name"),
 		AvatarURL:   stringClaim(raw, "picture"),
 		Role:        strongestRole(roles),
+		MFA:         mfaFromClaims(raw),
 	}
+}
+
+// mfaFromClaims reads the amr claim. Pure.
+func mfaFromClaims(raw map[string]any) bool {
+	amr, ok := raw["amr"].([]any)
+	if !ok {
+		return false
+	}
+	return amrIndicatesMFA(amr)
 }
 
 // rolesMap returns the Zitadel project-roles claim: { role: { orgID: orgDomain } }.

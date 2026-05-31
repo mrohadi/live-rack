@@ -47,6 +47,19 @@ export function formatAge(seconds: number): string {
   return `${seconds}s`;
 }
 
+/** Instantiate a pipeline from a built-in template, then refresh the list. */
+export function useCreateFromTemplate(storeId: string) {
+  const { post } = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (templateKey: string) =>
+      post<Board["pipeline"]>(`${basePath(storeId)}/from-template`, {
+        template_key: templateKey,
+      }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: pipelineKeys.list(storeId) }),
+  });
+}
+
 /** Fetch the pipeline selector list for a store. */
 export function usePipelines(storeId: string) {
   const { get } = useApi();

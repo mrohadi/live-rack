@@ -29,6 +29,9 @@ type fakeStore struct {
 	moved      store.PipelineCard
 	gotOrg     uuid.UUID
 	gotMovePos int32
+
+	createdPipeline store.CreatePipelineParams
+	createdStages   []store.CreateStageParams
 }
 
 func (f *fakeStore) ListPipelinesByStore(_ context.Context, arg store.ListPipelinesByStoreParams) ([]store.Pipeline, error) {
@@ -49,6 +52,16 @@ func (f *fakeStore) MoveCard(_ context.Context, arg store.MoveCardParams) (store
 	f.gotMovePos = arg.StagePosition
 	f.moved.StagePosition = arg.StagePosition
 	return f.moved, nil
+}
+
+func (f *fakeStore) CreatePipeline(_ context.Context, arg store.CreatePipelineParams) (store.Pipeline, error) {
+	f.createdPipeline = arg
+	return store.Pipeline{ID: uuid.New(), OrgID: arg.OrgID, StoreID: arg.StoreID, Key: arg.Key, Name: arg.Name}, nil
+}
+
+func (f *fakeStore) CreateStage(_ context.Context, arg store.CreateStageParams) (store.PipelineStage, error) {
+	f.createdStages = append(f.createdStages, arg)
+	return store.PipelineStage{ID: uuid.New(), Position: arg.Position, Name: arg.Name, SlaSeconds: arg.SlaSeconds}, nil
 }
 
 type fakePublisher struct {
@@ -183,6 +196,71 @@ func TestPipelinesHandler_MoveCard_ReadonlyForbidden(t *testing.T) {
 	c.SetParamValues(storeID.String(), pipeID.String(), cardID.String())
 
 	err := h.MoveCard(c)
+	require.Error(t, err)
+	he, ok := err.(*echo.HTTPError)
+	require.True(t, ok)
+	assert.Equal(t, http.StatusForbidden, he.Code)
+}
+
+func TestPipelinesHandler_CreateFromTemplate(t *testing.T) {
+	orgID, storeID := uuid.New(), uuid.New()
+	fs := &fakeStore{}
+	e := echo.New()
+	h := pipelines.New(fs, &fakePublisher{})
+
+	p := &domain.Principal{UserID: uuid.New(), OrgID: orgID, Role: domain.RoleManager}
+	c, rec := newContext(t, e, http.MethodPost,
+		"/api/v1/stores/"+storeID.String()+"/pipelines/from-template",
+		`{"template_key":"item-restoration"}`, p)
+	c.SetParamNames("storeID")
+	c.SetParamValues(storeID.String())
+
+	require.NoError(t, h.CreateFromTemplate(c))
+	assert.Equal(t, http.StatusCreated, rec.Code)
+	assert.Equal(t, "item-restoration", fs.createdPipeline.Key)
+	assert.Equal(t, storeID, fs.createdPipeline.StoreID)
+	require.Len(t, fs.createdStages, 5)
+	assert.Equal(t, "Intake", fs.createdStages[0].Name)
+	assert.Equal(t, int32(0), fs.createdStages[0].Position)
+	assert.Equal(t, int64((24 * time.Hour).Seconds()), fs.createdStages[0].SlaSeconds)
+	assert.Equal(t, "Restocked", fs.createdStages[4].Name)
+	assert.Equal(t, int64(0), fs.createdStages[4].SlaSeconds)
+}
+
+func TestPipelinesHandler_CreateFromTemplate_Unknown(t *testing.T) {
+	orgID, storeID := uuid.New(), uuid.New()
+	fs := &fakeStore{}
+	e := echo.New()
+	h := pipelines.New(fs, &fakePublisher{})
+
+	p := &domain.Principal{UserID: uuid.New(), OrgID: orgID, Role: domain.RoleManager}
+	c, _ := newContext(t, e, http.MethodPost,
+		"/api/v1/stores/"+storeID.String()+"/pipelines/from-template",
+		`{"template_key":"nope"}`, p)
+	c.SetParamNames("storeID")
+	c.SetParamValues(storeID.String())
+
+	err := h.CreateFromTemplate(c)
+	require.Error(t, err)
+	he, ok := err.(*echo.HTTPError)
+	require.True(t, ok)
+	assert.Equal(t, http.StatusBadRequest, he.Code)
+}
+
+func TestPipelinesHandler_CreateFromTemplate_StaffForbidden(t *testing.T) {
+	orgID, storeID := uuid.New(), uuid.New()
+	fs := &fakeStore{}
+	e := echo.New()
+	h := pipelines.New(fs, &fakePublisher{})
+
+	p := &domain.Principal{UserID: uuid.New(), OrgID: orgID, Role: domain.RoleStaff}
+	c, _ := newContext(t, e, http.MethodPost,
+		"/api/v1/stores/"+storeID.String()+"/pipelines/from-template",
+		`{"template_key":"item-restoration"}`, p)
+	c.SetParamNames("storeID")
+	c.SetParamValues(storeID.String())
+
+	err := h.CreateFromTemplate(c)
 	require.Error(t, err)
 	he, ok := err.(*echo.HTTPError)
 	require.True(t, ok)

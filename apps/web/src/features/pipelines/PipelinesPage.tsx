@@ -2,7 +2,14 @@ import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } f
 import { useEffect, useState } from "react";
 import { useCurrentStore } from "../map/useCurrentStore";
 import { StageColumn } from "./StageColumn";
-import { ageingCount, cardsByStage, useBoard, useMoveCard, usePipelines } from "./usePipelines";
+import {
+  ageingCount,
+  cardsByStage,
+  useBoard,
+  useCreateFromTemplate,
+  useMoveCard,
+  usePipelines,
+} from "./usePipelines";
 
 export function PipelinesPage() {
   const storeId = useCurrentStore();
@@ -16,6 +23,7 @@ export function PipelinesPage() {
 
   const { data: board, isLoading: loadingBoard } = useBoard(storeId, selected);
   const move = useMoveCard(storeId, selected ?? "");
+  const createFromTemplate = useCreateFromTemplate(storeId);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
@@ -34,7 +42,19 @@ export function PipelinesPage() {
     return <div className="p-6 text-sm text-muted-foreground">Loading pipelines…</div>;
   }
   if (pipelines.length === 0) {
-    return <div className="p-6 text-sm text-muted-foreground">No pipelines yet.</div>;
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-sm text-muted-foreground">
+        <span>No pipelines yet.</span>
+        <button
+          type="button"
+          disabled={createFromTemplate.isPending}
+          onClick={() => createFromTemplate.mutate("item-restoration")}
+          className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground disabled:opacity-50"
+        >
+          {createFromTemplate.isPending ? "Creating…" : "Start Item Restoration template"}
+        </button>
+      </div>
+    );
   }
 
   const ageing = board ? ageingCount(board.cards) : 0;

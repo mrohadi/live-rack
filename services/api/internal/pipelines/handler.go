@@ -22,6 +22,8 @@ type Store interface {
 	ListStagesByPipeline(ctx context.Context, arg store.ListStagesByPipelineParams) ([]store.PipelineStage, error)
 	ListCardsByPipeline(ctx context.Context, arg store.ListCardsByPipelineParams) ([]store.PipelineCard, error)
 	MoveCard(ctx context.Context, arg store.MoveCardParams) (store.PipelineCard, error)
+	CreatePipeline(ctx context.Context, arg store.CreatePipelineParams) (store.Pipeline, error)
+	CreateStage(ctx context.Context, arg store.CreateStageParams) (store.PipelineStage, error)
 }
 
 // Handler serves pipeline endpoints.
@@ -62,6 +64,7 @@ func detectBottleneck(stages []store.PipelineStage, cards []store.PipelineCard, 
 // Register mounts pipeline routes onto g (expected: /api/v1/stores).
 func (h *Handler) Register(g *echo.Group) {
 	g.GET("/:storeID/pipelines", h.List)
+	g.POST("/:storeID/pipelines/from-template", h.CreateFromTemplate)
 	g.GET("/:storeID/pipelines/:id", h.Board)
 	g.PATCH("/:storeID/pipelines/:id/cards/:cardID", h.MoveCard)
 }
@@ -136,6 +139,61 @@ func (h *Handler) List(c echo.Context) error {
 		out = append(out, PipelineRow{ID: r.ID, Key: r.Key, Name: r.Name})
 	}
 	return c.JSON(http.StatusOK, out)
+}
+
+type fromTemplateRequest struct {
+	TemplateKey string `json:"template_key"`
+}
+
+// CreateFromTemplate godoc
+//
+//	@Summary	Instantiate a pipeline from a built-in template (e.g. item-restoration)
+//	@Tags		pipelines
+//	@Accept		json
+//	@Produce	json
+//	@Param		storeID	path		string				true	"Store UUID"
+//	@Param		body	body		fromTemplateRequest	true	"Template key"
+//	@Success	201		{object}	PipelineRow
+//	@Failure	400		{object}	map[string]string
+//	@Failure	403		{object}	map[string]string
+//	@Router		/stores/{storeID}/pipelines/from-template [post]
+func (h *Handler) CreateFromTemplate(c echo.Context) error {
+	p, err := pkgauth.PrincipalFrom(c.Request().Context())
+	if err != nil {
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
+	}
+	if !domain.CanMutatePipeline(p) {
+		return echo.NewHTTPError(http.StatusForbidden, "forbidden")
+	}
+	storeID, err := uuid.Parse(c.Param("storeID"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid store id")
+	}
+	var req fromTemplateRequest
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
+	}
+	def, ok := domain.PipelineTemplate(req.TemplateKey)
+	if !ok {
+		return echo.NewHTTPError(http.StatusBadRequest, "unknown template")
+	}
+
+	ctx := c.Request().Context()
+	pipe, err := h.q.CreatePipeline(ctx, store.CreatePipelineParams{
+		OrgID: p.OrgID, StoreID: storeID, Key: def.Key, Name: def.Name,
+	})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "create pipeline")
+	}
+	for i, s := range def.Stages {
+		if _, err := h.q.CreateStage(ctx, store.CreateStageParams{
+			OrgID: p.OrgID, PipelineID: pipe.ID, Position: int32(i),
+			Name: s.Name, SlaSeconds: int64(s.SLA.Seconds()),
+		}); err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "create stage")
+		}
+	}
+	return c.JSON(http.StatusCreated, PipelineRow{ID: pipe.ID, Key: pipe.Key, Name: pipe.Name})
 }
 
 // Board godoc

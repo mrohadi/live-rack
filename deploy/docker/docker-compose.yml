@@ -16,7 +16,7 @@ services:
 
   nats:
     image: nats:latest
-    command: ["-js", "-sd", "/data"]
+    command: ["-js", "-sd", "/data", "-m", "8222"]
     ports:
       - "4222:4222"
       - "8222:8222"
@@ -68,7 +68,11 @@ services:
     volumes:
       - elasticsearch_data:/usr/share/elasticsearch/data
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS -u elastic:changeme http://localhost:9200/_cluster/health | grep -E 'yellow|green'"]
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS -u elastic:changeme http://localhost:9200/_cluster/health | grep -E 'yellow|green'",
+        ]
       interval: 10s
       retries: 15
 
@@ -115,8 +119,8 @@ services:
     volumes:
       - ../elk/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
     ports:
-      - "5044:5044"   # beats input
-      - "5001:5001"   # tcp/json input
+      - "5044:5044" # beats input
+      - "5001:5001" # tcp/json input
     depends_on:
       elasticsearch:
         condition: service_healthy
@@ -128,7 +132,7 @@ services:
     volumes:
       - ../elk/apm-server.yml:/usr/share/apm-server/apm-server.yml:ro
     ports:
-      - "8200:8200"   # OTLP / APM ingest
+      - "8200:8200" # OTLP / APM ingest
     depends_on:
       elasticsearch:
         condition: service_healthy
@@ -151,10 +155,53 @@ services:
     volumes:
       - ../elk/otel-collector.yaml:/etc/otel/config.yaml:ro
     ports:
-      - "4317:4317"   # OTLP gRPC (services → collector)
-      - "4318:4318"   # OTLP HTTP
+      - "4317:4317" # OTLP gRPC (services → collector)
+      - "4318:4318" # OTLP HTTP
     depends_on:
       - apm-server
+
+  # ─── Zitadel (self-hosted OIDC IdP, replaces Clerk) ──────────────────────────
+  zitadel-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: zitadel
+      POSTGRES_PASSWORD: zitadel
+      POSTGRES_DB: zitadel
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zitadel -d zitadel"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - zitadel_db_data:/var/lib/postgresql/data
+
+  zitadel:
+    image: ghcr.io/zitadel/zitadel:v2.71.9
+    command: 'start-from-init --masterkey "MasterkeyNeedsToHave32Characters" --tlsMode disabled'
+    environment:
+      ZITADEL_EXTERNALSECURE: "false"
+      ZITADEL_EXTERNALDOMAIN: localhost
+      ZITADEL_EXTERNALPORT: 8081
+      # Force legacy hosted login (v1) — v2.71 defaults the console to Login UI v2 (/login), unbundled here.
+      ZITADEL_OIDC_DEFAULTLOGINURLV2: ""
+      ZITADEL_OIDC_DEFAULTLOGOUTURLV2: ""
+      ZITADEL_DATABASE_POSTGRES_HOST: zitadel-db
+      ZITADEL_DATABASE_POSTGRES_PORT: 5432
+      ZITADEL_DATABASE_POSTGRES_DATABASE: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_USERNAME: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_PASSWORD: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE: disable
+      ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME: zitadel
+      ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD: zitadel
+      ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE: disable
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_USERNAME: admin@localhost
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD: Admin123!
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORDCHANGEREQUIRED: "false"
+    ports:
+      - "8081:8080"
+    depends_on:
+      zitadel-db:
+        condition: service_healthy
 
 volumes:
   postgres_data:
@@ -163,3 +210,4 @@ volumes:
   redis_data:
   minio_data:
   elasticsearch_data:
+  zitadel_db_data:

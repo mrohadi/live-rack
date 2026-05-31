@@ -12,6 +12,7 @@ var (
 	ErrCategoryOverlap   = errors.New("zone constraints: category appear in both allowed and deined")
 	ErrInvalidMaxPerSKU  = errors.New("zone constraints: max_units_per_sku must be >= 0")
 	ErrEmptyCategory     = errors.New("zone constraints: category must be non-empty")
+	ErrInvalidDwell      = errors.New("zone constraints: dwell_seconds must be >= 0")
 )
 
 // ZoneConstrains is the shaped type stored in zones.constraints JSON.
@@ -21,6 +22,7 @@ type ZoneConstraints struct {
 	DeniedCategories  []string `json:"denied_categories,omitempty"`
 	MaxUnitsPerSKU    *int     `json:"max_units_per_sku,omitempty"`
 	RequireDualScan   bool     `json:"require_dual_scan,omitempty"`
+	DwellSeconds      *int     `json:"dwell_seconds,omitempty"`
 }
 
 // Validate returns nil if the constraints are internally consistent.
@@ -46,6 +48,9 @@ func (c *ZoneConstraints) Validate() error {
 	}
 	if c.MaxUnitsPerSKU != nil && *c.MaxUnitsPerSKU < 0 {
 		return ErrInvalidMaxPerSKU
+	}
+	if c.DwellSeconds != nil && *c.DwellSeconds < 0 {
+		return ErrInvalidDwell
 	}
 
 	return nil

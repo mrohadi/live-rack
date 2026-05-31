@@ -10,7 +10,7 @@
 | Primary DB | PostgreSQL 16 + TimescaleDB |
 | Analytics | ClickHouse |
 | Cache | Redis 7 |
-| Auth | Clerk (multi-tenant, SSO, 2FA) |
+| Auth | Zitadel (self-hosted OIDC, multi-tenant, SSO, 2FA) — replaced Clerk (LR-005a) |
 | Scanner PWA | @zxing/browser + WebHID + IndexedDB offline queue |
 | Observability | ELK Stack (Elasticsearch + Logstash + Kibana) + Filebeat + APM Server + OpenTelemetry |
 
@@ -56,7 +56,7 @@ pkg/
   domain/                 # Pure entities: Zone, Item, Task, Pipeline, User, Org
   store/                  # sqlc-generated Postgres repos
   events/                 # NATS subject schemas
-  auth/                   # Clerk adapter, RBAC
+  auth/                   # Zitadel OIDC verifier (JWKS), JIT provisioning, RBAC
   observability/          # OTel bootstrap
 migrations/               # goose SQL files
 references/               # Claude Design bundle (read-only reference)
@@ -133,7 +133,19 @@ First action in a new chat:
 - Every table has `org_id UUID NOT NULL`
 - Postgres RLS policy per table — never bypass with `SET LOCAL row_security = off`
 - All repo functions receive `orgID uuid.UUID` — never derive from context alone
-- Clerk org → `org_id` mapping enforced at API gateway middleware
+- Zitadel org → `org_id` mapping enforced at API gateway middleware (JIT-provisioned on first login)
+
+## Auth — Zitadel (self-hosted OIDC)
+
+- Dev: `docker compose -f deploy/docker/docker-compose.yml up -d zitadel zitadel-db`
+- Pinned `ghcr.io/zitadel/zitadel:v2.71.9` (legacy hosted login; `OIDC_DEFAULTLOGINURLV2=""`)
+- Console: http://localhost:8081/ui/console — admin `admin@localhost` / `Admin123!`
+- Project `live-rack` (ID `375294302823120905`); SPA app `web` PKCE, redirect `http://localhost:5173/callback`
+- App Token Settings: **JWT** + "Add user roles to access token" + "User roles inside ID token" (required)
+- Roles: admin, manager, staff, readonly, service (assign via project Authorizations)
+- Org id derived from project-roles claim inner key (`urn:zitadel:iam:org:project:{id}:roles`) — no resourceowner claim
+- Env — api: `OIDC_ISSUER`, `OIDC_PROJECT_ID`; web: `VITE_OIDC_ISSUER`, `VITE_OIDC_CLIENT_ID`, `VITE_OIDC_REDIRECT_URI`
+- Frontend: `react-oidc-context` + `oidc-client-ts`, `loadUserInfo: true`
 
 ## Security
 

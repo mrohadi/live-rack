@@ -1,5 +1,5 @@
-import { setupClerkTestingToken } from "@clerk/testing/playwright";
 import { expect, test } from "@playwright/test";
+import { seedOidcSession } from "./auth";
 
 const STORE_ID = "22222222-2222-2222-2222-222222222222";
 const API = `/api/v1/stores/${STORE_ID}/zones`;
@@ -33,24 +33,8 @@ test.describe("Map — zone create → drag → save", () => {
       }
     });
 
-    // Create sign-in token via Clerk Backend API (Node.js side)
-    const tokenRes = await fetch("https://api.clerk.com/v1/sign_in_tokens", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.CLERK_SECRET_KEY!}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        user_id: process.env.CLERK_E2E_USER_ID!,
-        expires_in_seconds: 60,
-      }),
-    });
-    const { token } = (await tokenRes.json()) as { token: string };
-
-    // Navigate to sign-in with token — no UI flow needed
-    await setupClerkTestingToken({ page });
-    await page.goto(`/sign-in?__clerk_ticket=${token}`);
-    await page.waitForURL((url) => !url.pathname.includes("sign-in"), { timeout: 15_000 });
+    // Seed an authenticated OIDC session — no UI login flow needed.
+    await seedOidcSession(page);
 
     await page.goto("/map");
     await page.waitForLoadState("networkidle");

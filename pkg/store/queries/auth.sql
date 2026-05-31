@@ -1,20 +1,20 @@
--- name: GetOrgByClerkID :one
-SELECT * FROM orgs WHERE clerk_org_id = $1;
+-- name: GetOrgByIdpID :one
+SELECT * FROM orgs WHERE idp_org_id = $1;
 
 -- name: UpsertOrg :one
-INSERT INTO orgs (clerk_org_id, name, plan)
+INSERT INTO orgs (idp_org_id, name, plan)
 VALUES ($1, $2, $3)
-ON CONFLICT (clerk_org_id) DO UPDATE
+ON CONFLICT (idp_org_id) DO UPDATE
     SET name = EXCLUDED.name, updated_at = NOW()
 RETURNING *;
 
--- name: GetUserByClerkID :one
-SELECT * FROM users WHERE clerk_user_id = $1;
+-- name: GetUserByIdpID :one
+SELECT * FROM users WHERE idp_user_id = $1;
 
 -- name: UpsertUser :one
-INSERT INTO users (org_id, clerk_user_id, email, display_name, avatar_url)
+INSERT INTO users (org_id, idp_user_id, email, display_name, avatar_url)
 VALUES ($1, $2, $3, $4, $5)
-ON CONFLICT (clerk_user_id) DO UPDATE
+ON CONFLICT (idp_user_id) DO UPDATE
     SET email        = EXCLUDED.email,
         display_name = EXCLUDED.display_name,
         avatar_url   = EXCLUDED.avatar_url,

@@ -15,6 +15,58 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/stores/{storeID}/scan/validate": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "scans"
+                ],
+                "summary": "Validate a scan against zone rules",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Store UUID",
+                        "name": "storeID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Scan body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/scans.validateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/scans.ValidateResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/scans.ValidateResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/scans.ValidateResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/stores/{storeID}/zones": {
             "get": {
                 "produces": [
@@ -241,6 +293,47 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "scans.ValidateResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "requires_dual_scan": {
+                    "type": "boolean"
+                },
+                "valid": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "scans.validateRequest": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "type": "string"
+                },
+                "current_qty": {
+                    "type": "integer"
+                },
+                "dual_scan_confirmed": {
+                    "type": "boolean"
+                },
+                "last_scan_at": {
+                    "description": "TODO LR-205: source from scan_events server-side",
+                    "type": "string"
+                },
+                "scan_qty": {
+                    "type": "integer"
+                },
+                "zone_id": {
+                    "type": "string"
+                }
+            }
+        },
         "zones.ErrorResponse": {
             "type": "object",
             "properties": {
@@ -315,44 +408,7 @@ const docTemplate = `{
             }
         },
         "zones.zoneRequest": {
-            "type": "object",
-            "properties": {
-                "capacity": {
-                    "type": "integer"
-                },
-                "color": {
-                    "type": "string"
-                },
-                "constraints": {
-                    "type": "object"
-                },
-                "height": {
-                    "type": "number"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "type": {
-                    "type": "string",
-                    "enum": [
-                        "general",
-                        "frozen",
-                        "returns",
-                        "staging",
-                        "display",
-                        "checkout"
-                    ]
-                },
-                "width": {
-                    "type": "number"
-                },
-                "x": {
-                    "type": "number"
-                },
-                "y": {
-                    "type": "number"
-                }
-            }
+            "type": "object"
         }
     },
     "securityDefinitions": {

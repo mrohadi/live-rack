@@ -12,6 +12,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -23,17 +24,21 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 	echomw "github.com/labstack/echo/v4/middleware"
+	"github.com/nats-io/nats.go"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/labstack/echo/otelecho"
 
 	echoSwagger "github.com/swaggo/echo-swagger"
 
 	pkgauth "github.com/live-rack/pkg/auth"
+	"github.com/live-rack/pkg/events"
 	obs "github.com/live-rack/pkg/observability"
 	"github.com/live-rack/pkg/store"
 	_ "github.com/live-rack/services/api/docs" // swaggo generated
 	"github.com/live-rack/services/api/internal/authadapter"
 	apimw "github.com/live-rack/services/api/internal/middleware"
+	"github.com/live-rack/services/api/internal/scans"
+	"github.com/live-rack/services/api/internal/ws"
 	"github.com/live-rack/services/api/internal/zones"
 )
 
@@ -71,6 +76,40 @@ func main() {
 	}
 	defer pool.Close()
 
+	natsURL := envOr("NATS_URL", "nats://localhost:4222")
+	nc, err := nats.Connect(natsURL,
+		nats.Name("api"),
+		nats.MaxReconnects(-1),
+		nats.ReconnectWait(2*time.Second),
+	)
+	if err != nil {
+		log.Error("connect nats", "err", err)
+		os.Exit(1)
+	}
+	defer func() {
+		if err := nc.Drain(); err != nil {
+			log.Error("drain nats connection", "err", err)
+		}
+	}()
+
+	js, err := nc.JetStream()
+	if err != nil {
+		log.Error("jetstream", "err", err)
+		os.Exit(1)
+	}
+	if _, err := js.AddStream(&nats.StreamConfig{
+		Name:      "LIVE_RACK",
+		Subjects:  []string{"lr.>"},
+		MaxAge:    24 * time.Hour,
+		Storage:   nats.FileStorage,
+		Retention: nats.LimitsPolicy,
+	}); err != nil && !errors.Is(err, nats.ErrStreamNameAlreadyInUse) {
+		log.Error("add stream", "err", err)
+		os.Exit(1)
+	}
+
+	publisher := events.NewNATSPublisher(js)
+
 	// setOrgID executes SET LOCAL app.org_id = '<id>' on the acquired connection.
 	setOrgID := func(orgID string) error {
 		conn, err := pool.Acquire(context.Background())
@@ -82,7 +121,15 @@ func main() {
 		return err
 	}
 
-	// _ = pkgauth.NewClerkVerifier(mustEnv("CLERK_SECRET_KEY"), nil)
+	q := store.New(pool)
+
+	// Zitadel OIDC verifier — discovers JWKS at startup, JIT-provisions on first login.
+	resolver := pkgauth.NewDBResolver(authadapter.New(q))
+	verifier, err := pkgauth.NewZitadelVerifier(ctx, mustEnv("OIDC_ISSUER"), mustEnv("OIDC_PROJECT_ID"), resolver)
+	if err != nil {
+		log.Error("init oidc verifier", "err", err)
+		os.Exit(1)
+	}
 
 	e := echo.New()
 	e.HideBanner = true
@@ -106,26 +153,20 @@ func main() {
 	// OpenMetrics endpoint (scraped by Elastic Metricbeat) — no auth.
 	e.GET("/metrics", echo.WrapHandler(promhttp.Handler()))
 
-	// Clerk webhook — signed by Svix, no JWT auth.
-	clerkWebhookSecret := os.Getenv("CLERK_WEBHOOK_SECRET")
-	if clerkWebhookSecret != "" {
-		whHandler, err := apimw.NewClerkWebhookHandler(clerkWebhookSecret, nil)
-		if err != nil {
-			log.Error("init clerk webhook handler", "err", err)
-			os.Exit(1)
-		}
-		e.POST("/webhooks/clerk", echo.WrapHandler(http.HandlerFunc(whHandler.ServeHTTP)))
-	}
-
-	q := store.New(pool)
-
 	// Authenticated API group.
-	api := e.Group("/api/v1", apimw.Auth(
-		pkgauth.NewClerkVerifier(mustEnv("CLERK_SECRET_KEY"), pkgauth.NewDBResolver(authadapter.New(q))),
-		setOrgID,
-	))
+	api := e.Group("/api/v1", apimw.Auth(verifier, setOrgID))
 
 	zones.New(q).Register(api.Group("/stores"))
+	scans.New(q, q, publisher).Register(api.Group("/stores"))
+
+	hub := ws.NewHub(log)
+	if _, err := nc.Subscribe("lr.*.>", func(m *nats.Msg) {
+		hub.Broadcast(events.ExtractOrgID(m.Subject), m.Data)
+	}); err != nil {
+		log.Error("ws nats subscribe", "err", err)
+		os.Exit(1)
+	}
+	ws.NewHandler(hub, verifier).Register(e)
 
 	port := envOr("PORT", "8080")
 	srv := &http.Server{

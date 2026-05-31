@@ -9,8 +9,8 @@ import (
 	pkgauth "github.com/live-rack/pkg/auth"
 )
 
-// Auth verifies Clerk JWT, sets Principal + app.org_id on DB connection.
-func Auth(verifier *pkgauth.ClerkVerifier, setOrgID func(orgID string) error) echo.MiddlewareFunc {
+// Auth verifies the OIDC JWT, sets Principal + app.org_id on DB connection.
+func Auth(verifier pkgauth.Verifier, setOrgID func(orgID string) error) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			principal, err := verifier.VerifyRequest(c.Request())

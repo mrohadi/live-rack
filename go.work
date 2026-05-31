@@ -11,4 +11,5 @@ use (
 	./scripts/seed
 	./services/api
 	./services/ingest
+	./services/rollup
 )

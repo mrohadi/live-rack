@@ -12,16 +12,20 @@ import (
 
 type Querier interface {
 	AdjustItemLocationQty(ctx context.Context, arg AdjustItemLocationQtyParams) (ItemLocation, error)
+	AssignTask(ctx context.Context, arg AssignTaskParams) (Task, error)
 	BindUserRole(ctx context.Context, arg BindUserRoleParams) error
 	CountZonesByStore(ctx context.Context, arg CountZonesByStoreParams) (int64, error)
 	CreateScanEvent(ctx context.Context, arg CreateScanEventParams) (ScanEvent, error)
 	CreateStore(ctx context.Context, arg CreateStoreParams) (Store, error)
+	CreateTask(ctx context.Context, arg CreateTaskParams) (Task, error)
 	CreateZone(ctx context.Context, arg CreateZoneParams) (Zone, error)
+	DeleteTask(ctx context.Context, arg DeleteTaskParams) error
 	DeleteZone(ctx context.Context, arg DeleteZoneParams) error
 	GetItemBySKU(ctx context.Context, arg GetItemBySKUParams) (Item, error)
 	GetLastScanForSKU(ctx context.Context, arg GetLastScanForSKUParams) (ScanEvent, error)
 	GetOrgByIdpID(ctx context.Context, idpOrgID string) (Org, error)
 	GetStore(ctx context.Context, arg GetStoreParams) (Store, error)
+	GetTask(ctx context.Context, arg GetTaskParams) (Task, error)
 	GetUserByIdpID(ctx context.Context, idpUserID string) (User, error)
 	GetUserRole(ctx context.Context, arg GetUserRoleParams) (string, error)
 	GetUserStoreIDs(ctx context.Context, arg GetUserStoreIDsParams) ([]uuid.UUID, error)
@@ -30,11 +34,13 @@ type Querier interface {
 	ListItems(ctx context.Context, orgID uuid.UUID) ([]Item, error)
 	ListScanEventsByZone(ctx context.Context, arg ListScanEventsByZoneParams) ([]ScanEvent, error)
 	ListStoresByOrg(ctx context.Context, orgID uuid.UUID) ([]Store, error)
+	ListTasksByStore(ctx context.Context, arg ListTasksByStoreParams) ([]Task, error)
 	ListZonesByStore(ctx context.Context, arg ListZonesByStoreParams) ([]Zone, error)
 	// Fuzzy ⌘K search across items (sku + name) and zones (name) for one org.
 	// Trigram similarity ranks fuzzy hits; ILIKE catches short substrings GIN trigram
 	// can still serve. Results ordered by best score, capped by max_results.
 	SearchEntities(ctx context.Context, arg SearchEntitiesParams) ([]SearchEntitiesRow, error)
+	UpdateTaskStatus(ctx context.Context, arg UpdateTaskStatusParams) (Task, error)
 	UpdateZone(ctx context.Context, arg UpdateZoneParams) (Zone, error)
 	UpsertItem(ctx context.Context, arg UpsertItemParams) (Item, error)
 	UpsertOrg(ctx context.Context, arg UpsertOrgParams) (Org, error)

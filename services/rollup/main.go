@@ -32,8 +32,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Jobs are registered by their owning tickets (LR-706, LR-707).
-	runner := jobs.NewRunner(ch)
+	runner := jobs.NewRunner(ch,
+		jobs.TimeToSell{},
+		jobs.SellThrough{},
+	)
 
 	interval := envDuration("ROLLUP_INTERVAL", 24*time.Hour)
 	runOnce := func() {

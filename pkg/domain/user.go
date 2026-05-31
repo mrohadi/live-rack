@@ -34,6 +34,7 @@ type Principal struct {
 	IDPOrgID string
 	Role     RoleName
 	StoreIDs []uuid.UUID // empty = all stores
+	ZoneIDs  []uuid.UUID // empty = all zones (org-wide)
 }
 
 func (p *Principal) HasRole(roles ...RoleName) bool {
@@ -51,6 +52,21 @@ func (p *Principal) CanAccessStore(storeID uuid.UUID) bool {
 	}
 	for _, sid := range p.StoreIDs {
 		if sid == storeID {
+			return true
+		}
+	}
+	return false
+}
+
+// CanAccessZone reports whether the principal may access a zone. An empty
+// ZoneIDs set means org-wide access (admins, managers); otherwise access is
+// restricted to the assigned zones. Mirrors the user_zones RLS predicate.
+func (p *Principal) CanAccessZone(zoneID uuid.UUID) bool {
+	if len(p.ZoneIDs) == 0 {
+		return true
+	}
+	for _, zid := range p.ZoneIDs {
+		if zid == zoneID {
 			return true
 		}
 	}

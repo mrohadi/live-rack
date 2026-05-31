@@ -8,6 +8,7 @@ require (
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/labstack/echo/v4 v4.12.0
 	github.com/live-rack/pkg/auth v0.0.0
+	github.com/live-rack/pkg/chstore v0.0.0
 	github.com/live-rack/pkg/domain v0.0.0
 	github.com/live-rack/pkg/events v0.0.0-00010101000000-000000000000
 	github.com/live-rack/pkg/observability v0.0.0
@@ -87,6 +88,7 @@ require (
 
 replace (
 	github.com/live-rack/pkg/auth => ../../pkg/auth
+	github.com/live-rack/pkg/chstore => ../../pkg/chstore
 	github.com/live-rack/pkg/domain => ../../pkg/domain
 	github.com/live-rack/pkg/events => ../../pkg/events
 	github.com/live-rack/pkg/observability => ../../pkg/observability

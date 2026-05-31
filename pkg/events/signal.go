@@ -27,3 +27,22 @@ const subjectWeatherSignal = "lr.%s.signal.weather"
 func WeatherSignalSubject(orgID uuid.UUID) string {
 	return fmt.Sprintf(subjectWeatherSignal, orgID)
 }
+
+// TransitSignal is published by the signals worker after polling a transit
+// provider for one store's geo.
+type TransitSignal struct {
+	OrgID           uuid.UUID `json:"org_id"`
+	StoreID         uuid.UUID `json:"store_id"`
+	Source          string    `json:"source"`
+	StopCount       int       `json:"stop_count"`
+	ArrivalsNext30m int       `json:"arrivals_next_30m"`
+	BusiestRoute    string    `json:"busiest_route"`
+	ObservedAt      time.Time `json:"observed_at"`
+}
+
+const subjectTransitSignal = "lr.%s.signal.transit"
+
+// TransitSignalSubject returns the per-org signal.transit subject.
+func TransitSignalSubject(orgID uuid.UUID) string {
+	return fmt.Sprintf(subjectTransitSignal, orgID)
+}

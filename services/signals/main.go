@@ -93,12 +93,18 @@ func main() {
 	}
 
 	fetch := &httpFetcher{client: &http.Client{Timeout: 10 * time.Second}}
-	weather := poller.NewWeatherPoller(&pgStoreLister{pool: pool}, fetch, events.NewNATSPublisher(js), mustEnv("OPENWEATHER_API_KEY"))
+	lister := &pgStoreLister{pool: pool}
+	pub := events.NewNATSPublisher(js)
+	weather := poller.NewWeatherPoller(lister, fetch, pub, mustEnv("OPENWEATHER_API_KEY"))
+	transit := poller.NewTransitPoller(lister, fetch, pub, envOr("TRANSIT_API_KEY", ""))
 
 	interval := envDuration("SIGNALS_INTERVAL", 15*time.Minute)
 	runOnce := func() {
 		if err := weather.Poll(ctx); err != nil {
 			log.Error("weather poll", "err", err)
+		}
+		if err := transit.Poll(ctx); err != nil {
+			log.Error("transit poll", "err", err)
 		}
 	}
 	runOnce()

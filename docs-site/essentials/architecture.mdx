@@ -1,0 +1,26 @@
+---
+title: Architecture
+description: "Services, data stores, and the event bus."
+---
+
+## Services
+
+| Service | Role |
+|---|---|
+| `api` | Echo HTTP + WebSocket gateway, auth, RLS context |
+| `ingest` | NATS → ClickHouse raw tables |
+| `rollup` | Daily ClickHouse aggregates (time-to-sell, sell-through, combos) |
+| `signals` | Weather/transit pollers → signal events |
+| `insight` | Rule-based recommender → `recommendation.created` |
+
+## Data stores
+
+- **Postgres 16 + TimescaleDB** — OLTP, scan/sales hypertables, multi-tenant RLS by `org_id` (+ zone scope by `user_id`).
+- **ClickHouse** — analytics warehouse; materialized views maintain 5-minute zone-perf and 7×24 heatmaps.
+- **Redis** — cache, rate limits, short locks.
+- **NATS JetStream** — durable event bus (`lr.{org}.{domain}.{action}`).
+
+## Multi-tenancy
+
+Every table carries `org_id`; RLS reads `app.org_id` and `app.user_id` set per
+request. See [Authentication](/essentials/authentication).

@@ -15,7 +15,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/nats-io/nats.go"
 
+	"github.com/live-rack/pkg/chstore"
 	"github.com/live-rack/pkg/store"
+	"github.com/live-rack/services/ingest/internal/chsink"
 	"github.com/live-rack/services/ingest/internal/consumer"
 )
 
@@ -62,18 +64,46 @@ func main() {
 
 	cons := consumer.New(&pgRecorder{pool: pool})
 
-	sub, err := nc.QueueSubscribe("lr.*.pos.sale", "ingest", func(m *nats.Msg) {
+	// ClickHouse analytics sink: mirror scan + sale events into the raw tables
+	// the rollups and materialized views aggregate from.
+	chCfg, err := chstore.ParseConfig(mustEnv("CLICKHOUSE_URL"), envOr("CLICKHOUSE_DB", "liverack"))
+	if err != nil {
+		log.Error("parse clickhouse url", "err", err)
+		os.Exit(1)
+	}
+	ch := chstore.New(chCfg)
+	if err := ch.Migrate(ctx); err != nil {
+		log.Error("clickhouse migrate", "err", err)
+		os.Exit(1)
+	}
+	sink := chsink.New(ch)
+
+	saleSub, err := nc.QueueSubscribe("lr.*.pos.sale", "ingest", func(m *nats.Msg) {
 		if err := cons.Handle(context.Background(), m.Data); err != nil {
 			log.Error("handle pos.sale", "err", err, "subject", m.Subject)
+		}
+		if err := sink.HandleSale(context.Background(), m.Data); err != nil {
+			log.Error("sink pos.sale", "err", err, "subject", m.Subject)
 		}
 	})
 	if err != nil {
 		log.Error("subscribe pos.sale", "err", err)
 		os.Exit(1)
 	}
-	defer func() { _ = sub.Unsubscribe() }()
+	defer func() { _ = saleSub.Unsubscribe() }()
 
-	log.Info("ingest worker listening", "subject", "lr.*.pos.sale")
+	scanSub, err := nc.QueueSubscribe("lr.*.scan.recorded", "ingest", func(m *nats.Msg) {
+		if err := sink.HandleScan(context.Background(), m.Data); err != nil {
+			log.Error("sink scan.recorded", "err", err, "subject", m.Subject)
+		}
+	})
+	if err != nil {
+		log.Error("subscribe scan.recorded", "err", err)
+		os.Exit(1)
+	}
+	defer func() { _ = scanSub.Unsubscribe() }()
+
+	log.Info("ingest worker listening", "subjects", "lr.*.pos.sale, lr.*.scan.recorded")
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)

@@ -11,12 +11,14 @@ import (
 )
 
 type Querier interface {
+	AdjustItemLocationQty(ctx context.Context, arg AdjustItemLocationQtyParams) (ItemLocation, error)
 	BindUserRole(ctx context.Context, arg BindUserRoleParams) error
 	CountZonesByStore(ctx context.Context, arg CountZonesByStoreParams) (int64, error)
 	CreateScanEvent(ctx context.Context, arg CreateScanEventParams) (ScanEvent, error)
 	CreateStore(ctx context.Context, arg CreateStoreParams) (Store, error)
 	CreateZone(ctx context.Context, arg CreateZoneParams) (Zone, error)
 	DeleteZone(ctx context.Context, arg DeleteZoneParams) error
+	GetItemBySKU(ctx context.Context, arg GetItemBySKUParams) (Item, error)
 	GetLastScanForSKU(ctx context.Context, arg GetLastScanForSKUParams) (ScanEvent, error)
 	GetOrgByIdpID(ctx context.Context, idpOrgID string) (Org, error)
 	GetStore(ctx context.Context, arg GetStoreParams) (Store, error)
@@ -24,10 +26,13 @@ type Querier interface {
 	GetUserRole(ctx context.Context, arg GetUserRoleParams) (string, error)
 	GetUserStoreIDs(ctx context.Context, arg GetUserStoreIDsParams) ([]uuid.UUID, error)
 	GetZone(ctx context.Context, arg GetZoneParams) (Zone, error)
+	ListInventoryByStore(ctx context.Context, arg ListInventoryByStoreParams) ([]ListInventoryByStoreRow, error)
+	ListItems(ctx context.Context, orgID uuid.UUID) ([]Item, error)
 	ListScanEventsByZone(ctx context.Context, arg ListScanEventsByZoneParams) ([]ScanEvent, error)
 	ListStoresByOrg(ctx context.Context, orgID uuid.UUID) ([]Store, error)
 	ListZonesByStore(ctx context.Context, arg ListZonesByStoreParams) ([]Zone, error)
 	UpdateZone(ctx context.Context, arg UpdateZoneParams) (Zone, error)
+	UpsertItem(ctx context.Context, arg UpsertItemParams) (Item, error)
 	UpsertOrg(ctx context.Context, arg UpsertOrgParams) (Org, error)
 	UpsertUser(ctx context.Context, arg UpsertUserParams) (User, error)
 }

@@ -47,6 +47,18 @@ func (f *fakeRecorder) CreateScanEvent(_ context.Context, arg store.CreateScanEv
 	return store.ScanEvent{ID: uuid.New()}, nil
 }
 
+type fakeAdjuster struct {
+	mu      sync.Mutex
+	adjusts []store.AdjustItemLocationQtyParams
+}
+
+func (f *fakeAdjuster) AdjustItemLocationQty(_ context.Context, arg store.AdjustItemLocationQtyParams) (store.ItemLocation, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.adjusts = append(f.adjusts, arg)
+	return store.ItemLocation{ID: uuid.New(), Sku: arg.Sku, Qty: arg.Qty}, nil
+}
+
 type fakePublisher struct {
 	mu       sync.Mutex
 	subjects []string
@@ -87,13 +99,14 @@ func mustConstraints(t *testing.T, c domain.ZoneConstraints) []byte {
 }
 
 // run wires one validate request and returns the recorder.
-func run(t *testing.T, getter *fakeZoneGetter, orgID, storeID uuid.UUID, body map[string]any) (*httptest.ResponseRecorder, *fakeRecorder, *fakePublisher, error) {
+func run(t *testing.T, getter *fakeZoneGetter, orgID, storeID uuid.UUID, body map[string]any) (*httptest.ResponseRecorder, *fakeRecorder, *fakeAdjuster, *fakePublisher, error) {
 	t.Helper()
 	e := echo.New()
 	e.HideBanner = true
 	rec0 := &fakeRecorder{}
+	adj := &fakeAdjuster{}
 	pub := &fakePublisher{}
-	h := scans.New(getter, rec0, pub)
+	h := scans.New(getter, rec0, adj, pub)
 	h.Register(e.Group("/api/v1/stores"))
 
 	raw, _ := json.Marshal(body)
@@ -105,7 +118,7 @@ func run(t *testing.T, getter *fakeZoneGetter, orgID, storeID uuid.UUID, body ma
 	c.SetParamNames("storeID")
 	c.SetParamValues(storeID.String())
 	withPrincipal(c, orgID, storeID)
-	return rec, rec0, pub, h.Validate(c)
+	return rec, rec0, adj, pub, h.Validate(c)
 }
 
 func TestScanHandler_Validate(t *testing.T) {
@@ -172,7 +185,7 @@ func TestScanHandler_Validate(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			rec, recorder, pub, err := run(t, getter, orgID, storeID, tc.body)
+			rec, recorder, adj, pub, err := run(t, getter, orgID, storeID, tc.body)
 			require.NoError(t, err)
 			assert.Equal(t, http.StatusOK, rec.Code)
 			// every scan persisted + published once
@@ -181,6 +194,12 @@ func TestScanHandler_Validate(t *testing.T) {
 			assert.Equal(t, events.ScanSubject(orgID), pub.subjects[0])
 			ev := pub.payloads[0].(events.ScanRecorded)
 			assert.Equal(t, tc.wantValid, ev.Valid)
+			// only valid scans adjust on-hand inventory
+			if tc.wantValid {
+				assert.Len(t, adj.adjusts, 1)
+			} else {
+				assert.Empty(t, adj.adjusts)
+			}
 
 			var resp struct {
 				Valid            bool   `json:"valid"`
@@ -200,7 +219,7 @@ func TestScanHandler_Validate_ZoneNotFound(t *testing.T) {
 	storeID := uuid.New()
 	getter := &fakeZoneGetter{rows: map[uuid.UUID]store.Zone{}}
 
-	_, _, _, err := run(t, getter, orgID, storeID, map[string]any{
+	_, _, _, _, err := run(t, getter, orgID, storeID, map[string]any{
 		"zone_id": uuid.New(), "category": "frozen", "scan_qty": 1, "scanner_id": "scn-1", "sku": "SKU1", "action": "place",
 	})
 	var he *echo.HTTPError
@@ -213,7 +232,7 @@ func TestScanHandler_Validate_BadScanQty(t *testing.T) {
 	storeID := uuid.New()
 	getter := &fakeZoneGetter{rows: map[uuid.UUID]store.Zone{}}
 
-	_, _, _, err := run(t, getter, orgID, storeID, map[string]any{
+	_, _, _, _, err := run(t, getter, orgID, storeID, map[string]any{
 		"zone_id": uuid.New(), "category": "frozen", "scan_qty": 0, "scanner_id": "scn-1", "sku": "SKU1", "action": "place",
 	})
 	var he *echo.HTTPError

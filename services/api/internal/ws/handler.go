@@ -15,11 +15,11 @@ var upgrader = websocket.Upgrader{CheckOrigin: func(_ *http.Request) bool { retu
 // Handler upgrades authenticated requests and registers clients on the hub.
 type Handler struct {
 	hub      *Hub
-	verifier *pkgauth.ClerkVerifier
+	verifier pkgauth.Verifier
 }
 
 // NewHandler wires the hub + token verifier.
-func NewHandler(hub *Hub, v *pkgauth.ClerkVerifier) *Handler {
+func NewHandler(hub *Hub, v pkgauth.Verifier) *Handler {
 	return &Handler{hub: hub, verifier: v}
 }
 

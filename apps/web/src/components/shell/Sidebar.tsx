@@ -1,4 +1,4 @@
-import { useUser } from "@clerk/clerk-react";
+import { useAuth } from "react-oidc-context";
 import { NavLink } from "react-router-dom";
 import { BrandMark } from "./BrandMark";
 import { Icon, Icons } from "./Icon";
@@ -36,10 +36,17 @@ const NAV_SECTIONS = [
 ] as const;
 
 export function Sidebar({ accent = "#2563eb", onNavigate }: SidebarProps) {
-  const { user } = useUser();
-  const initials = user
-    ? `${user.firstName?.[0] ?? ""}${user.lastName?.[0] ?? ""}`.toUpperCase()
-    : "?";
+  const auth = useAuth();
+  const profile = auth.user?.profile;
+  const fullName = (profile?.name as string | undefined) ?? "";
+  const email = (profile?.email as string | undefined) ?? "";
+  const initials =
+    fullName
+      .split(" ")
+      .map((p) => p[0] ?? "")
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "?";
 
   return (
     <aside className="sidebar">
@@ -70,10 +77,10 @@ export function Sidebar({ accent = "#2563eb", onNavigate }: SidebarProps) {
 
       <div className="sidebar-footer">
         <div className="user-chip">
-          <div className="avatar">{initials || "?"}</div>
+          <div className="avatar">{initials}</div>
           <div style={{ minWidth: 0 }}>
-            <div className="user-name">{user?.fullName ?? "—"}</div>
-            <div className="user-role">{user?.primaryEmailAddress?.emailAddress ?? ""}</div>
+            <div className="user-name">{fullName || "—"}</div>
+            <div className="user-role">{email}</div>
           </div>
         </div>
       </div>

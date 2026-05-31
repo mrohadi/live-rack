@@ -60,12 +60,12 @@ func (ns NullZoneType) Value() (driver.Value, error) {
 }
 
 type Org struct {
-	ID         uuid.UUID `json:"id"`
-	ClerkOrgID string    `json:"clerk_org_id"`
-	Name       string    `json:"name"`
-	Plan       string    `json:"plan"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	ID        uuid.UUID `json:"id"`
+	IdpOrgID  string    `json:"idp_org_id"`
+	Name      string    `json:"name"`
+	Plan      string    `json:"plan"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type Role struct {
@@ -109,7 +109,7 @@ type Store struct {
 type User struct {
 	ID          uuid.UUID   `json:"id"`
 	OrgID       uuid.UUID   `json:"org_id"`
-	ClerkUserID string      `json:"clerk_user_id"`
+	IdpUserID   string      `json:"idp_user_id"`
 	Email       string      `json:"email"`
 	DisplayName string      `json:"display_name"`
 	AvatarUrl   pgtype.Text `json:"avatar_url"`

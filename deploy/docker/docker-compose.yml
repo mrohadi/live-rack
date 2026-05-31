@@ -160,6 +160,49 @@ services:
     depends_on:
       - apm-server
 
+  # ─── Zitadel (self-hosted OIDC IdP, replaces Clerk) ──────────────────────────
+  zitadel-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: zitadel
+      POSTGRES_PASSWORD: zitadel
+      POSTGRES_DB: zitadel
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zitadel -d zitadel"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - zitadel_db_data:/var/lib/postgresql/data
+
+  zitadel:
+    image: ghcr.io/zitadel/zitadel:v2.71.9
+    command: 'start-from-init --masterkey "MasterkeyNeedsToHave32Characters" --tlsMode disabled'
+    environment:
+      ZITADEL_EXTERNALSECURE: "false"
+      ZITADEL_EXTERNALDOMAIN: localhost
+      ZITADEL_EXTERNALPORT: 8081
+      # Force legacy hosted login (v1) — v2.71 defaults the console to Login UI v2 (/login), unbundled here.
+      ZITADEL_OIDC_DEFAULTLOGINURLV2: ""
+      ZITADEL_OIDC_DEFAULTLOGOUTURLV2: ""
+      ZITADEL_DATABASE_POSTGRES_HOST: zitadel-db
+      ZITADEL_DATABASE_POSTGRES_PORT: 5432
+      ZITADEL_DATABASE_POSTGRES_DATABASE: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_USERNAME: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_PASSWORD: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE: disable
+      ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME: zitadel
+      ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD: zitadel
+      ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE: disable
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_USERNAME: admin@localhost
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD: Admin123!
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORDCHANGEREQUIRED: "false"
+    ports:
+      - "8081:8080"
+    depends_on:
+      zitadel-db:
+        condition: service_healthy
+
 volumes:
   postgres_data:
   nats_data:
@@ -167,3 +210,4 @@ volumes:
   redis_data:
   minio_data:
   elasticsearch_data:
+  zitadel_db_data:

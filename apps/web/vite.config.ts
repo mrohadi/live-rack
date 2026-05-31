@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
@@ -23,5 +24,10 @@ export default defineConfig({
     }),
   ],
   server: { port: 5173, proxy: { "/api": "http://localhost:8080" } },
-  resolve: { alias: { konva: "konva/lib/index.js" } },
+  resolve: {
+    alias: {
+      konva: "konva/lib/index.js",
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
+    },
+  },
 });

@@ -121,7 +121,15 @@ func main() {
 		return err
 	}
 
-	// _ = pkgauth.NewClerkVerifier(mustEnv("CLERK_SECRET_KEY"), nil)
+	q := store.New(pool)
+
+	// Zitadel OIDC verifier — discovers JWKS at startup, JIT-provisions on first login.
+	resolver := pkgauth.NewDBResolver(authadapter.New(q))
+	verifier, err := pkgauth.NewZitadelVerifier(ctx, mustEnv("OIDC_ISSUER"), mustEnv("OIDC_PROJECT_ID"), resolver)
+	if err != nil {
+		log.Error("init oidc verifier", "err", err)
+		os.Exit(1)
+	}
 
 	e := echo.New()
 	e.HideBanner = true
@@ -145,24 +153,8 @@ func main() {
 	// OpenMetrics endpoint (scraped by Elastic Metricbeat) — no auth.
 	e.GET("/metrics", echo.WrapHandler(promhttp.Handler()))
 
-	// Clerk webhook — signed by Svix, no JWT auth.
-	clerkWebhookSecret := os.Getenv("CLERK_WEBHOOK_SECRET")
-	if clerkWebhookSecret != "" {
-		whHandler, err := apimw.NewClerkWebhookHandler(clerkWebhookSecret, nil)
-		if err != nil {
-			log.Error("init clerk webhook handler", "err", err)
-			os.Exit(1)
-		}
-		e.POST("/webhooks/clerk", echo.WrapHandler(http.HandlerFunc(whHandler.ServeHTTP)))
-	}
-
-	q := store.New(pool)
-
 	// Authenticated API group.
-	api := e.Group("/api/v1", apimw.Auth(
-		pkgauth.NewClerkVerifier(mustEnv("CLERK_SECRET_KEY"), pkgauth.NewDBResolver(authadapter.New(q))),
-		setOrgID,
-	))
+	api := e.Group("/api/v1", apimw.Auth(verifier, setOrgID))
 
 	zones.New(q).Register(api.Group("/stores"))
 	scans.New(q, q, publisher).Register(api.Group("/stores"))
@@ -174,8 +166,7 @@ func main() {
 		log.Error("ws nats subscribe", "err", err)
 		os.Exit(1)
 	}
-	wsVerifier := pkgauth.NewClerkVerifier(mustEnv("CLERK_SECRET_KEY"), pkgauth.NewDBResolver(authadapter.New(q)))
-	ws.NewHandler(hub, wsVerifier).Register(e)
+	ws.NewHandler(hub, verifier).Register(e)
 
 	port := envOr("PORT", "8080")
 	srv := &http.Server{

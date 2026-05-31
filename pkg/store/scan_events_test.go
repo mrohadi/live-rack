@@ -28,8 +28,8 @@ func TestScanEventsRepo(t *testing.T) {
 	zoneID := uuid.New()
 
 	_, err := pool.Exec(ctx,
-		`INSERT INTO orgs (id, clerk_org_id, name) VALUES ($1, $2, $3)`,
-		orgID, "clerk_test_"+orgID.String(), "Test Org")
+		`INSERT INTO orgs (id, idp_org_id, name) VALUES ($1, $2, $3)`,
+		orgID, "idp_test_"+orgID.String(), "Test Org")
 	require.NoError(t, err)
 
 	_, err = pool.Exec(ctx,

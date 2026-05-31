@@ -48,6 +48,7 @@ import (
 	"github.com/live-rack/services/api/internal/scans"
 	"github.com/live-rack/services/api/internal/search"
 	"github.com/live-rack/services/api/internal/tasks"
+	"github.com/live-rack/services/api/internal/users"
 	"github.com/live-rack/services/api/internal/webhooks"
 	"github.com/live-rack/services/api/internal/ws"
 	"github.com/live-rack/services/api/internal/zones"
@@ -189,6 +190,7 @@ func main() {
 	}
 	analytics.New(chstore.New(chCfg)).Register(api)
 	recommendations.New(q).Register(api)
+	users.New(q).Register(api)
 
 	hub := ws.NewHub(log)
 	if _, err := nc.Subscribe("lr.*.>", func(m *nats.Msg) {

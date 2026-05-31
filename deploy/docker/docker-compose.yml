@@ -25,6 +25,11 @@ services:
 
   clickhouse:
     image: clickhouse/clickhouse-server:latest
+    environment:
+      CLICKHOUSE_DB: liverack
+      CLICKHOUSE_USER: liverack
+      CLICKHOUSE_PASSWORD: liverack
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
     ports:
       - "8123:8123"
       - "9000:9000"

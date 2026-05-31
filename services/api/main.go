@@ -31,11 +31,13 @@ import (
 	echoSwagger "github.com/swaggo/echo-swagger"
 
 	pkgauth "github.com/live-rack/pkg/auth"
+	"github.com/live-rack/pkg/chstore"
 	"github.com/live-rack/pkg/events"
 	"github.com/live-rack/pkg/integrations"
 	obs "github.com/live-rack/pkg/observability"
 	"github.com/live-rack/pkg/store"
 	_ "github.com/live-rack/services/api/docs" // swaggo generated
+	"github.com/live-rack/services/api/internal/analytics"
 	"github.com/live-rack/services/api/internal/authadapter"
 	integrationsapi "github.com/live-rack/services/api/internal/integrations"
 	"github.com/live-rack/services/api/internal/inventory"
@@ -175,6 +177,14 @@ func main() {
 	sales.New(q).Register(api)
 	integrationsapi.New(q).Register(api)
 	search.New(q).Register(api)
+
+	// ClickHouse-backed analytics reads.
+	chCfg, err := chstore.ParseConfig(mustEnv("CLICKHOUSE_URL"), envOr("CLICKHOUSE_DB", "liverack"))
+	if err != nil {
+		log.Error("parse clickhouse url", "err", err)
+		os.Exit(1)
+	}
+	analytics.New(chstore.New(chCfg)).Register(api)
 
 	hub := ws.NewHub(log)
 	if _, err := nc.Subscribe("lr.*.>", func(m *nats.Msg) {

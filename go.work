@@ -2,6 +2,7 @@ go 1.26.3
 
 use (
 	./pkg/auth
+	./pkg/chstore
 	./pkg/domain
 	./pkg/events
 	./pkg/integrations
@@ -10,4 +11,5 @@ use (
 	./scripts/seed
 	./services/api
 	./services/ingest
+	./services/rollup
 )

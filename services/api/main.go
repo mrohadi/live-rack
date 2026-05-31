@@ -47,7 +47,9 @@ import (
 	"github.com/live-rack/services/api/internal/sales"
 	"github.com/live-rack/services/api/internal/scans"
 	"github.com/live-rack/services/api/internal/search"
+	"github.com/live-rack/services/api/internal/servicetokens"
 	"github.com/live-rack/services/api/internal/tasks"
+	"github.com/live-rack/services/api/internal/users"
 	"github.com/live-rack/services/api/internal/webhooks"
 	"github.com/live-rack/services/api/internal/ws"
 	"github.com/live-rack/services/api/internal/zones"
@@ -121,26 +123,32 @@ func main() {
 
 	publisher := events.NewNATSPublisher(js)
 
-	// setOrgID executes SET LOCAL app.org_id = '<id>' on the acquired connection.
-	setOrgID := func(orgID string) error {
+	// setSession sets app.org_id + app.user_id on the acquired connection; RLS
+	// policies read both to enforce tenant and zone scope.
+	setSession := func(orgID, userID string) error {
 		conn, err := pool.Acquire(context.Background())
 		if err != nil {
 			return fmt.Errorf("acquire conn: %w", err)
 		}
 		defer conn.Release()
-		_, err = conn.Exec(context.Background(), fmt.Sprintf("SET LOCAL app.org_id = '%s'", orgID))
+		_, err = conn.Exec(context.Background(),
+			fmt.Sprintf("SET LOCAL app.org_id = '%s'; SET LOCAL app.user_id = '%s'", orgID, userID))
 		return err
 	}
 
 	q := store.New(pool)
 
 	// Zitadel OIDC verifier — discovers JWKS at startup, JIT-provisions on first login.
-	resolver := pkgauth.NewDBResolver(authadapter.New(q))
-	verifier, err := pkgauth.NewZitadelVerifier(ctx, mustEnv("OIDC_ISSUER"), mustEnv("OIDC_PROJECT_ID"), resolver)
+	adapter := authadapter.New(q)
+	resolver := pkgauth.NewDBResolver(adapter)
+	oidcVerifier, err := pkgauth.NewZitadelVerifier(ctx, mustEnv("OIDC_ISSUER"), mustEnv("OIDC_PROJECT_ID"), resolver)
 	if err != nil {
 		log.Error("init oidc verifier", "err", err)
 		os.Exit(1)
 	}
+	// Composite verifier: opaque service tokens ("lrk_...") resolve to service
+	// principals; everything else goes through OIDC.
+	verifier := pkgauth.NewCompositeVerifier(pkgauth.NewServiceVerifier(adapter), oidcVerifier)
 
 	e := echo.New()
 	e.HideBanner = true
@@ -168,7 +176,7 @@ func main() {
 	webhooks.New(q, publisher, integrations.NewShopify(), integrations.NewSquare()).Register(e)
 
 	// Authenticated API group.
-	api := e.Group("/api/v1", apimw.Auth(verifier, setOrgID))
+	api := e.Group("/api/v1", apimw.Auth(verifier, setSession))
 
 	zones.New(q).Register(api.Group("/stores"))
 	scans.New(q, q, q, publisher).Register(api.Group("/stores"))
@@ -187,6 +195,8 @@ func main() {
 	}
 	analytics.New(chstore.New(chCfg)).Register(api)
 	recommendations.New(q).Register(api)
+	users.New(q).Register(api)
+	servicetokens.New(q).Register(api)
 
 	hub := ws.NewHub(log)
 	if _, err := nc.Subscribe("lr.*.>", func(m *nats.Msg) {

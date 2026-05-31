@@ -14,9 +14,9 @@ import (
 
 const adjustItemLocationQty = `-- name: AdjustItemLocationQty :one
 INSERT INTO item_locations (org_id, store_id, zone_id, sku, qty)
-VALUES ($1, $2, $3, $4, GREATEST($5, 0))
+VALUES ($1, $2, $3, $4, GREATEST($5::int, 0))
 ON CONFLICT (org_id, zone_id, sku) DO UPDATE
-SET qty = GREATEST(item_locations.qty + $5, 0)
+SET qty = GREATEST(item_locations.qty + $5::int, 0)
 RETURNING id, org_id, store_id, zone_id, sku, qty, updated_at
 `
 

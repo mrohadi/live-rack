@@ -16,11 +16,12 @@ const PAGE_LABELS: Record<string, string> = {
 interface TopbarProps {
   density: "Compact" | "Balanced" | "Roomy";
   onDensityChange: (d: "Compact" | "Balanced" | "Roomy") => void;
+  onOpenSearch: () => void;
 }
 
 const DENSITIES = ["Compact", "Balanced", "Roomy"] as const;
 
-export function Topbar({ density, onDensityChange }: TopbarProps) {
+export function Topbar({ density, onDensityChange, onOpenSearch }: TopbarProps) {
   const { pathname } = useLocation();
   const label = PAGE_LABELS[pathname] ?? pathname.slice(1);
 
@@ -32,11 +33,11 @@ export function Topbar({ density, onDensityChange }: TopbarProps) {
         <span className="now">{label}</span>
       </div>
 
-      <label className="search">
+      <button type="button" className="search" onClick={onOpenSearch}>
         <Icon d={Icons.search} size={14} />
-        <input placeholder="Search SKUs, zones, tasks…" />
+        <span className="search-placeholder">Search SKUs, zones, tasks…</span>
         <kbd>⌘K</kbd>
-      </label>
+      </button>
 
       <div className="topbar-actions">
         <div className="tabs">

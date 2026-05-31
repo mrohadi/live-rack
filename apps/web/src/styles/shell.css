@@ -206,6 +206,14 @@ textarea {
   flex: 1;
   font-size: 13px;
 }
+button.search {
+  cursor: pointer;
+  text-align: left;
+}
+.search-placeholder {
+  flex: 1;
+  color: var(--text-3);
+}
 .search kbd {
   font-family: var(--mono);
   font-size: 10.5px;
@@ -214,6 +222,91 @@ textarea {
   padding: 1px 5px;
   border-radius: 4px;
   color: var(--text-3);
+}
+
+/* ⌘K command palette (LR-303). */
+.cmdk-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 15vh;
+  background: rgba(15, 23, 42, 0.45);
+}
+.cmdk-panel {
+  width: 100%;
+  max-width: 560px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.25);
+  overflow: hidden;
+}
+.cmdk-input {
+  width: 100%;
+  padding: 14px 16px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+}
+.cmdk-input::placeholder {
+  color: var(--text-3);
+}
+.cmdk-list {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+.cmdk-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 12px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  text-align: left;
+  font-size: 14px;
+  color: var(--text);
+}
+.cmdk-item.active,
+.cmdk-item:hover {
+  background: var(--accent-soft);
+}
+.cmdk-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cmdk-sku {
+  margin-left: 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-3);
+}
+.cmdk-kind {
+  flex: none;
+  font-size: 11px;
+  color: var(--text-3);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 6px;
+}
+.cmdk-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--text-3);
+  font-size: 14px;
 }
 .topbar-actions {
   margin-left: auto;
@@ -399,6 +492,56 @@ textarea {
     height: 6px;
     border-radius: 50%;
     background: var(--danger);
+  }
+}
+
+/* Branded loading screen (LoadingScreen.tsx) */
+.lr-loader {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+}
+.lr-loader-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  animation: lr-spin 0.8s linear infinite;
+}
+.lr-loader-mark {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  animation: lr-pulse 1.6s ease-in-out infinite;
+}
+.lr-loader-mark .brand-mark {
+  width: 40px;
+  height: 40px;
+}
+@keyframes lr-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes lr-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(0.88);
+    opacity: 0.75;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lr-loader-ring,
+  .lr-loader-mark {
+    animation: none;
   }
 }
 

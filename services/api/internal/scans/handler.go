@@ -26,16 +26,22 @@ type ScanRecorder interface {
 	CreateScanEvent(ctx context.Context, arg store.CreateScanEventParams) (store.ScanEvent, error)
 }
 
+// LocationAdjuster applies an on-hand quantity delta to an item location.
+type LocationAdjuster interface {
+	AdjustItemLocationQty(ctx context.Context, arg store.AdjustItemLocationQtyParams) (store.ItemLocation, error)
+}
+
 // Handler handles scan validation endpoints.
 type Handler struct {
 	q   ZoneGetter
 	rec ScanRecorder
+	loc LocationAdjuster
 	pub events.Publisher
 }
 
 // New creates a Handler.
-func New(q ZoneGetter, rec ScanRecorder, pub events.Publisher) *Handler {
-	return &Handler{q: q, rec: rec, pub: pub}
+func New(q ZoneGetter, rec ScanRecorder, loc LocationAdjuster, pub events.Publisher) *Handler {
+	return &Handler{q: q, rec: rec, loc: loc, pub: pub}
 }
 
 // Register mounts scan routes onto g (expected: /api/v1/stores).
@@ -128,6 +134,20 @@ func (h *Handler) Validate(c echo.Context) error {
 		Reason:    resp.Reason,
 	}); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "persist scan")
+	}
+
+	// Only valid scans mutate on-hand inventory.
+	if resp.Valid {
+		delta := domain.QtyDelta(domain.ScanAction(req.Action), req.ScanQty)
+		if _, err := h.loc.AdjustItemLocationQty(ctx, store.AdjustItemLocationQtyParams{
+			OrgID:   orgID,
+			StoreID: storeID,
+			ZoneID:  req.ZoneID,
+			Sku:     req.SKU,
+			Qty:     int32(delta),
+		}); err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "adjust inventory")
+		}
 	}
 
 	if err := h.pub.Publish(ctx, events.ScanSubject(orgID), events.ScanRecorded{

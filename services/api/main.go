@@ -36,8 +36,10 @@ import (
 	"github.com/live-rack/pkg/store"
 	_ "github.com/live-rack/services/api/docs" // swaggo generated
 	"github.com/live-rack/services/api/internal/authadapter"
+	"github.com/live-rack/services/api/internal/inventory"
 	apimw "github.com/live-rack/services/api/internal/middleware"
 	"github.com/live-rack/services/api/internal/scans"
+	"github.com/live-rack/services/api/internal/search"
 	"github.com/live-rack/services/api/internal/ws"
 	"github.com/live-rack/services/api/internal/zones"
 )
@@ -157,7 +159,9 @@ func main() {
 	api := e.Group("/api/v1", apimw.Auth(verifier, setOrgID))
 
 	zones.New(q).Register(api.Group("/stores"))
-	scans.New(q, q, publisher).Register(api.Group("/stores"))
+	scans.New(q, q, q, publisher).Register(api.Group("/stores"))
+	inventory.New(q).Register(api.Group("/stores"))
+	search.New(q).Register(api)
 
 	hub := ws.NewHub(log)
 	if _, err := nc.Subscribe("lr.*.>", func(m *nats.Msg) {

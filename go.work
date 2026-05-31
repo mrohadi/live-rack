@@ -6,5 +6,6 @@ use (
 	./pkg/events
 	./pkg/observability
 	./pkg/store
+	./scripts/seed
 	./services/api
 )

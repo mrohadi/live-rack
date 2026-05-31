@@ -59,6 +59,27 @@ func (ns NullZoneType) Value() (driver.Value, error) {
 	return string(ns.ZoneType), nil
 }
 
+type Item struct {
+	ID        uuid.UUID `json:"id"`
+	OrgID     uuid.UUID `json:"org_id"`
+	Sku       string    `json:"sku"`
+	Name      string    `json:"name"`
+	Category  string    `json:"category"`
+	Status    string    `json:"status"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type ItemLocation struct {
+	ID        uuid.UUID `json:"id"`
+	OrgID     uuid.UUID `json:"org_id"`
+	StoreID   uuid.UUID `json:"store_id"`
+	ZoneID    uuid.UUID `json:"zone_id"`
+	Sku       string    `json:"sku"`
+	Qty       int32     `json:"qty"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 type Org struct {
 	ID        uuid.UUID `json:"id"`
 	IdpOrgID  string    `json:"idp_org_id"`

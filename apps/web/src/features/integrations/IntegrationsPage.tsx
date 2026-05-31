@@ -1,8 +1,11 @@
+import { useState } from "react";
+import { WebhookConfig } from "./WebhookConfig";
 import { statusTone, useIntegrations, useWebhookLog } from "./useIntegrations";
 
 export function IntegrationsPage() {
   const { data: integrations = [], isLoading: loadingIntegrations } = useIntegrations();
   const { data: events = [], isLoading: loadingLog } = useWebhookLog();
+  const [outbound, setOutbound] = useState<Record<string, boolean>>({});
 
   return (
     <div className="flex h-full flex-col">
@@ -12,6 +15,14 @@ export function IntegrationsPage() {
       </header>
 
       <div className="flex-1 space-y-6 overflow-auto p-4">
+        <section>
+          <h2 className="mb-2 text-sm font-semibold text-foreground">Marketplace &amp; webhooks</h2>
+          <WebhookConfig
+            outboundEnabled={outbound}
+            onToggleOutbound={(kind, enabled) => setOutbound((p) => ({ ...p, [kind]: enabled }))}
+          />
+        </section>
+
         <section>
           <h2 className="mb-2 text-sm font-semibold text-foreground">Connectors</h2>
           {loadingIntegrations ? (

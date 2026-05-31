@@ -48,5 +48,5 @@ type Integration struct {
 // CanManageIntegrations reports whether the principal may connect/configure
 // integrations. Admin-only, matching the design permission matrix.
 func CanManageIntegrations(p *Principal) bool {
-	return p.HasRole(RoleAdmin)
+	return Can(p.Role, PermManageIntegrations)
 }

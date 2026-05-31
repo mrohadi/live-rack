@@ -121,5 +121,5 @@ type Pipeline struct {
 // CanMutatePipeline reports whether the principal may create pipelines, edit
 // stages, or move cards. Matches the design permission matrix: Admin + Manager.
 func CanMutatePipeline(p *Principal) bool {
-	return p.HasRole(RoleAdmin, RoleManager)
+	return Can(p.Role, PermManagePipelines)
 }

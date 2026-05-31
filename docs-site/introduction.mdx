@@ -1,0 +1,31 @@
+---
+title: Introduction
+description: "Warehouse zoning, real-time tracking, and cross-signal analytics."
+---
+
+## What is live-rack?
+
+live-rack is a multi-tenant SaaS that connects your physical store layout, item
+movement, POS sales, and external signals (weather, transit) into one
+operational console.
+
+<CardGroup cols={2}>
+  <Card title="Map & Zones" icon="map">
+    Drag-and-drop floor layout with live heatmap overlays.
+  </Card>
+  <Card title="Scanner PWA" icon="barcode">
+    Camera + Zebra WebHID scanning with offline queue and mis-scan prevention.
+  </Card>
+  <Card title="Analytics" icon="chart-line">
+    Zone performance, time-to-sell, co-purchase lift, 7×24 heatmaps.
+  </Card>
+  <Card title="Signals" icon="cloud-bolt">
+    Weather/transit-driven recommendations you can apply as tasks.
+  </Card>
+</CardGroup>
+
+## Architecture at a glance
+
+React SPA + Scanner PWA → Go (Echo) API + WebSocket gateway → Postgres/Timescale
+(OLTP) and ClickHouse (analytics), with NATS JetStream as the event bus. See
+[Architecture](/essentials/architecture).

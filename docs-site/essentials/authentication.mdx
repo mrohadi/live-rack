@@ -1,0 +1,38 @@
+---
+title: Authentication
+description: "OIDC users and opaque service tokens."
+---
+
+## User auth (OIDC)
+
+Users authenticate via self-hosted **Zitadel** (OIDC). The API verifies the JWT
+against Zitadel's JWKS, JIT-provisions the user/org, and derives a `Principal`
+(role, store/zone scope, MFA state from the `amr` claim).
+
+```http
+Authorization: Bearer <oidc-jwt>
+```
+
+## Service tokens
+
+Machine clients use opaque tokens prefixed `lrk_`. Only the SHA-256 hash is
+stored; the token resolves to a **service** principal scoped to its org.
+
+```http
+Authorization: Bearer lrk_<random>
+```
+
+Create one (admin + 2FA required):
+
+```bash
+curl -X POST $API/api/v1/service-tokens \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -d '{"name":"Shopify sync"}'
+# -> { "token": "lrk_...", ... }   # shown once
+```
+
+## RBAC
+
+Roles: `admin`, `manager`, `staff`, `readonly`, `service`. Permissions follow a
+central matrix; high-impact actions (edit users, manage integrations) also
+require a verified second factor.

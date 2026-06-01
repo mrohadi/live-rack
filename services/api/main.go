@@ -215,6 +215,7 @@ func main() {
 	analytics.New(chstore.New(chCfg)).Register(api)
 	recommendations.New(q).Register(api)
 	users.New(q).Register(api)
+	users.NewMetrics(q, mgmt).Register(api)
 	users.NewInvite(mgmt, auditWriter).Register(api)
 	servicetokens.New(q).Register(api)
 

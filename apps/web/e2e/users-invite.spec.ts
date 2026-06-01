@@ -24,6 +24,14 @@ test.describe("Users — invite flow", () => {
       if (route.request().method() === "GET") await route.fulfill({ json: [] });
       else await route.continue();
     });
+    await page.route("**/api/v1/users/stats", async (route) => {
+      await route.fulfill({
+        json: { members: 0, roles: 5, active_now: 0, pending_invites: 0, twofa_coverage: 0 },
+      });
+    });
+    await page.route("**/api/v1/me/2fa", async (route) => {
+      await route.fulfill({ status: 204, body: "" });
+    });
 
     await seedOidcSession(page);
     await page.goto("/users");
@@ -40,7 +48,7 @@ test.describe("Users — invite flow", () => {
       });
     });
 
-    await page.getByRole("button", { name: "Invite member" }).click();
+    await page.getByRole("button", { name: "Add user" }).click();
     await expect(page.getByRole("dialog", { name: "Invite user" })).toBeVisible();
 
     await page.getByLabel("Email").fill("new@acme.test");
@@ -59,6 +67,6 @@ test.describe("Users — invite flow", () => {
     });
     await page.reload();
     await page.waitForLoadState("networkidle");
-    await expect(page.getByRole("button", { name: "Invite member" })).toBeHidden();
+    await expect(page.getByRole("button", { name: "Add user" })).toBeHidden();
   });
 });

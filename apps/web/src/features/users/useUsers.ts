@@ -7,6 +7,20 @@ export interface OrgUser {
   display_name: string;
   avatar_url: string;
   role: string;
+  title: string;
+  shift: string;
+  status: string;
+  mfa_enabled: boolean;
+  last_seen_at: string | null;
+  zones: string[];
+}
+
+export interface RosterStats {
+  members: number;
+  roles: number;
+  active_now: number;
+  pending_invites: number;
+  twofa_coverage: number;
 }
 
 export interface Capabilities {
@@ -21,7 +35,25 @@ export interface Capabilities {
 export const userKeys = {
   list: ["users", "list"] as const,
   me: ["users", "me"] as const,
+  stats: ["users", "stats"] as const,
 };
+
+/** Zone-access label: explicit zones joined, else org-wide "All". Pure. */
+export function zonesLabel(zones: string[] | undefined): string {
+  return zones && zones.length > 0 ? zones.join(", ") : "All";
+}
+
+/** Compact relative time from an ISO timestamp. Pure. */
+export function relativeTime(iso: string | null, now: number = Date.now()): string {
+  if (!iso) return "—";
+  const diff = Math.max(0, now - new Date(iso).getTime());
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
 
 /** Role columns shown in the permission matrix, in display order. */
 export const ROLE_COLUMNS = ["Admin", "Manager", "Staff", "Read-only"] as const;
@@ -61,6 +93,28 @@ export function useUsers() {
 export function useCapabilities() {
   const { get } = useApi();
   return useQuery({ queryKey: userKeys.me, queryFn: () => get<Capabilities>("/api/v1/me") });
+}
+
+/** Fetch the Users & Access header metrics. */
+export function useRosterStats() {
+  const { get } = useApi();
+  return useQuery({
+    queryKey: userKeys.stats,
+    queryFn: () => get<RosterStats>("/api/v1/users/stats"),
+  });
+}
+
+/** Sync the caller's 2FA state (from the ID-token amr) to the server. */
+export function useSyncMfa() {
+  const { post } = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (enabled: boolean) => post<void>("/api/v1/me/2fa", { enabled }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: userKeys.list });
+      void qc.invalidateQueries({ queryKey: userKeys.stats });
+    },
+  });
 }
 
 /** Roles an admin may assign when inviting a teammate. */

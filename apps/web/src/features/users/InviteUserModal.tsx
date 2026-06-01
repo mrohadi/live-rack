@@ -43,6 +43,10 @@ export function InviteUserModal({ onClose, onInvited }: InviteUserModalProps) {
         className="w-full max-w-md space-y-4 rounded-lg border border-border bg-surface p-5 shadow-lg"
       >
         <h2 className="text-base font-semibold text-foreground">Invite a teammate</h2>
+        <p className="text-xs text-muted-foreground">
+          We email a verification link. They confirm the address, set a password, and enrol 2FA
+          before first sign-in.
+        </p>
 
         <label className="block text-sm">
           <span className="mb-1 block text-muted-foreground">Email</span>

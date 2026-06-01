@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -23,6 +24,10 @@ type Management interface {
 	GrantProjectRole(ctx context.Context, orgID, userID, role string) error
 	// ResendInvite re-sends the initialization email for a not-yet-active user.
 	ResendInvite(ctx context.Context, orgID, userID string) error
+	// PendingInvites counts users still in the initial (not-yet-verified) state.
+	PendingInvites(ctx context.Context, orgID string) (int, error)
+	// SendPasswordReset emails a user a password-reset link.
+	SendPasswordReset(ctx context.Context, orgID, userID string) error
 }
 
 // TokenSource yields a bearer token authorized for Zitadel management calls.
@@ -166,5 +171,32 @@ func (m *ZitadelManagement) GrantProjectRole(ctx context.Context, orgID, userID,
 func (m *ZitadelManagement) ResendInvite(ctx context.Context, orgID, userID string) error {
 	return m.post(ctx,
 		fmt.Sprintf("/management/v1/users/%s/_resend_initialization", userID), orgID,
+		map[string]any{}, nil)
+}
+
+// PendingInvites counts org users still in USER_STATE_INITIAL (invited, not yet
+// verified). Returns 0 on a missing/!2xx response so the UI degrades gracefully.
+func (m *ZitadelManagement) PendingInvites(ctx context.Context, orgID string) (int, error) {
+	body := map[string]any{
+		"queries": []any{
+			map[string]any{"stateQuery": map[string]any{"state": "USER_STATE_INITIAL"}},
+		},
+	}
+	var resp struct {
+		Details struct {
+			TotalResult string `json:"totalResult"`
+		} `json:"details"`
+	}
+	if err := m.post(ctx, "/management/v1/users/_search", orgID, body, &resp); err != nil {
+		return 0, err
+	}
+	n, _ := strconv.Atoi(resp.Details.TotalResult)
+	return n, nil
+}
+
+// SendPasswordReset asks Zitadel to email the user a password-reset link.
+func (m *ZitadelManagement) SendPasswordReset(ctx context.Context, orgID, userID string) error {
+	return m.post(ctx,
+		fmt.Sprintf("/management/v1/users/%s/_reset_password", userID), orgID,
 		map[string]any{}, nil)
 }

@@ -16,6 +16,7 @@ type Querier interface {
 	BindUserRole(ctx context.Context, arg BindUserRoleParams) error
 	CountZonesByStore(ctx context.Context, arg CountZonesByStoreParams) (int64, error)
 	CreateCard(ctx context.Context, arg CreateCardParams) (PipelineCard, error)
+	CreateInvitedUser(ctx context.Context, arg CreateInvitedUserParams) (User, error)
 	CreatePipeline(ctx context.Context, arg CreatePipelineParams) (Pipeline, error)
 	CreateSaleEvent(ctx context.Context, arg CreateSaleEventParams) (SalesEvent, error)
 	CreateScanEvent(ctx context.Context, arg CreateScanEventParams) (ScanEvent, error)

@@ -3,10 +3,34 @@ import { useApi } from "../../lib/api";
 
 export interface OrgUser {
   id: string;
+  idp_user_id: string;
   email: string;
   display_name: string;
   avatar_url: string;
   role: string;
+  title: string;
+  shift: string;
+  status: string;
+  mfa_enabled: boolean;
+  last_seen_at: string | null;
+  zones: string[];
+}
+
+export interface AuditEntry {
+  ts: string;
+  actor_user_id: string | null;
+  action: string;
+  resource_type: string;
+  resource_id: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface RosterStats {
+  members: number;
+  roles: number;
+  active_now: number;
+  pending_invites: number;
+  twofa_coverage: number;
 }
 
 export interface Capabilities {
@@ -21,7 +45,25 @@ export interface Capabilities {
 export const userKeys = {
   list: ["users", "list"] as const,
   me: ["users", "me"] as const,
+  stats: ["users", "stats"] as const,
 };
+
+/** Zone-access label: explicit zones joined, else org-wide "All". Pure. */
+export function zonesLabel(zones: string[] | undefined): string {
+  return zones && zones.length > 0 ? zones.join(", ") : "All";
+}
+
+/** Compact relative time from an ISO timestamp. Pure. */
+export function relativeTime(iso: string | null, now: number = Date.now()): string {
+  if (!iso) return "—";
+  const diff = Math.max(0, now - new Date(iso).getTime());
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
 
 /** Role columns shown in the permission matrix, in display order. */
 export const ROLE_COLUMNS = ["Admin", "Manager", "Staff", "Read-only"] as const;
@@ -61,6 +103,28 @@ export function useUsers() {
 export function useCapabilities() {
   const { get } = useApi();
   return useQuery({ queryKey: userKeys.me, queryFn: () => get<Capabilities>("/api/v1/me") });
+}
+
+/** Fetch the Users & Access header metrics. */
+export function useRosterStats() {
+  const { get } = useApi();
+  return useQuery({
+    queryKey: userKeys.stats,
+    queryFn: () => get<RosterStats>("/api/v1/users/stats"),
+  });
+}
+
+/** Sync the caller's 2FA state (from the ID-token amr) to the server. */
+export function useSyncMfa() {
+  const { post } = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (enabled: boolean) => post<void>("/api/v1/me/2fa", { enabled }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: userKeys.list });
+      void qc.invalidateQueries({ queryKey: userKeys.stats });
+    },
+  });
 }
 
 /** Roles an admin may assign when inviting a teammate. */
@@ -112,4 +176,40 @@ export function useResendInvite() {
   return useMutation({
     mutationFn: (userID: string) => post<void>(`/api/v1/users/${userID}/resend`, {}),
   });
+}
+
+/** Recent audit-trail entries, optionally scoped to one actor. */
+export function useAudit(actor?: string, limit = 10) {
+  const { get } = useApi();
+  const qs = `?limit=${limit}${actor ? `&actor=${actor}` : ""}`;
+  return useQuery({
+    queryKey: ["users", "audit", actor ?? "all", limit] as const,
+    queryFn: () => get<AuditEntry[]>(`/api/v1/audit${qs}`),
+  });
+}
+
+/** Change a member's role (re-grants in Zitadel via idp id). */
+export function useSetRole() {
+  const { patch } = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: string; idpUserId: string; role: AssignableRole }) =>
+      patch<void>(`/api/v1/users/${v.id}/role`, { role: v.role, idp_user_id: v.idpUserId }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: userKeys.list }),
+  });
+}
+
+/** Email a member a password-reset link (by Zitadel user id). */
+export function useResetPassword() {
+  const { post } = useApi();
+  return useMutation({
+    mutationFn: (idpUserId: string) => post<void>(`/api/v1/users/${idpUserId}/reset-password`, {}),
+  });
+}
+
+/** Humanize an audit action key, e.g. "user.role_changed" → "Role changed". Pure. */
+export function auditLabel(action: string): string {
+  const tail = action.includes(".") ? action.split(".").slice(1).join(".") : action;
+  const s = tail.replace(/_/g, " ");
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }

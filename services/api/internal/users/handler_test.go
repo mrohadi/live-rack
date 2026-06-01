@@ -19,13 +19,25 @@ import (
 )
 
 type fakeStore struct {
-	rows   []store.UserListRow
-	gotOrg uuid.UUID
+	rows    []store.UserListRow
+	gotOrg  uuid.UUID
+	mfaSet  bool
+	touched bool
 }
 
 func (f *fakeStore) ListUsersByOrg(_ context.Context, orgID uuid.UUID) ([]store.UserListRow, error) {
 	f.gotOrg = orgID
 	return f.rows, nil
+}
+
+func (f *fakeStore) SetUserMFA(_ context.Context, _, _ uuid.UUID, enabled bool) error {
+	f.mfaSet = enabled
+	return nil
+}
+
+func (f *fakeStore) TouchLastSeen(_ context.Context, _, _ uuid.UUID) error {
+	f.touched = true
+	return nil
 }
 
 func serve(t *testing.T, p *domain.Principal, target string) (*httptest.ResponseRecorder, *fakeStore) {

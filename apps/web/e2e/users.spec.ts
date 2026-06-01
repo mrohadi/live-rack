@@ -40,6 +40,17 @@ test.describe("Users — roster + permission matrix", () => {
       if (route.request().method() === "GET") await route.fulfill({ json: ROSTER });
       else await route.continue();
     });
+    await page.route("**/api/v1/users/stats", async (route) => {
+      await route.fulfill({
+        json: { members: 2, roles: 5, active_now: 1, pending_invites: 0, twofa_coverage: 50 },
+      });
+    });
+    await page.route("**/api/v1/me/2fa", async (route) => {
+      await route.fulfill({ status: 204, body: "" });
+    });
+    await page.route("**/api/v1/audit*", async (route) => {
+      await route.fulfill({ json: [] });
+    });
 
     await seedOidcSession(page);
     await page.goto("/users");
@@ -49,9 +60,10 @@ test.describe("Users — roster + permission matrix", () => {
   test("renders the roster, caller role, and permission matrix", async ({ page }) => {
     await expect(page.getByRole("heading", { name: "Users & Access" })).toBeVisible();
 
-    // Roster rows.
-    await expect(page.getByText("Ada Lovelace")).toBeVisible();
+    // Roster rows (Ada also appears in the side detail panel → first()).
+    await expect(page.getByText("Ada Lovelace").first()).toBeVisible();
     await expect(page.getByText("Grace Hopper")).toBeVisible();
+    await expect(page.getByTestId("user-row")).toHaveCount(2);
 
     // Caller capabilities surface in the subheader.
     await expect(page.getByText(/you: admin · 2FA on/)).toBeVisible();

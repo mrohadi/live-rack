@@ -10,6 +10,7 @@ Mitigate → Verify → Escalate**.
 | [postgres-failover.md](postgres-failover.md) | Primary DB unhealthy |
 | [webhook-failures.md](webhook-failures.md) | POS/Stripe webhook signature rejections |
 | [on-call.md](on-call.md) | Rotation, severities, comms |
+| [zitadel-setup.md](zitadel-setup.md) | Auth/OIDC deploy + `ZITADEL_MGMT_TOKEN` |
 
 ## Severities
 

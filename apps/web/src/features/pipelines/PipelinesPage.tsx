@@ -49,7 +49,7 @@ export function PipelinesPage() {
           type="button"
           disabled={createFromTemplate.isPending}
           onClick={() => createFromTemplate.mutate("item-restoration")}
-          className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground disabled:opacity-50"
+          className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
         >
           {createFromTemplate.isPending ? "Creating…" : "Start Item Restoration template"}
         </button>

@@ -17,6 +17,8 @@ import (
 // Store is the narrow dependency the handler needs.
 type Store interface {
 	ListUsersByOrg(ctx context.Context, orgID uuid.UUID) ([]store.UserListRow, error)
+	SetUserMFA(ctx context.Context, userID, orgID uuid.UUID, enabled bool) error
+	TouchLastSeen(ctx context.Context, userID, orgID uuid.UUID) error
 }
 
 // Handler serves user + capability endpoints.
@@ -33,6 +35,37 @@ func New(q Store) *Handler {
 func (h *Handler) Register(g *echo.Group) {
 	g.GET("/users", h.List)
 	g.GET("/me", h.Me)
+	g.POST("/me/2fa", h.SyncMFA)
+}
+
+// SyncMFARequest reports whether the caller completed a second factor. The amr
+// claim lives only in the ID token, so the SPA syncs it here for roster + 2FA
+// coverage. It is not a security gate — that stays at the Zitadel login policy.
+type SyncMFARequest struct {
+	Enabled bool `json:"enabled"`
+}
+
+// SyncMFA godoc
+//
+//	@Summary	Sync the caller's 2FA state from the ID-token amr claim
+//	@Tags		users
+//	@Accept		json
+//	@Param		body	body	SyncMFARequest	true	"MFA state"
+//	@Success	204
+//	@Router		/me/2fa [post]
+func (h *Handler) SyncMFA(c echo.Context) error {
+	p, err := pkgauth.PrincipalFrom(c.Request().Context())
+	if err != nil {
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
+	}
+	var req SyncMFARequest
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid body")
+	}
+	if err := h.q.SetUserMFA(c.Request().Context(), p.UserID, p.OrgID, req.Enabled); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "sync mfa")
+	}
+	return c.NoContent(http.StatusNoContent)
 }
 
 // CapabilitiesResponse describes the caller's effective access.
@@ -57,6 +90,8 @@ func (h *Handler) Me(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
 	}
+	// Best-effort presence stamp; /me is polled on load.
+	_ = h.q.TouchLastSeen(c.Request().Context(), p.UserID, p.OrgID)
 	perms := domain.Permissions(p.Role)
 	out := CapabilitiesResponse{
 		UserID:      p.UserID.String(),

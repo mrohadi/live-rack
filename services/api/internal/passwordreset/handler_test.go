@@ -8,12 +8,28 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/live-rack/pkg/audit"
+	"github.com/live-rack/pkg/store"
 	"github.com/live-rack/services/api/internal/passwordreset"
 )
+
+type fakeResolver struct{}
+
+func (fakeResolver) GetUserByIdpID(_ context.Context, _ string) (store.User, error) {
+	return store.User{ID: uuid.New(), OrgID: uuid.New()}, nil
+}
+
+type fakeAuditor struct{ actions []string }
+
+func (f *fakeAuditor) Write(_ context.Context, e audit.Entry) error {
+	f.actions = append(f.actions, e.Action)
+	return nil
+}
 
 type fakeResetter struct {
 	foundID                  string
@@ -43,7 +59,7 @@ func (f *fakeResetter) ResetPassword(_ context.Context, userID, code, password s
 func serve(t *testing.T, f *fakeResetter, path, body string) *httptest.ResponseRecorder {
 	t.Helper()
 	e := echo.New()
-	passwordreset.New(f).Register(e)
+	passwordreset.New(f, fakeResolver{}, &fakeAuditor{}).Register(e)
 	req := httptest.NewRequestWithContext(context.Background(),
 		http.MethodPost, path, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")

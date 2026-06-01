@@ -210,10 +210,10 @@ func main() {
 	login.New(loginClient).Register(e)
 
 	// Public invite acceptance — verify email + set password + enroll TOTP.
-	onboarding.New(mgmt, loginClient).Register(e)
+	onboarding.New(mgmt, loginClient, q, auditWriter).Register(e)
 
 	// Public forgot/reset-password flow.
-	passwordreset.New(mgmt).Register(e)
+	passwordreset.New(mgmt, q, auditWriter).Register(e)
 
 	// Authenticated API group.
 	api := e.Group("/api/v1", apimw.Auth(verifier, setSession))
@@ -238,7 +238,7 @@ func main() {
 	users.New(q).Register(api)
 	users.NewMetrics(q, mgmt).Register(api)
 	users.NewInvite(mgmt, q, auditWriter).Register(api)
-	users.NewMFA(mgmt, q).Register(api)
+	users.NewMFA(mgmt, q, auditWriter).Register(api)
 	users.NewAccess(q, mgmt, auditWriter).Register(api)
 	servicetokens.New(q).Register(api)
 

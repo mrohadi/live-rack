@@ -11,7 +11,9 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	"github.com/live-rack/pkg/audit"
 	pkgauth "github.com/live-rack/pkg/auth"
+	"github.com/live-rack/pkg/store"
 )
 
 // Completer is the Zitadel surface invite acceptance needs.
@@ -32,15 +34,43 @@ type PasswordChecker interface {
 	CheckPassword(ctx context.Context, sessionID, sessionToken, password string) (pkgauth.Session, error)
 }
 
+// Resolver maps an IdP user id to the local user (for audit attribution).
+// *store.Queries satisfies it.
+type Resolver interface {
+	GetUserByIdpID(ctx context.Context, idpUserID string) (store.User, error)
+}
+
+// Auditor records an append-only audit entry. *audit.Writer satisfies it.
+type Auditor interface {
+	Write(ctx context.Context, e audit.Entry) error
+}
+
 // Handler serves the public invite-acceptance endpoints.
 type Handler struct {
-	zit   Completer
-	login PasswordChecker
+	zit      Completer
+	login    PasswordChecker
+	resolver Resolver
+	audit    Auditor
 }
 
 // New builds an onboarding Handler.
-func New(z Completer, login PasswordChecker) *Handler {
-	return &Handler{zit: z, login: login}
+func New(z Completer, login PasswordChecker, r Resolver, a Auditor) *Handler {
+	return &Handler{zit: z, login: login, resolver: r, audit: a}
+}
+
+// record writes a best-effort audit entry attributed to the IdP user.
+func (h *Handler) record(ctx context.Context, idpUserID, action string) {
+	u, err := h.resolver.GetUserByIdpID(ctx, idpUserID)
+	if err != nil {
+		return
+	}
+	_ = h.audit.Write(ctx, audit.Entry{
+		OrgID:        u.OrgID,
+		ActorUserID:  u.ID,
+		Action:       action,
+		ResourceType: "user",
+		ResourceID:   idpUserID,
+	})
 }
 
 // Register mounts the public onboarding routes on the root router (no auth).
@@ -107,6 +137,7 @@ func (h *Handler) Complete(c echo.Context) error {
 	if err := h.zit.SetPassword(ctx, orgID, userID, req.Password); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "password rejected")
 	}
+	h.record(ctx, userID, "user.onboarded")
 	return c.NoContent(http.StatusNoContent)
 }
 
@@ -180,5 +211,6 @@ func (h *Handler) TOTPVerify(c echo.Context) error {
 	if err := h.zit.VerifyTOTP(ctx, userID, code); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid code")
 	}
+	h.record(ctx, userID, "user.2fa_enrolled")
 	return c.NoContent(http.StatusNoContent)
 }

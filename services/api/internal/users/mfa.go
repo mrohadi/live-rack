@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 
+	"github.com/live-rack/pkg/audit"
 	pkgauth "github.com/live-rack/pkg/auth"
 )
 
@@ -27,11 +28,12 @@ type MFAStore interface {
 type MFAHandler struct {
 	zit   Enroller
 	store MFAStore
+	audit Auditor
 }
 
 // NewMFA builds an MFAHandler.
-func NewMFA(zit Enroller, s MFAStore) *MFAHandler {
-	return &MFAHandler{zit: zit, store: s}
+func NewMFA(zit Enroller, s MFAStore, a Auditor) *MFAHandler {
+	return &MFAHandler{zit: zit, store: s, audit: a}
 }
 
 // Register mounts enrollment routes on the authenticated API group.
@@ -105,5 +107,12 @@ func (h *MFAHandler) Verify(c echo.Context) error {
 	if err := h.store.SetUserMFA(ctx, p.UserID, p.OrgID, true); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "record mfa")
 	}
+	_ = h.audit.Write(ctx, audit.Entry{
+		OrgID:        p.OrgID,
+		ActorUserID:  p.UserID,
+		Action:       "user.2fa_enrolled",
+		ResourceType: "user",
+		ResourceID:   p.IDPUserID,
+	})
 	return c.NoContent(http.StatusNoContent)
 }

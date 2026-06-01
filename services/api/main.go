@@ -208,8 +208,8 @@ func main() {
 	// Public custom-login proxy — drives Zitadel's Session API for our own sign-in UI.
 	login.New(loginClient).Register(e)
 
-	// Public invite acceptance — verify email + set password from our own screen.
-	onboarding.New(mgmt).Register(e)
+	// Public invite acceptance — verify email + set password + enroll TOTP.
+	onboarding.New(mgmt, loginClient).Register(e)
 
 	// Authenticated API group.
 	api := e.Group("/api/v1", apimw.Auth(verifier, setSession))

@@ -37,6 +37,8 @@ type Management interface {
 	VerifyEmail(ctx context.Context, userID, code string) error
 	// SetPassword sets a user's password (admin authority, no current password).
 	SetPassword(ctx context.Context, orgID, userID, password string) error
+	// GetLoginName returns a user's preferred login name.
+	GetLoginName(ctx context.Context, userID string) (string, error)
 }
 
 // TokenSource yields a bearer token authorized for Zitadel management calls.
@@ -117,6 +119,54 @@ func (m *ZitadelManagement) post(ctx context.Context, path, orgID string, body, 
 		}
 	}
 	return nil
+}
+
+// get issues a JSON GET with the management bearer token, decoding into out.
+func (m *ZitadelManagement) get(ctx context.Context, path string, out any) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, m.baseURL+path, nil)
+	if err != nil {
+		return fmt.Errorf("zitadel: new request: %w", err)
+	}
+	tok, err := m.token(ctx)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+tok)
+
+	res, err := m.hc.Do(req)
+	if err != nil {
+		return fmt.Errorf("zitadel: GET %s: %w", path, err)
+	}
+	defer func() { _ = res.Body.Close() }()
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		var b bytes.Buffer
+		_, _ = b.ReadFrom(res.Body)
+		return fmt.Errorf("zitadel: GET %s: status %d: %s", path, res.StatusCode, b.String())
+	}
+	if out != nil {
+		if err := json.NewDecoder(res.Body).Decode(out); err != nil {
+			return fmt.Errorf("zitadel: decode response: %w", err)
+		}
+	}
+	return nil
+}
+
+// GetLoginName returns a user's preferred login name (used to gate onboarding
+// actions by re-validating the just-set password).
+func (m *ZitadelManagement) GetLoginName(ctx context.Context, userID string) (string, error) {
+	var resp struct {
+		User struct {
+			PreferredLoginName string `json:"preferredLoginName"`
+		} `json:"user"`
+	}
+	if err := m.get(ctx, fmt.Sprintf("/v2/users/%s", userID), &resp); err != nil {
+		return "", err
+	}
+	if resp.User.PreferredLoginName == "" {
+		return "", fmt.Errorf("zitadel: user %s has no login name", userID)
+	}
+	return resp.User.PreferredLoginName, nil
 }
 
 // CreateOrg provisions a tenant org via the management API.

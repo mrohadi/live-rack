@@ -13,7 +13,8 @@ describe("initials", () => {
     expect(initials("Avery Chen")).toBe("AC");
     expect(initials("madonna")).toBe("M");
     expect(initials("  Jon  Ola  Vik ")).toBe("JO");
-    expect(initials("")).toBe("");
+    expect(initials("")).toBe("?");
+    expect(initials("muhammad.rohadi03@gmail.com")).toBe("MR");
   });
 });
 

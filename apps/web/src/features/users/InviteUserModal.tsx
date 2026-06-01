@@ -93,6 +93,7 @@ export function InviteUserModal({ onClose, onInvited }: InviteUserModalProps) {
           <span className="mb-1 block text-muted-foreground">Display name</span>
           <input
             type="text"
+            required
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
             placeholder="Ada Lovelace"

@@ -1,5 +1,6 @@
 import { useAuth } from "react-oidc-context";
 import { NavLink } from "react-router-dom";
+import { isAdmin } from "../../lib/roles";
 import { BrandMark } from "./BrandMark";
 import { Icon, Icons } from "./Icon";
 
@@ -30,7 +31,14 @@ const NAV_SECTIONS = [
     items: [
       { to: "/analytics", name: "Analytics", icon: Icons.chart, badge: null, end: false },
       { to: "/integrations", name: "Integrations", icon: Icons.plug, badge: "7", end: false },
-      { to: "/users", name: "Users & Access", icon: Icons.user, badge: null, end: false },
+      {
+        to: "/users",
+        name: "Users & Access",
+        icon: Icons.user,
+        badge: null,
+        end: false,
+        adminOnly: true,
+      },
     ],
   },
 ] as const;
@@ -38,6 +46,7 @@ const NAV_SECTIONS = [
 export function Sidebar({ accent = "#2563eb", onNavigate }: SidebarProps) {
   const auth = useAuth();
   const profile = auth.user?.profile;
+  const admin = isAdmin(profile);
   const fullName = (profile?.name as string | undefined) ?? "";
   const email = (profile?.email as string | undefined) ?? "";
   const initials =
@@ -59,19 +68,21 @@ export function Sidebar({ accent = "#2563eb", onNavigate }: SidebarProps) {
       {NAV_SECTIONS.map((section) => (
         <div className="nav-section" key={section.label}>
           <div className="nav-label">{section.label}</div>
-          {section.items.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              onClick={onNavigate}
-              className={({ isActive }) => `nav-item${isActive ? " active" : ""}`}
-            >
-              <Icon d={item.icon} />
-              <span>{item.name}</span>
-              {item.badge && <span className="nav-badge">{item.badge}</span>}
-            </NavLink>
-          ))}
+          {section.items
+            .filter((item) => admin || !("adminOnly" in item && item.adminOnly))
+            .map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                onClick={onNavigate}
+                className={({ isActive }) => `nav-item${isActive ? " active" : ""}`}
+              >
+                <Icon d={item.icon} />
+                <span>{item.name}</span>
+                {item.badge && <span className="nav-badge">{item.badge}</span>}
+              </NavLink>
+            ))}
         </div>
       ))}
 

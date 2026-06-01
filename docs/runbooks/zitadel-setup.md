@@ -112,6 +112,26 @@ curl -s -X PUT "$OIDC_ISSUER/admin/v1/policies/login" \
 Console equivalent: **Default settings → Login Behavior and Security → Default
 Redirect URI**.
 
+## 3d. Custom login UI (LR-909)
+
+The app hosts its own sign-in at `/login` (and verify/reset screens) backed by
+Zitadel's Session API via the `/api/v1/login/*` proxy. To route the SPA to it:
+
+1. Console → Project `live-rack` → App `web` → **Login Behavior** →
+   set **Login V2** with base URI `https://<web-host>` (origin only — Zitadel
+   appends `/login?authRequest=…` itself). (Per-app override; console keeps legacy.)
+2. The app's redirect URIs must include `https://<web-host>/callback` (already set)
+   — `finalize` returns a callback URL there.
+3. API env: `ZITADEL_LOGIN_CLIENT_TOKEN` (service user with **IAM_LOGIN_CLIENT**).
+   Falls back to `ZITADEL_MGMT_TOKEN` if unset.
+   **IAM_OWNER is NOT enough** — `finalize` (`/v2/oidc/auth_requests/{id}`)
+   returns `No matching permissions (AUTH-AWfge)` without the **IAM_LOGIN_CLIENT**
+   instance role. Grant it:
+   `PUT /admin/v1/members/{userId}` body `{"roles":["IAM_OWNER","IAM_LOGIN_CLIENT"]}`.
+4. Restart the API. Hit the app → it redirects to `/login?authRequest=…` → our UI.
+
+Rollback: set the app's login back to **Login V1** in the console.
+
 ## 4. Branding (optional, matches palette)
 
 ```bash

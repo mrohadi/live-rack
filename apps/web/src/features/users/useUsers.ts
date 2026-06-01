@@ -83,14 +83,23 @@ export const PERMISSION_MATRIX: { label: string; allow: boolean[] }[] = [
   { label: "Export reports", allow: [true, true, false, true] },
 ];
 
-/** Initials for an avatar from a display name. Pure. */
-export function initials(name: string): string {
-  return name
-    .trim()
-    .split(/\s+/)
+/** Initials for an avatar from a display name or email. Pure.
+ *  Emails fall back to their local part split on separators. */
+export function initials(nameOrEmail: string): string {
+  const raw = nameOrEmail.trim();
+  if (!raw) return "?";
+  const base = raw.includes("@") ? raw.slice(0, raw.indexOf("@")) : raw;
+  const parts = base.split(/[\s._-]+/).filter(Boolean);
+  const letters = parts
     .slice(0, 2)
     .map((w) => w[0]?.toUpperCase() ?? "")
     .join("");
+  return letters || "?";
+}
+
+/** Best display label for a user: their name, else email. Pure. */
+export function displayLabel(u: { display_name: string; email: string }): string {
+  return u.display_name.trim() || u.email;
 }
 
 /** Fetch the org user roster. */

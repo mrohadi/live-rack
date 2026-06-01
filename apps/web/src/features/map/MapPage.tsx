@@ -2,9 +2,9 @@ import { useCallback, useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { ViewMode, Zone } from "./types";
 import { useCurrentStore } from "./useCurrentStore";
-import { useCreateZone, useZones, zoneKeys } from "./useZones";
+import { useCreateZone, useUpdateZone, useZones, zoneKeys } from "./useZones";
 import { ZoneDetailSidebar } from "./ZoneDetailSidebar";
-import { ZoneMapView } from "./ZoneMapView";
+import { ZoneMapView, type ZoneRect } from "./ZoneMapView";
 import { useInventory } from "../inventory/useInventory";
 import { useScanStream } from "../../lib/useScanStream";
 import type { ScanRecorded } from "../../lib/ws";
@@ -20,6 +20,7 @@ export function MapPage() {
   const { data: zones = [], isLoading } = useZones(storeId);
   const { data: items = [] } = useInventory(storeId);
   const createZone = useCreateZone(storeId);
+  const updateZone = useUpdateZone(storeId);
 
   const qc = useQueryClient();
   const onScan = useCallback(
@@ -71,6 +72,13 @@ export function MapPage() {
         },
       },
     );
+  };
+
+  // The backend PUT requires a full zone body; merge the new rect into it.
+  const handleMove = (id: string, rect: ZoneRect) => {
+    const existing = zones.find((z) => z.id === id);
+    if (!existing) return;
+    updateZone.mutate({ ...existing, ...rect });
   };
 
   const selectedZone = zones.find((z) => z.id === selectedId) ?? null;
@@ -167,6 +175,7 @@ export function MapPage() {
               view={view}
               selectedId={selectedId}
               onSelect={setSelectedId}
+              onMove={handleMove}
             />
           )}
         </div>

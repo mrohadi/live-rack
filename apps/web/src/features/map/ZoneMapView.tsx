@@ -1,6 +1,15 @@
+import { useRef, useState } from "react";
 import type { InventoryRow } from "../inventory/types";
 import type { ViewMode, Zone } from "./types";
 import { fillRatio, rgba, slotStatus } from "./zoneMath";
+
+/** Partial position/size update in percentage units. */
+export interface ZoneRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
 
 interface Props {
   zones: Zone[];
@@ -8,6 +17,8 @@ interface Props {
   view: ViewMode;
   selectedId: string | null;
   onSelect: (id: string) => void;
+  /** Commit a moved/resized zone (percentage coords). Omit to disable editing. */
+  onMove?: (id: string, rect: ZoneRect) => void;
 }
 
 const HEAT_ACCENT = "#2563eb";
@@ -22,27 +33,44 @@ const LEGEND = [
   { label: "Bulk / Staging", color: "#5b6577" },
 ];
 
-export function ZoneMapView({ zones, items, view, selectedId, onSelect }: Props) {
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
+export function ZoneMapView({ zones, items, view, selectedId, onSelect, onMove }: Props) {
+  const canvasRef = useRef<HTMLDivElement>(null);
+  // Live rect while dragging/resizing one zone; committed on pointer up.
+  const [draft, setDraft] = useState<{ id: string; rect: ZoneRect } | null>(null);
+
   return (
     <div className="flex h-full flex-col gap-3 p-4">
       <div
-        className="relative flex-1 overflow-hidden rounded-lg border border-border bg-background"
+        ref={canvasRef}
+        className="relative flex-1 touch-none select-none overflow-hidden rounded-lg border border-border bg-background"
         style={{
           backgroundImage:
             "linear-gradient(to right, rgba(0,0,0,0.04) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.04) 1px, transparent 1px)",
           backgroundSize: "24px 24px",
         }}
       >
-        {zones.map((z) => (
-          <ZoneBox
-            key={z.id}
-            zone={z}
-            items={items.filter((it) => it.zone_id === z.id)}
-            view={view}
-            selected={selectedId === z.id}
-            onSelect={() => onSelect(z.id)}
-          />
-        ))}
+        {zones.map((z) => {
+          const rect = draft?.id === z.id ? { ...z, ...draft.rect } : z;
+          return (
+            <ZoneBox
+              key={z.id}
+              zone={rect}
+              items={items.filter((it) => it.zone_id === z.id)}
+              view={view}
+              selected={selectedId === z.id}
+              editable={!!onMove}
+              canvasRef={canvasRef}
+              onSelect={() => onSelect(z.id)}
+              onDraft={(r) => setDraft({ id: z.id, rect: r })}
+              onCommit={(r) => {
+                setDraft(null);
+                onMove?.(z.id, r);
+              }}
+            />
+          );
+        })}
 
         {/* SKU location pins for the selected zone (Items view) */}
         {view === "items" &&
@@ -100,26 +128,115 @@ function ZoneBox({
   items,
   view,
   selected,
+  editable,
+  canvasRef,
   onSelect,
+  onDraft,
+  onCommit,
 }: {
   zone: Zone;
   items: InventoryRow[];
   view: ViewMode;
   selected: boolean;
+  editable: boolean;
+  canvasRef: React.RefObject<HTMLDivElement | null>;
   onSelect: () => void;
+  onDraft: (rect: ZoneRect) => void;
+  onCommit: (rect: ZoneRect) => void;
 }) {
   const fill = fillRatio(zone);
   const pct = Math.round(fill * 100);
   const heatBg = view === "heat" ? rgba(HEAT_ACCENT, 0.12 + fill * 0.78) : rgba(zone.color, 0.06);
+  const gesture = useRef<{
+    mode: "move" | "resize";
+    startX: number;
+    startY: number;
+    base: ZoneRect;
+    moved: boolean;
+  } | null>(null);
+  // True briefly after a drag so the synthetic click doesn't re-select.
+  const draggedRef = useRef(false);
+
+  // Convert a pixel delta to canvas-percentage units.
+  const toPct = (dxPx: number, dyPx: number) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    const w = rect?.width || 1;
+    const h = rect?.height || 1;
+    return { dx: (dxPx / w) * 100, dy: (dyPx / h) * 100 };
+  };
+
+  const begin = (mode: "move" | "resize") => (e: React.PointerEvent) => {
+    if (!editable) return;
+    e.stopPropagation();
+    const el = e.target as Element;
+    if (typeof el.setPointerCapture === "function") el.setPointerCapture(e.pointerId);
+    draggedRef.current = false;
+    gesture.current = {
+      mode,
+      startX: e.clientX,
+      startY: e.clientY,
+      base: { x: zone.x, y: zone.y, width: zone.width, height: zone.height },
+      moved: false,
+    };
+  };
+
+  const move = (e: React.PointerEvent) => {
+    const g = gesture.current;
+    if (!g) return;
+    const { dx, dy } = toPct(e.clientX - g.startX, e.clientY - g.startY);
+    if (Math.abs(e.clientX - g.startX) > 2 || Math.abs(e.clientY - g.startY) > 2) g.moved = true;
+    if (g.mode === "move") {
+      onDraft({
+        ...g.base,
+        x: clamp(g.base.x + dx, 0, 100 - g.base.width),
+        y: clamp(g.base.y + dy, 0, 100 - g.base.height),
+      });
+    } else {
+      onDraft({
+        ...g.base,
+        width: clamp(g.base.width + dx, 6, 100 - g.base.x),
+        height: clamp(g.base.height + dy, 6, 100 - g.base.y),
+      });
+    }
+  };
+
+  const end = (e: React.PointerEvent) => {
+    const g = gesture.current;
+    gesture.current = null;
+    if (!g || !g.moved) return; // a plain click selects via onClick
+    draggedRef.current = true;
+    const { dx, dy } = toPct(e.clientX - g.startX, e.clientY - g.startY);
+    const rect: ZoneRect =
+      g.mode === "move"
+        ? {
+            ...g.base,
+            x: Math.round(clamp(g.base.x + dx, 0, 100 - g.base.width)),
+            y: Math.round(clamp(g.base.y + dy, 0, 100 - g.base.height)),
+          }
+        : {
+            ...g.base,
+            width: Math.round(clamp(g.base.width + dx, 6, 100 - g.base.x)),
+            height: Math.round(clamp(g.base.height + dy, 6, 100 - g.base.y)),
+          };
+    onCommit(rect);
+  };
 
   return (
-    <button
-      type="button"
+    <div
       data-testid="zone-box"
-      onClick={onSelect}
-      className={`absolute flex flex-col overflow-hidden rounded-lg border-2 p-2 text-left transition ${
-        selected ? "ring-2 ring-offset-1" : ""
-      }`}
+      onPointerDown={begin("move")}
+      onPointerMove={move}
+      onPointerUp={end}
+      onClick={() => {
+        if (draggedRef.current) {
+          draggedRef.current = false;
+          return;
+        }
+        onSelect();
+      }}
+      className={`absolute flex select-none flex-col overflow-hidden rounded-lg border-2 p-2 text-left transition ${
+        editable ? "cursor-move" : "cursor-pointer"
+      } ${selected ? "ring-2 ring-offset-1" : ""}`}
       style={{
         left: `${zone.x}%`,
         top: `${zone.y}%`,
@@ -136,7 +253,18 @@ function ZoneBox({
       </div>
 
       {view === "items" && <RackGrid zone={zone} items={items} fill={fill} />}
-    </button>
+
+      {editable && selected && (
+        <span
+          aria-label="resize"
+          onPointerDown={begin("resize")}
+          onPointerMove={move}
+          onPointerUp={end}
+          className="absolute bottom-0 right-0 h-3 w-3 cursor-nwse-resize rounded-tl-sm"
+          style={{ background: zone.color }}
+        />
+      )}
+    </div>
   );
 }
 
@@ -148,7 +276,7 @@ function RackGrid({ zone, items, fill }: { zone: Zone; items: InventoryRow[]; fi
 
   return (
     <div
-      className="mt-1.5 grid flex-1 gap-0.5"
+      className="pointer-events-none mt-1.5 grid flex-1 gap-0.5"
       style={{
         gridTemplateColumns: `repeat(${cols}, 1fr)`,
         gridTemplateRows: `repeat(${rows}, 1fr)`,

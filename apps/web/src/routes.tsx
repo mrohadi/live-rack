@@ -8,6 +8,10 @@ export const routes: RouteObject[] = [
     path: "/callback",
     element: <CallbackPage />,
   },
+  {
+    path: "/signup",
+    lazy: () => import("./features/signup/SignupPage").then((m) => ({ Component: m.SignupPage })),
+  },
   // Zitadel issues relative login redirects; if one lands on the app origin, recover to home.
   {
     path: "/ui/*",

@@ -17,6 +17,13 @@ export const routes: RouteObject[] = [
     path: "/signup",
     lazy: () => import("./features/signup/SignupPage").then((m) => ({ Component: m.SignupPage })),
   },
+  {
+    path: "/verify-email",
+    lazy: () =>
+      import("./features/onboarding/VerifyEmailPage").then((m) => ({
+        Component: m.VerifyEmailPage,
+      })),
+  },
   // Zitadel issues relative login redirects; if one lands on the app origin, recover to home.
   {
     path: "/ui/*",

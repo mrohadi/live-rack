@@ -38,7 +38,7 @@ func TestZitadelManagement_CreateOrgUserGrant(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	m := auth.NewZitadelManagement(srv.URL, "proj-1", auth.StaticToken("svc-token"))
+	m := auth.NewZitadelManagement(srv.URL, "proj-1", "http://localhost:5173", auth.StaticToken("svc-token"))
 	ctx := context.Background()
 
 	orgID, err := m.CreateOrg(ctx, "Acme Co")
@@ -67,7 +67,7 @@ func TestZitadelManagement_PropagatesError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	m := auth.NewZitadelManagement(srv.URL, "proj-1", auth.StaticToken("t"))
+	m := auth.NewZitadelManagement(srv.URL, "proj-1", "http://localhost:5173", auth.StaticToken("t"))
 	_, err := m.CreateHumanUser(context.Background(), "org-1", "dup@acme.test", "Dup User")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "status 409")

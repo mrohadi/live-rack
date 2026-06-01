@@ -33,6 +33,10 @@ type Management interface {
 	RegisterTOTP(ctx context.Context, userID string) (uri, secret string, err error)
 	// VerifyTOTP confirms enrollment by validating the user's first code.
 	VerifyTOTP(ctx context.Context, userID, code string) error
+	// VerifyEmail confirms a user's email with the code from their invite email.
+	VerifyEmail(ctx context.Context, userID, code string) error
+	// SetPassword sets a user's password (admin authority, no current password).
+	SetPassword(ctx context.Context, orgID, userID, password string) error
 }
 
 // TokenSource yields a bearer token authorized for Zitadel management calls.
@@ -53,20 +57,23 @@ func StaticToken(tok string) TokenSource {
 // the v2.71 surface; org context for management v1 calls rides the
 // x-zitadel-orgid header.
 type ZitadelManagement struct {
-	baseURL   string
-	projectID string
-	token     TokenSource
-	hc        *http.Client
+	baseURL    string
+	projectID  string
+	appBaseURL string
+	token      TokenSource
+	hc         *http.Client
 }
 
 // NewZitadelManagement builds a management client. baseURL is the issuer origin
-// (e.g. http://localhost:8081); projectID scopes role grants.
-func NewZitadelManagement(baseURL, projectID string, token TokenSource) *ZitadelManagement {
+// (e.g. http://localhost:8081); projectID scopes role grants; appBaseURL is the
+// SPA origin that invite emails link back to (e.g. http://localhost:5173).
+func NewZitadelManagement(baseURL, projectID, appBaseURL string, token TokenSource) *ZitadelManagement {
 	return &ZitadelManagement{
-		baseURL:   strings.TrimRight(baseURL, "/"),
-		projectID: projectID,
-		token:     token,
-		hc:        &http.Client{Timeout: 15 * time.Second},
+		baseURL:    strings.TrimRight(baseURL, "/"),
+		projectID:  projectID,
+		appBaseURL: strings.TrimRight(appBaseURL, "/"),
+		token:      token,
+		hc:         &http.Client{Timeout: 15 * time.Second},
 	}
 }
 
@@ -145,10 +152,16 @@ func splitName(display string) (given, family string) {
 // invite flow so the invitee sets their own credentials.
 func (m *ZitadelManagement) CreateHumanUser(ctx context.Context, orgID, email, displayName string) (string, error) {
 	given, family := splitName(displayName)
+	// Link the verification email to our own onboarding screen instead of the
+	// Zitadel hosted page. Zitadel fills {{.Code}}/{{.UserID}}/{{.OrgID}}.
+	urlTemplate := m.appBaseURL + "/verify-email?code={{.Code}}&userID={{.UserID}}&orgID={{.OrgID}}"
 	reqBody := map[string]any{
 		"organization": map[string]string{"orgId": orgID},
 		"profile":      map[string]string{"givenName": given, "familyName": family},
-		"email":        map[string]any{"email": email, "sendCode": map[string]any{}},
+		"email": map[string]any{
+			"email":    email,
+			"sendCode": map[string]any{"urlTemplate": urlTemplate},
+		},
 	}
 	var resp struct {
 		UserID string `json:"userId"`
@@ -204,6 +217,20 @@ func (m *ZitadelManagement) SendPasswordReset(ctx context.Context, orgID, userID
 	return m.post(ctx,
 		fmt.Sprintf("/management/v1/users/%s/_reset_password", userID), orgID,
 		map[string]any{}, nil)
+}
+
+// VerifyEmail confirms a user's email address with the code from their invite
+// email (v2 user service).
+func (m *ZitadelManagement) VerifyEmail(ctx context.Context, userID, code string) error {
+	return m.post(ctx, fmt.Sprintf("/v2/users/%s/email/verify", userID), "",
+		map[string]any{"verificationCode": code}, nil)
+}
+
+// SetPassword sets a user's password with admin authority (no current password
+// required) via the management API; used to complete invite onboarding.
+func (m *ZitadelManagement) SetPassword(ctx context.Context, orgID, userID, password string) error {
+	return m.post(ctx, fmt.Sprintf("/management/v1/users/%s/password", userID), orgID,
+		map[string]any{"password": password, "noChangeRequired": true}, nil)
 }
 
 // RegisterTOTP starts authenticator enrollment via the v2 user service. The

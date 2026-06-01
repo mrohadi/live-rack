@@ -1,0 +1,36 @@
+---
+title: Quickstart
+description: "Run the full stack locally in minutes."
+---
+
+## Prerequisites
+
+- Docker, Go 1.22+, Node 18+ with pnpm.
+
+## Boot the stack
+
+```bash
+make dev      # Postgres+Timescale, NATS, ClickHouse, Redis, MinIO, Zitadel
+make seed     # load fixture data
+goose -dir migrations postgres "$DATABASE_URL" up
+```
+
+## Run services
+
+```bash
+go run ./services/api        # HTTP + WebSocket gateway :8080
+go run ./services/ingest     # NATS -> ClickHouse
+go run ./services/rollup     # daily analytics jobs
+go run ./services/signals    # weather/transit pollers
+go run ./services/insight    # rule-based recommendations
+pnpm -F web dev              # SPA :5173
+```
+
+## Verify
+
+```bash
+curl -s localhost:8080/healthz   # {"status":"ok"}
+```
+
+Open the SPA, sign in via Zitadel, and the Analytics screen renders zone
+performance and the activity heatmap once events flow.

@@ -119,8 +119,9 @@ func (h *Handler) List(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
 	}
-	if !domain.Can(p.Role, domain.PermViewDashboards) {
-		return echo.NewHTTPError(http.StatusForbidden, "insufficient role")
+	// Roster is admin-only — it exposes every member's role, presence, and 2FA state.
+	if !domain.Can(p.Role, domain.PermEditUsers) {
+		return echo.NewHTTPError(http.StatusForbidden, "requires admin")
 	}
 	rows, err := h.q.ListUsersByOrg(c.Request().Context(), p.OrgID)
 	if err != nil {

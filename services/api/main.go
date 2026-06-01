@@ -45,7 +45,9 @@ import (
 	"github.com/live-rack/services/api/internal/billing"
 	integrationsapi "github.com/live-rack/services/api/internal/integrations"
 	"github.com/live-rack/services/api/internal/inventory"
+	"github.com/live-rack/services/api/internal/login"
 	apimw "github.com/live-rack/services/api/internal/middleware"
+	"github.com/live-rack/services/api/internal/onboarding"
 	"github.com/live-rack/services/api/internal/pipelines"
 	"github.com/live-rack/services/api/internal/recommendations"
 	"github.com/live-rack/services/api/internal/sales"
@@ -156,9 +158,18 @@ func main() {
 
 	// Zitadel management client drives onboarding (signup + invites). The
 	// service-account token authorises org/user creation and role grants.
-	mgmt := pkgauth.NewZitadelManagement(issuer, projectID,
+	appBaseURL := envOr("APP_BASE_URL", "http://localhost:5173")
+	mgmt := pkgauth.NewZitadelManagement(issuer, projectID, appBaseURL,
 		pkgauth.StaticToken(os.Getenv("ZITADEL_MGMT_TOKEN")))
 	auditWriter := audit.NewWriter(pool)
+	// Login client drives the custom sign-in UI via Zitadel's Session API. Needs
+	// an IAM_LOGIN_CLIENT token; falls back to the management token (IAM_OWNER
+	// is a superset) when a dedicated one is not configured.
+	loginTok := os.Getenv("ZITADEL_LOGIN_CLIENT_TOKEN")
+	if loginTok == "" {
+		loginTok = os.Getenv("ZITADEL_MGMT_TOKEN")
+	}
+	loginClient := pkgauth.NewZitadelLogin(issuer, pkgauth.StaticToken(loginTok))
 	// Composite verifier: opaque service tokens ("lrk_...") resolve to service
 	// principals; everything else goes through OIDC.
 	verifier := pkgauth.NewCompositeVerifier(pkgauth.NewServiceVerifier(adapter), oidcVerifier)
@@ -194,6 +205,12 @@ func main() {
 	// Public self-service signup — provisions a tenant org + admin in Zitadel.
 	signup.New(mgmt).Register(e)
 
+	// Public custom-login proxy — drives Zitadel's Session API for our own sign-in UI.
+	login.New(loginClient).Register(e)
+
+	// Public invite acceptance — verify email + set password + enroll TOTP.
+	onboarding.New(mgmt, loginClient).Register(e)
+
 	// Authenticated API group.
 	api := e.Group("/api/v1", apimw.Auth(verifier, setSession))
 
@@ -217,6 +234,7 @@ func main() {
 	users.New(q).Register(api)
 	users.NewMetrics(q, mgmt).Register(api)
 	users.NewInvite(mgmt, q, auditWriter).Register(api)
+	users.NewMFA(mgmt, q).Register(api)
 	users.NewAccess(q, mgmt, auditWriter).Register(api)
 	servicetokens.New(q).Register(api)
 

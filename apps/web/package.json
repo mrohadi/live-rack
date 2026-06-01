@@ -24,6 +24,7 @@
     "idb": "^8.0.3",
     "konva": "^9.3.22",
     "oidc-client-ts": "^3.1.0",
+    "qrcode.react": "^4.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-konva": "18.2.10",

@@ -30,6 +30,7 @@ type User struct {
 // Principal carries verified identity after auth middleware.
 type Principal struct {
 	UserID      uuid.UUID
+	IDPUserID   string // Zitadel subject — targets the user in IdP-side calls
 	OrgID       uuid.UUID
 	IDPOrgID    string
 	Role        RoleName

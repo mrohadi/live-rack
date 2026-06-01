@@ -5,8 +5,9 @@ interface WelcomeProps {
   onSignIn: () => void;
 }
 
-/** Branded sign-in landing shown to signed-out users. "Sign in" hands off to the
- *  Zitadel hosted login; "Create workspace" routes to self-service signup. */
+/** Branded sign-in landing shown to signed-out users. "Sign in" starts the OIDC
+ *  flow (Zitadel redirects to our custom /login); "Create workspace" routes to
+ *  self-service signup. */
 export function Welcome({ onSignIn }: WelcomeProps) {
   return (
     <AuthLayout title="Welcome back" subtitle="Sign in to your live-rack workspace.">

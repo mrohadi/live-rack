@@ -83,14 +83,23 @@ export const PERMISSION_MATRIX: { label: string; allow: boolean[] }[] = [
   { label: "Export reports", allow: [true, true, false, true] },
 ];
 
-/** Initials for an avatar from a display name. Pure. */
-export function initials(name: string): string {
-  return name
-    .trim()
-    .split(/\s+/)
+/** Initials for an avatar from a display name or email. Pure.
+ *  Emails fall back to their local part split on separators. */
+export function initials(nameOrEmail: string): string {
+  const raw = nameOrEmail.trim();
+  if (!raw) return "?";
+  const base = raw.includes("@") ? raw.slice(0, raw.indexOf("@")) : raw;
+  const parts = base.split(/[\s._-]+/).filter(Boolean);
+  const letters = parts
     .slice(0, 2)
     .map((w) => w[0]?.toUpperCase() ?? "")
     .join("");
+  return letters || "?";
+}
+
+/** Best display label for a user: their name, else email. Pure. */
+export function displayLabel(u: { display_name: string; email: string }): string {
+  return u.display_name.trim() || u.email;
 }
 
 /** Fetch the org user roster. */
@@ -111,6 +120,32 @@ export function useRosterStats() {
   return useQuery({
     queryKey: userKeys.stats,
     queryFn: () => get<RosterStats>("/api/v1/users/stats"),
+  });
+}
+
+export interface TotpEnrollment {
+  uri: string;
+  secret: string;
+}
+
+/** Begin authenticator enrollment: returns the otpauth URI + manual secret. */
+export function useStartTotp() {
+  const { post } = useApi();
+  return useMutation({
+    mutationFn: () => post<TotpEnrollment>("/api/v1/me/2fa/totp", {}),
+  });
+}
+
+/** Confirm authenticator enrollment with the first code; refreshes coverage. */
+export function useVerifyTotp() {
+  const { post } = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (code: string) => post<void>("/api/v1/me/2fa/totp/verify", { code }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: userKeys.list });
+      void qc.invalidateQueries({ queryKey: userKeys.stats });
+    },
   });
 }
 

@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import { useAuth } from "react-oidc-context";
 import { AuditLogModal } from "./AuditLogModal";
 import { EditAccessModal } from "./EditAccessModal";
+import { Enroll2FAModal } from "./Enroll2FAModal";
 import { InviteUserModal } from "./InviteUserModal";
 import {
   PERMISSION_MATRIX,
   ROLE_COLUMNS,
   auditLabel,
   canInvite,
+  displayLabel,
   hasMfa,
   initials,
   relativeTime,
@@ -29,6 +31,7 @@ const ROLE_TONES: Record<string, string> = {
   service: "bg-violet-500/15 text-violet-500",
 };
 
+// Deterministic per-member avatar color, like the design roster.
 const AVATAR_TONES = [
   "bg-primary",
   "bg-success",
@@ -36,6 +39,8 @@ const AVATAR_TONES = [
   "bg-amber-500",
   "bg-rose-500",
   "bg-cyan-500",
+  "bg-teal-500",
+  "bg-indigo-500",
 ];
 
 function avatarTone(seed: string): string {
@@ -94,7 +99,7 @@ const ROLE_TABS: { key: string; label: string }[] = [
 function Avatar({ name, size = 32 }: { name: string; size?: number }) {
   return (
     <div
-      className={`flex shrink-0 items-center justify-center rounded-full text-[11px] font-semibold text-white ${avatarTone(name)}`}
+      className={`flex shrink-0 items-center justify-center rounded-full font-semibold text-white ${avatarTone(name)}`}
       style={{ width: size, height: size, fontSize: size > 36 ? 14 : 11 }}
     >
       {initials(name)}
@@ -115,6 +120,7 @@ export function UsersPage() {
   const [inviting, setInviting] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [enrolling, setEnrolling] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const resetPassword = useResetPassword();
 
@@ -182,6 +188,7 @@ export function UsersPage() {
       {inviting && <InviteUserModal onClose={() => setInviting(false)} />}
       {auditOpen && <AuditLogModal onClose={() => setAuditOpen(false)} />}
       {editing && selected && <EditAccessModal user={selected} onClose={() => setEditing(false)} />}
+      {enrolling && <Enroll2FAModal onClose={() => setEnrolling(false)} />}
 
       <div className="flex-1 space-y-4 overflow-auto p-4">
         {/* Stat cards */}
@@ -260,10 +267,10 @@ export function UsersPage() {
                       >
                         <td className="px-3 py-2">
                           <div className="flex items-center gap-2.5">
-                            <Avatar name={u.display_name} />
+                            <Avatar name={displayLabel(u)} />
                             <div className="min-w-0">
                               <div className="truncate font-medium text-foreground">
-                                {u.display_name}
+                                {displayLabel(u)}
                               </div>
                               <div className="truncate text-[11.5px] text-muted-foreground">
                                 {u.title ? `${u.title} · ` : ""}
@@ -337,10 +344,10 @@ export function UsersPage() {
           {selected && (
             <aside className="rounded-lg border border-border bg-surface xl:sticky xl:top-4">
               <div className="flex items-center gap-3 border-b border-border p-4">
-                <Avatar name={selected.display_name} size={44} />
+                <Avatar name={displayLabel(selected)} size={44} />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-semibold text-foreground">
-                    {selected.display_name}
+                    {displayLabel(selected)}
                   </div>
                   <div className="truncate text-xs text-muted-foreground">
                     {selected.title || selected.role}
@@ -367,6 +374,14 @@ export function UsersPage() {
                         <span className="h-1.5 w-1.5 rounded-full bg-current" />
                         Enabled
                       </span>
+                    ) : me.data?.user_id === selected.id ? (
+                      <button
+                        type="button"
+                        onClick={() => setEnrolling(true)}
+                        className="text-xs font-medium text-primary hover:underline"
+                      >
+                        Set up authenticator
+                      </button>
                     ) : (
                       <span className="text-xs text-muted-foreground">Not enabled</span>
                     )

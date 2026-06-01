@@ -8,6 +8,7 @@ import (
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/google/uuid"
+	"golang.org/x/oauth2"
 
 	"github.com/live-rack/pkg/domain"
 )
@@ -74,6 +75,7 @@ var rolePrecedence = []domain.RoleName{
 // ZitadelVerifier validates OIDC JWTs against Zitadel's JWKS and maps them to a Principal.
 type ZitadelVerifier struct {
 	verifier  *oidc.IDTokenVerifier
+	provider  *oidc.Provider
 	resolver  OrgResolver
 	projectID string
 }
@@ -86,6 +88,7 @@ func NewZitadelVerifier(ctx context.Context, issuer, projectID string, resolver 
 	}
 	return &ZitadelVerifier{
 		verifier:  provider.Verifier(&oidc.Config{SkipClientIDCheck: true}),
+		provider:  provider,
 		resolver:  resolver,
 		projectID: projectID,
 	}, nil
@@ -115,6 +118,10 @@ func (v *ZitadelVerifier) VerifyRequest(r *http.Request) (*domain.Principal, err
 		return nil, fmt.Errorf("auth: token missing org claim")
 	}
 
+	// Zitadel JWT access tokens carry roles but not profile/email; fetch those
+	// from the userinfo endpoint so the roster shows real names, not blanks.
+	v.enrichFromUserInfo(ctx, token, &claims)
+
 	if err := v.resolver.Provision(ctx, claims); err != nil {
 		return nil, fmt.Errorf("auth: provision: %w", err)
 	}
@@ -138,6 +145,7 @@ func (v *ZitadelVerifier) VerifyRequest(r *http.Request) (*domain.Principal, err
 
 	return &domain.Principal{
 		UserID:      user.ID,
+		IDPUserID:   claims.Subject,
 		OrgID:       org.ID,
 		IDPOrgID:    claims.IDPOrgID,
 		Role:        role,
@@ -166,6 +174,42 @@ func (v *ZitadelVerifier) parseClaims(subject string, raw map[string]any) Claims
 		Role:        strongestRole(roles),
 		MFA:         mfaFromClaims(raw),
 	}
+}
+
+// enrichFromUserInfo fills missing profile claims from the OIDC userinfo
+// endpoint. Best-effort: the token already authenticated, so a userinfo
+// failure must not block the request. Only fills empty fields.
+func (v *ZitadelVerifier) enrichFromUserInfo(ctx context.Context, token string, c *Claims) {
+	if c.Email != "" && c.DisplayName != "" && c.AvatarURL != "" {
+		return
+	}
+	ui, err := v.provider.UserInfo(ctx, oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token}))
+	if err != nil {
+		return
+	}
+	var raw map[string]any
+	if err := ui.Claims(&raw); err != nil {
+		return
+	}
+	if c.Email == "" {
+		c.Email = firstNonEmpty(ui.Email, stringClaim(raw, "email"))
+	}
+	if c.DisplayName == "" {
+		c.DisplayName = firstNonEmpty(stringClaim(raw, "name"), stringClaim(raw, "preferred_username"))
+	}
+	if c.AvatarURL == "" {
+		c.AvatarURL = stringClaim(raw, "picture")
+	}
+}
+
+// firstNonEmpty returns the first non-empty string. Pure.
+func firstNonEmpty(vals ...string) string {
+	for _, s := range vals {
+		if s != "" {
+			return s
+		}
+	}
+	return ""
 }
 
 // mfaFromClaims reads the amr claim. Pure.

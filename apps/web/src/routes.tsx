@@ -1,6 +1,7 @@
 import { Navigate, type RouteObject } from "react-router-dom";
 import { AuthGuard } from "./components/AuthGuard";
 import { CallbackPage } from "./components/CallbackPage";
+import { RequireAdmin } from "./components/RequireAdmin";
 import { AppShell } from "./components/shell";
 
 export const routes: RouteObject[] = [
@@ -9,8 +10,19 @@ export const routes: RouteObject[] = [
     element: <CallbackPage />,
   },
   {
+    path: "/login",
+    lazy: () => import("./features/login/LoginPage").then((m) => ({ Component: m.LoginPage })),
+  },
+  {
     path: "/signup",
     lazy: () => import("./features/signup/SignupPage").then((m) => ({ Component: m.SignupPage })),
+  },
+  {
+    path: "/verify-email",
+    lazy: () =>
+      import("./features/onboarding/VerifyEmailPage").then((m) => ({
+        Component: m.VerifyEmailPage,
+      })),
   },
   // Zitadel issues relative login redirects; if one lands on the app origin, recover to home.
   {
@@ -76,9 +88,14 @@ export const routes: RouteObject[] = [
               })),
           },
           {
-            path: "users",
-            lazy: () =>
-              import("./features/users/UsersPage").then((m) => ({ Component: m.UsersPage })),
+            element: <RequireAdmin />,
+            children: [
+              {
+                path: "users",
+                lazy: () =>
+                  import("./features/users/UsersPage").then((m) => ({ Component: m.UsersPage })),
+              },
+            ],
           },
         ],
       },

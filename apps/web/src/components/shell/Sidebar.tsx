@@ -82,6 +82,30 @@ export function Sidebar({ accent = "#2563eb", onNavigate }: SidebarProps) {
             <div className="user-name">{fullName || "—"}</div>
             <div className="user-role">{email}</div>
           </div>
+          <button
+            type="button"
+            aria-label="Sign out"
+            title="Sign out"
+            onClick={() => {
+              void auth.signoutRedirect();
+            }}
+            className="ml-auto rounded-md p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+          </button>
         </div>
       </div>
     </aside>

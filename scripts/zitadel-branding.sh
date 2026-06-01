@@ -18,12 +18,10 @@ set -euo pipefail
 ISSUER="${OIDC_ISSUER:?set OIDC_ISSUER}"
 TOKEN="${ZITADEL_MGMT_TOKEN:?set ZITADEL_MGMT_TOKEN}"
 MGMT="${ISSUER%/}/management/v1"
-ADMIN="${ISSUER%/}/admin/v1"
 
 auth=(-H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json")
 
-echo "→ updating label policy (colors + theme)"
-curl -fsS -X PUT "${MGMT}/policies/label" "${auth[@]}" -d '{
+PALETTE='{
   "primaryColor":        "#2563eb",
   "backgroundColor":     "#f8fafc",
   "warnColor":           "#dc2626",
@@ -34,15 +32,20 @@ curl -fsS -X PUT "${MGMT}/policies/label" "${auth[@]}" -d '{
   "fontColorDark":       "#f8fafc",
   "hideLoginNameSuffix": true,
   "disableWatermark":    false
-}' >/dev/null
+}'
+
+# A fresh org inherits the default (instance) label policy, so we POST to create
+# a custom org policy first; PUT only succeeds once one exists. Both are
+# idempotent here — a "not changed" PUT is fine.
+echo "→ creating custom label policy"
+curl -fsS -o /dev/null -X POST "${MGMT}/policies/label" "${auth[@]}" -d "${PALETTE}" || true
+
+echo "→ updating label policy (colors + theme)"
+curl -fsS -o /dev/null -X PUT "${MGMT}/policies/label" "${auth[@]}" -d "${PALETTE}" || true
 
 echo "→ activating label policy"
-curl -fsS -X POST "${MGMT}/policies/label/_activate" "${auth[@]}" -d '{}' >/dev/null
-
-# Force English on the hosted login regardless of the browser Accept-Language.
-echo "→ restricting instance language to English"
-curl -fsS -X PUT "${ADMIN}/restrictions" "${auth[@]}" \
-  -d '{"allowedLanguages":["en"]}' >/dev/null || \
-  echo "  (restrictions endpoint unavailable on this version — skipped)"
+curl -fsS -o /dev/null -X POST "${MGMT}/policies/label/_activate" "${auth[@]}" -d '{}'
 
 echo "✓ branding applied. Hard-refresh the login page (incognito) to see it."
+echo "  Logo + Inter font: Console → Default settings → Branding (multipart upload)."
+echo "  English login: Console → Default settings → Languages → set default 'en'."

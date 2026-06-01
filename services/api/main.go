@@ -31,6 +31,7 @@ import (
 
 	echoSwagger "github.com/swaggo/echo-swagger"
 
+	"github.com/live-rack/pkg/audit"
 	pkgauth "github.com/live-rack/pkg/auth"
 	"github.com/live-rack/pkg/chstore"
 	"github.com/live-rack/pkg/domain"
@@ -51,6 +52,7 @@ import (
 	"github.com/live-rack/services/api/internal/scans"
 	"github.com/live-rack/services/api/internal/search"
 	"github.com/live-rack/services/api/internal/servicetokens"
+	"github.com/live-rack/services/api/internal/signup"
 	"github.com/live-rack/services/api/internal/tasks"
 	"github.com/live-rack/services/api/internal/users"
 	"github.com/live-rack/services/api/internal/webhooks"
@@ -142,13 +144,21 @@ func main() {
 	q := store.New(pool)
 
 	// Zitadel OIDC verifier — discovers JWKS at startup, JIT-provisions on first login.
+	issuer := mustEnv("OIDC_ISSUER")
+	projectID := mustEnv("OIDC_PROJECT_ID")
 	adapter := authadapter.New(q)
 	resolver := pkgauth.NewDBResolver(adapter)
-	oidcVerifier, err := pkgauth.NewZitadelVerifier(ctx, mustEnv("OIDC_ISSUER"), mustEnv("OIDC_PROJECT_ID"), resolver)
+	oidcVerifier, err := pkgauth.NewZitadelVerifier(ctx, issuer, projectID, resolver)
 	if err != nil {
 		log.Error("init oidc verifier", "err", err)
 		os.Exit(1)
 	}
+
+	// Zitadel management client drives onboarding (signup + invites). The
+	// service-account token authorises org/user creation and role grants.
+	mgmt := pkgauth.NewZitadelManagement(issuer, projectID,
+		pkgauth.StaticToken(os.Getenv("ZITADEL_MGMT_TOKEN")))
+	auditWriter := audit.NewWriter(pool)
 	// Composite verifier: opaque service tokens ("lrk_...") resolve to service
 	// principals; everything else goes through OIDC.
 	verifier := pkgauth.NewCompositeVerifier(pkgauth.NewServiceVerifier(adapter), oidcVerifier)
@@ -181,6 +191,9 @@ func main() {
 	// Stripe billing webhook → org plan changes. Price→plan map from env (JSON).
 	billing.New(q, envOr("STRIPE_BILLING_SECRET", ""), parsePricePlans(os.Getenv("STRIPE_PRICE_PLANS"))).Register(e)
 
+	// Public self-service signup — provisions a tenant org + admin in Zitadel.
+	signup.New(mgmt).Register(e)
+
 	// Authenticated API group.
 	api := e.Group("/api/v1", apimw.Auth(verifier, setSession))
 
@@ -202,6 +215,7 @@ func main() {
 	analytics.New(chstore.New(chCfg)).Register(api)
 	recommendations.New(q).Register(api)
 	users.New(q).Register(api)
+	users.NewInvite(mgmt, auditWriter).Register(api)
 	servicetokens.New(q).Register(api)
 
 	hub := ws.NewHub(log)

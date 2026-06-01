@@ -1,6 +1,9 @@
+import { useState } from "react";
+import { InviteUserModal } from "./InviteUserModal";
 import {
   PERMISSION_MATRIX,
   ROLE_COLUMNS,
+  canInvite,
   initials,
   useCapabilities,
   useUsers,
@@ -40,16 +43,31 @@ export function UsersPage() {
   const usersQuery = useUsers();
   const me = useCapabilities();
   const users = usersQuery.data ?? [];
+  const [inviting, setInviting] = useState(false);
+  const showInvite = canInvite(me.data);
 
   return (
     <div className="flex h-full flex-col">
-      <header className="border-b border-border px-4 py-3">
-        <h1 className="text-lg font-semibold text-foreground">Users &amp; Access</h1>
-        <p className="text-xs text-muted-foreground">
-          {users.length} members
-          {me.data ? ` · you: ${me.data.role}${me.data.mfa_verified ? " · 2FA on" : ""}` : ""}
-        </p>
+      <header className="flex items-center justify-between border-b border-border px-4 py-3">
+        <div>
+          <h1 className="text-lg font-semibold text-foreground">Users &amp; Access</h1>
+          <p className="text-xs text-muted-foreground">
+            {users.length} members
+            {me.data ? ` · you: ${me.data.role}${me.data.mfa_verified ? " · 2FA on" : ""}` : ""}
+          </p>
+        </div>
+        {showInvite && (
+          <button
+            type="button"
+            onClick={() => setInviting(true)}
+            className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground"
+          >
+            Invite member
+          </button>
+        )}
       </header>
+
+      {inviting && <InviteUserModal onClose={() => setInviting(false)} />}
 
       <div className="flex-1 space-y-4 overflow-auto p-4">
         <div className="overflow-hidden rounded-lg border border-border bg-surface">

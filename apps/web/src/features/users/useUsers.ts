@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../../lib/api";
 
 export interface OrgUser {
@@ -61,4 +61,44 @@ export function useUsers() {
 export function useCapabilities() {
   const { get } = useApi();
   return useQuery({ queryKey: userKeys.me, queryFn: () => get<Capabilities>("/api/v1/me") });
+}
+
+/** Roles an admin may assign when inviting a teammate. */
+export const ASSIGNABLE_ROLES = ["admin", "manager", "staff", "readonly"] as const;
+export type AssignableRole = (typeof ASSIGNABLE_ROLES)[number];
+
+export interface InvitePayload {
+  email: string;
+  display_name: string;
+  role: AssignableRole;
+}
+
+export interface InviteResult {
+  user_id: string;
+  email: string;
+  role: string;
+  status: string;
+}
+
+/** True when the caller may invite users (admin + verified second factor). Pure. */
+export function canInvite(caps: Capabilities | undefined): boolean {
+  return Boolean(caps && caps.role === "admin" && caps.mfa_verified);
+}
+
+/** Invite a teammate; refreshes the roster on success. */
+export function useInviteUser() {
+  const { post } = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: InvitePayload) => post<InviteResult>("/api/v1/users/invite", body),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: userKeys.list }),
+  });
+}
+
+/** Resend a pending invite by Zitadel user id. */
+export function useResendInvite() {
+  const { post } = useApi();
+  return useMutation({
+    mutationFn: (userID: string) => post<void>(`/api/v1/users/${userID}/resend`, {}),
+  });
 }

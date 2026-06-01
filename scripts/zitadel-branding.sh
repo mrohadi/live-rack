@@ -1,25 +1,29 @@
 #!/usr/bin/env bash
-# Apply live-rack branding to Zitadel's hosted login (LabelPolicy), so the
-# sign-in/register pages match our palette (primary #2563eb, Inter).
+# Apply live-rack branding to Zitadel's hosted login so the sign-in / register
+# pages match our palette (primary #2563eb, Inter) and default to English.
+#
+# Mint a service-account PAT once (see scripts/README or the PR notes):
+#   Console → Users → Service Users → New → generate Personal Access Token,
+#   then grant it Manager role "IAM_OWNER" (Instance) so it can write policies.
 #
 # Usage:
 #   OIDC_ISSUER=http://localhost:8081 \
 #   ZITADEL_MGMT_TOKEN=<service-account PAT> \
 #   ./scripts/zitadel-branding.sh
 #
-# The service account needs the IAM/org policy-write grant. Logo + font are
-# uploaded separately (multipart) via the console; this script sets colors +
-# theme flags and activates the policy.
+# Logo + custom font are multipart uploads — do those in the console; this
+# script sets colors, theme flags, language, and activates the policy.
 set -euo pipefail
 
 ISSUER="${OIDC_ISSUER:?set OIDC_ISSUER}"
 TOKEN="${ZITADEL_MGMT_TOKEN:?set ZITADEL_MGMT_TOKEN}"
-BASE="${ISSUER%/}/management/v1"
+MGMT="${ISSUER%/}/management/v1"
+ADMIN="${ISSUER%/}/admin/v1"
 
 auth=(-H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json")
 
-echo "→ updating label policy"
-curl -fsS -X PUT "${BASE}/policies/label" "${auth[@]}" -d '{
+echo "→ updating label policy (colors + theme)"
+curl -fsS -X PUT "${MGMT}/policies/label" "${auth[@]}" -d '{
   "primaryColor":        "#2563eb",
   "backgroundColor":     "#f8fafc",
   "warnColor":           "#dc2626",
@@ -33,6 +37,12 @@ curl -fsS -X PUT "${BASE}/policies/label" "${auth[@]}" -d '{
 }' >/dev/null
 
 echo "→ activating label policy"
-curl -fsS -X POST "${BASE}/policies/label/_activate" "${auth[@]}" -d '{}' >/dev/null
+curl -fsS -X POST "${MGMT}/policies/label/_activate" "${auth[@]}" -d '{}' >/dev/null
 
-echo "✓ branding applied. Hard-refresh the login page to see it."
+# Force English on the hosted login regardless of the browser Accept-Language.
+echo "→ restricting instance language to English"
+curl -fsS -X PUT "${ADMIN}/restrictions" "${auth[@]}" \
+  -d '{"allowedLanguages":["en"]}' >/dev/null || \
+  echo "  (restrictions endpoint unavailable on this version — skipped)"
+
+echo "✓ branding applied. Hard-refresh the login page (incognito) to see it."

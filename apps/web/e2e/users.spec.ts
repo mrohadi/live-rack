@@ -48,6 +48,9 @@ test.describe("Users — roster + permission matrix", () => {
     await page.route("**/api/v1/me/2fa", async (route) => {
       await route.fulfill({ status: 204, body: "" });
     });
+    await page.route("**/api/v1/audit*", async (route) => {
+      await route.fulfill({ json: [] });
+    });
 
     await seedOidcSession(page);
     await page.goto("/users");

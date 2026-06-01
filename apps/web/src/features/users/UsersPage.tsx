@@ -1,14 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "react-oidc-context";
+import { AuditLogModal } from "./AuditLogModal";
+import { EditAccessModal } from "./EditAccessModal";
 import { InviteUserModal } from "./InviteUserModal";
 import {
   PERMISSION_MATRIX,
   ROLE_COLUMNS,
+  auditLabel,
   canInvite,
   hasMfa,
   initials,
   relativeTime,
+  useAudit,
   useCapabilities,
+  useResetPassword,
   useRosterStats,
   useSyncMfa,
   useUsers,
@@ -107,9 +112,19 @@ export function UsersPage() {
   const [filter, setFilter] = useState("all");
   const [selectedId, setSelectedId] = useState<string | undefined>();
   const [inviting, setInviting] = useState(false);
+  const [auditOpen, setAuditOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const resetPassword = useResetPassword();
 
   const showInvite = canInvite(me.data);
   const mfaOn = hasMfa(auth.user?.profile);
+
+  const copyInviteLink = () => {
+    void navigator.clipboard?.writeText(`${window.location.origin}/signup`);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 1500);
+  };
 
   // Sync the caller's 2FA state (amr lives only in the ID token) once it is known.
   const synced = useRef(false);
@@ -134,18 +149,38 @@ export function UsersPage() {
             {me.data ? ` · you: ${me.data.role}${mfaOn ? " · 2FA on" : ""}` : ""}
           </p>
         </div>
-        {showInvite && (
+        <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => setInviting(true)}
-            className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white transition hover:opacity-90"
+            onClick={() => setAuditOpen(true)}
+            className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-muted"
           >
-            + Add user
+            Audit log
           </button>
-        )}
+          {showInvite && (
+            <>
+              <button
+                type="button"
+                onClick={copyInviteLink}
+                className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-muted"
+              >
+                {linkCopied ? "Link copied ✓" : "Invite link"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setInviting(true)}
+                className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white transition hover:opacity-90"
+              >
+                + Add user
+              </button>
+            </>
+          )}
+        </div>
       </header>
 
       {inviting && <InviteUserModal onClose={() => setInviting(false)} />}
+      {auditOpen && <AuditLogModal onClose={() => setAuditOpen(false)} />}
+      {editing && selected && <EditAccessModal user={selected} onClose={() => setEditing(false)} />}
 
       <div className="flex-1 space-y-4 overflow-auto p-4">
         {/* Stat cards */}
@@ -336,11 +371,60 @@ export function UsersPage() {
                     )
                   }
                 />
+
+                <RecentActivity userId={selected.id} />
+
+                {showInvite && (
+                  <div className="mt-2 flex items-center justify-between gap-2 border-t border-border pt-3">
+                    <button
+                      type="button"
+                      disabled={resetPassword.isPending || !selected.idp_user_id}
+                      onClick={() => resetPassword.mutate(selected.idp_user_id)}
+                      className="text-sm font-medium text-foreground hover:underline disabled:opacity-50"
+                    >
+                      {resetPassword.isSuccess ? "Reset sent ✓" : "Reset password"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditing(true)}
+                      className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white hover:opacity-90"
+                    >
+                      Edit access
+                    </button>
+                  </div>
+                )}
               </div>
             </aside>
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function RecentActivity({ userId }: { userId: string }) {
+  const audit = useAudit(userId, 6);
+  const rows = audit.data ?? [];
+  return (
+    <div className="pt-2">
+      <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        Recent activity
+      </div>
+      {rows.length === 0 ? (
+        <div className="text-xs text-muted-foreground">No recent activity.</div>
+      ) : (
+        <ul className="space-y-1.5">
+          {rows.map((e, i) => (
+            <li key={i} className="flex items-center justify-between gap-2 text-xs">
+              <span className="flex items-center gap-2 truncate text-foreground">
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                {auditLabel(e.action)}
+              </span>
+              <span className="shrink-0 font-mono text-muted-foreground">{relativeTime(e.ts)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

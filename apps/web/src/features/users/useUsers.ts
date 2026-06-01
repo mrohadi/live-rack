@@ -3,6 +3,7 @@ import { useApi } from "../../lib/api";
 
 export interface OrgUser {
   id: string;
+  idp_user_id: string;
   email: string;
   display_name: string;
   avatar_url: string;
@@ -13,6 +14,15 @@ export interface OrgUser {
   mfa_enabled: boolean;
   last_seen_at: string | null;
   zones: string[];
+}
+
+export interface AuditEntry {
+  ts: string;
+  actor_user_id: string | null;
+  action: string;
+  resource_type: string;
+  resource_id: string;
+  metadata: Record<string, unknown>;
 }
 
 export interface RosterStats {
@@ -166,4 +176,40 @@ export function useResendInvite() {
   return useMutation({
     mutationFn: (userID: string) => post<void>(`/api/v1/users/${userID}/resend`, {}),
   });
+}
+
+/** Recent audit-trail entries, optionally scoped to one actor. */
+export function useAudit(actor?: string, limit = 10) {
+  const { get } = useApi();
+  const qs = `?limit=${limit}${actor ? `&actor=${actor}` : ""}`;
+  return useQuery({
+    queryKey: ["users", "audit", actor ?? "all", limit] as const,
+    queryFn: () => get<AuditEntry[]>(`/api/v1/audit${qs}`),
+  });
+}
+
+/** Change a member's role (re-grants in Zitadel via idp id). */
+export function useSetRole() {
+  const { patch } = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: string; idpUserId: string; role: AssignableRole }) =>
+      patch<void>(`/api/v1/users/${v.id}/role`, { role: v.role, idp_user_id: v.idpUserId }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: userKeys.list }),
+  });
+}
+
+/** Email a member a password-reset link (by Zitadel user id). */
+export function useResetPassword() {
+  const { post } = useApi();
+  return useMutation({
+    mutationFn: (idpUserId: string) => post<void>(`/api/v1/users/${idpUserId}/reset-password`, {}),
+  });
+}
+
+/** Humanize an audit action key, e.g. "user.role_changed" → "Role changed". Pure. */
+export function auditLabel(action: string): string {
+  const tail = action.includes(".") ? action.split(".").slice(1).join(".") : action;
+  const s = tail.replace(/_/g, " ");
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }

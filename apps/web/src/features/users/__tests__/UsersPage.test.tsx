@@ -41,6 +41,9 @@ describe("UsersPage", () => {
           },
         ]);
       }
+      if (path.startsWith("/api/v1/audit")) {
+        return Promise.resolve([]);
+      }
       if (path === "/api/v1/users/stats") {
         return Promise.resolve({
           members: 1,

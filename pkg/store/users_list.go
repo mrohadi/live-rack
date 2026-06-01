@@ -11,6 +11,7 @@ import (
 // UserListRow is one row of the org user roster with role, presence, and scope.
 type UserListRow struct {
 	ID          uuid.UUID  `json:"id"`
+	IDPUserID   string     `json:"idp_user_id"`
 	Email       string     `json:"email"`
 	DisplayName string     `json:"display_name"`
 	AvatarURL   string     `json:"avatar_url"`
@@ -24,7 +25,7 @@ type UserListRow struct {
 }
 
 const listUsersByOrg = `
-SELECT u.id, u.email, u.display_name, COALESCE(u.avatar_url, ''), COALESCE(r.name, ''),
+SELECT u.id, COALESCE(u.clerk_user_id, ''), u.email, u.display_name, COALESCE(u.avatar_url, ''), COALESCE(r.name, ''),
        u.title, u.shift, u.status, u.mfa_enabled, u.last_seen_at,
        COALESCE(array_remove(array_agg(z.name ORDER BY z.name), NULL), '{}') AS zones
 FROM users u
@@ -48,7 +49,7 @@ func (q *Queries) ListUsersByOrg(ctx context.Context, orgID uuid.UUID) ([]UserLi
 	var out []UserListRow
 	for rows.Next() {
 		var u UserListRow
-		if err := rows.Scan(&u.ID, &u.Email, &u.DisplayName, &u.AvatarURL, &u.Role,
+		if err := rows.Scan(&u.ID, &u.IDPUserID, &u.Email, &u.DisplayName, &u.AvatarURL, &u.Role,
 			&u.Title, &u.Shift, &u.Status, &u.MFAEnabled, &u.LastSeenAt, &u.Zones); err != nil {
 			return nil, fmt.Errorf("store: scan user row: %w", err)
 		}

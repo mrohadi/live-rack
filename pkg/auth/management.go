@@ -26,6 +26,8 @@ type Management interface {
 	ResendInvite(ctx context.Context, orgID, userID string) error
 	// PendingInvites counts users still in the initial (not-yet-verified) state.
 	PendingInvites(ctx context.Context, orgID string) (int, error)
+	// SendPasswordReset emails a user a password-reset link.
+	SendPasswordReset(ctx context.Context, orgID, userID string) error
 }
 
 // TokenSource yields a bearer token authorized for Zitadel management calls.
@@ -190,4 +192,11 @@ func (m *ZitadelManagement) PendingInvites(ctx context.Context, orgID string) (i
 	}
 	n, _ := strconv.Atoi(resp.Details.TotalResult)
 	return n, nil
+}
+
+// SendPasswordReset asks Zitadel to email the user a password-reset link.
+func (m *ZitadelManagement) SendPasswordReset(ctx context.Context, orgID, userID string) error {
+	return m.post(ctx,
+		fmt.Sprintf("/management/v1/users/%s/_reset_password", userID), orgID,
+		map[string]any{}, nil)
 }

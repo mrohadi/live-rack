@@ -1,16 +1,24 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { KonvaZoneCanvas } from "./renderers/KonvaZoneCanvas";
-import type { ViewMode, Zone, ZoneUpdate } from "./types";
+import type { ViewMode, Zone } from "./types";
 import { useCurrentStore } from "./useCurrentStore";
 import { useCreateZone, useUpdateZone, useZones, zoneKeys } from "./useZones";
 import { ZoneDetailSidebar } from "./ZoneDetailSidebar";
+import { ZoneMapView, type ZoneRect } from "./ZoneMapView";
+import { useInventory } from "../inventory/useInventory";
 import { useScanStream } from "../../lib/useScanStream";
 import type { ScanRecorded } from "../../lib/ws";
+
+const TABS: { label: string; value: ViewMode }[] = [
+  { label: "Zones", value: "zones" },
+  { label: "Heat", value: "heat" },
+  { label: "Items", value: "items" },
+];
 
 export function MapPage() {
   const storeId = useCurrentStore();
   const { data: zones = [], isLoading } = useZones(storeId);
+  const { data: items = [] } = useInventory(storeId);
   const createZone = useCreateZone(storeId);
   const updateZone = useUpdateZone(storeId);
 
@@ -34,19 +42,15 @@ export function MapPage() {
   );
   useScanStream(onScan);
 
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [view, setView] = useState<ViewMode>("zones");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newZoneName, setNewZoneName] = useState("");
 
-  /** Merge drag/resize delta into the full zone, then PUT. */
-  const handleChange = (updates: ZoneUpdate[]) => {
-    updates.forEach((delta) => {
-      const existing = zones.find((z) => z.id === delta.id);
-      if (!existing) return;
-      updateZone.mutate({ ...existing, ...delta });
-    });
-  };
+  // Default to the first zone once loaded so the detail panel is never empty.
+  useEffect(() => {
+    if (!selectedId && zones.length > 0) setSelectedId(zones[0].id);
+  }, [zones, selectedId]);
 
   const handleAddZone = () => {
     if (!newZoneName.trim()) return;
@@ -56,9 +60,9 @@ export function MapPage() {
         type: "general",
         x: 40,
         y: 40,
-        width: 200,
-        height: 120,
-        color: "#6366f1",
+        width: 20,
+        height: 14,
+        color: "#2563eb",
         capacity: 100,
       },
       {
@@ -70,54 +74,54 @@ export function MapPage() {
     );
   };
 
-  const TABS: { label: string; value: ViewMode }[] = [
-    { label: "Zones", value: "zones" },
-    { label: "Heat", value: "heat" },
-    { label: "Items", value: "items" },
-  ];
+  // The backend PUT requires a full zone body; merge the new rect into it.
+  const handleMove = (id: string, rect: ZoneRect) => {
+    const existing = zones.find((z) => z.id === id);
+    if (!existing) return;
+    updateZone.mutate({ ...existing, ...rect });
+  };
 
-  const selectedZone =
-    selectedIds.length === 1 ? (zones.find((z) => z.id === selectedIds[0]) ?? null) : null;
-
-  if (isLoading) {
-    return (
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          height: "100%",
-          color: "#94a3b8",
-        }}
-      >
-        Loading zones…
-      </div>
-    );
-  }
+  const selectedZone = zones.find((z) => z.id === selectedId) ?? null;
+  const itemsTracked = zones.reduce((sum, z) => sum + (z.items ?? 0), 0);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      <header
-        style={{
-          padding: "12px 16px",
-          borderBottom: "1px solid #1f2937",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: 12,
-        }}
-      >
+    <div className="flex h-full flex-col">
+      <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
         <div>
-          <h1 style={{ margin: 0, fontSize: 18 }}>Map &amp; Zones</h1>
-          <p style={{ margin: "4px 0 0", color: "#94a3b8", fontSize: 13 }}>
-            Drag to move · drag corners to resize · shift-click for multi-select
+          <h1 className="text-lg font-semibold text-foreground">Map &amp; Zones</h1>
+          <p className="text-xs text-muted-foreground">
+            Floor 1 · {zones.length} zones · {itemsTracked.toLocaleString()} items tracked · last
+            sync 12s
           </p>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {/* Add zone */}
+        <div className="flex items-center gap-2">
+          <div className="inline-flex gap-1 rounded-lg border border-border bg-surface p-1">
+            {TABS.map((t) => (
+              <button
+                key={t.value}
+                type="button"
+                onClick={() => setView(t.value)}
+                className={`rounded-md px-3 py-1 text-sm font-medium transition ${
+                  view === t.value
+                    ? "bg-primary text-white"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-muted"
+          >
+            Filter
+          </button>
+
           {showAddForm ? (
-            <>
+            <div className="flex items-center gap-2">
               <input
                 autoFocus
                 value={newZoneName}
@@ -127,99 +131,53 @@ export function MapPage() {
                   if (e.key === "Escape") setShowAddForm(false);
                 }}
                 placeholder="Zone name"
-                style={{
-                  padding: "4px 8px",
-                  borderRadius: 4,
-                  border: "1px solid #334155",
-                  background: "#1e293b",
-                  color: "#f1f5f9",
-                  fontSize: 13,
-                }}
+                className="w-32 rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground"
               />
               <button
+                type="button"
                 onClick={handleAddZone}
                 disabled={createZone.isPending}
-                style={{
-                  padding: "4px 12px",
-                  borderRadius: 4,
-                  border: "none",
-                  cursor: "pointer",
-                  fontSize: 13,
-                  background: "#6366f1",
-                  color: "#fff",
-                  opacity: createZone.isPending ? 0.6 : 1,
-                }}
+                className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
               >
                 {createZone.isPending ? "Saving…" : "Add"}
               </button>
               <button
+                type="button"
                 onClick={() => setShowAddForm(false)}
-                style={{
-                  padding: "4px 8px",
-                  borderRadius: 4,
-                  border: "none",
-                  cursor: "pointer",
-                  fontSize: 13,
-                  background: "transparent",
-                  color: "#94a3b8",
-                }}
+                className="px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground"
               >
                 Cancel
               </button>
-            </>
+            </div>
           ) : (
             <button
+              type="button"
               data-testid="add-zone-btn"
               onClick={() => setShowAddForm(true)}
-              style={{
-                padding: "4px 14px",
-                borderRadius: 4,
-                border: "1px solid #334155",
-                cursor: "pointer",
-                fontSize: 13,
-                background: "transparent",
-                color: "#f1f5f9",
-              }}
+              className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white transition hover:opacity-90"
             >
-              + Add zone
+              + New zone
             </button>
           )}
-
-          {/* View tabs */}
-          <div
-            style={{ display: "flex", gap: 4, background: "#1e293b", borderRadius: 6, padding: 4 }}
-          >
-            {TABS.map((t) => (
-              <button
-                key={t.value}
-                onClick={() => setView(t.value)}
-                style={{
-                  padding: "4px 14px",
-                  borderRadius: 4,
-                  border: "none",
-                  cursor: "pointer",
-                  fontSize: 13,
-                  background: view === t.value ? "#334155" : "transparent",
-                  color: view === t.value ? "#f1f5f9" : "#94a3b8",
-                  fontWeight: view === t.value ? 600 : 400,
-                }}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
         </div>
       </header>
 
-      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
-        <div style={{ flex: 1, position: "relative", background: "#0f172a" }}>
-          <KonvaZoneCanvas
-            zones={zones}
-            selectedIds={selectedIds}
-            onSelect={setSelectedIds}
-            onChange={handleChange}
-            viewMode={view}
-          />
+      <div className="flex flex-1 overflow-hidden">
+        <div className="flex-1 overflow-auto">
+          {isLoading ? (
+            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+              Loading zones…
+            </div>
+          ) : (
+            <ZoneMapView
+              zones={zones}
+              items={items}
+              view={view}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              onMove={handleMove}
+            />
+          )}
         </div>
         <ZoneDetailSidebar zone={selectedZone} />
       </div>

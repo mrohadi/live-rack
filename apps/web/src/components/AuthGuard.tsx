@@ -1,7 +1,7 @@
-import { useEffect } from "react";
 import { useAuth } from "react-oidc-context";
 import { Outlet } from "react-router-dom";
 
+import { Welcome } from "./auth/Welcome";
 import { LoadingScreen } from "./LoadingScreen";
 
 // Zitadel project-roles claim: { roleName: { orgId: orgDomain } }. Org id = inner key.
@@ -17,24 +17,27 @@ function orgIdFromRoles(profile?: Record<string, unknown>): string | undefined {
 export function AuthGuard() {
   const auth = useAuth();
 
-  // Kick off the redirect to Zitadel's hosted login once we know the user is signed out.
-  useEffect(() => {
-    if (!auth.isLoading && !auth.isAuthenticated && !auth.activeNavigator && !auth.error) {
-      void auth.signinRedirect();
-    }
-  }, [auth]);
-
   if (auth.isLoading || auth.activeNavigator) return <LoadingScreen />;
 
-  if (auth.error) {
+  // Signed out → branded landing. The user explicitly chooses to sign in
+  // (hand-off to Zitadel) or create a workspace, instead of an abrupt redirect.
+  if (!auth.isAuthenticated) {
     return (
-      <div className="flex h-screen items-center justify-center flex-col gap-4">
-        <p className="text-sm text-red-500">Sign-in failed: {auth.error.message}</p>
-      </div>
+      <Welcome
+        onSignIn={() => {
+          void auth.signinRedirect();
+        }}
+      />
     );
   }
 
-  if (!auth.isAuthenticated) return <LoadingScreen label="Redirecting to sign-in…" />;
+  if (auth.error) {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center gap-4">
+        <p className="text-sm text-destructive">Sign-in failed: {auth.error.message}</p>
+      </div>
+    );
+  }
 
   // Every user must belong to an org (tenant).
   const orgId = orgIdFromRoles(auth.user?.profile);

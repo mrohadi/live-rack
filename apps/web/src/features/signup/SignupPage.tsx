@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { AuthLayout } from "../../components/auth/AuthLayout";
 import { useSignup } from "./useSignup";
 
 /** Public self-service registration. Creates a tenant org + admin, then prompts
@@ -21,63 +22,58 @@ export function SignupPage() {
 
   if (signup.isSuccess) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background p-4">
-        <div className="w-full max-w-md space-y-3 rounded-lg border border-border bg-surface p-6 text-center">
-          <h1 className="text-lg font-semibold text-foreground">Check your email</h1>
-          <p className="text-sm text-muted-foreground">
-            We created your workspace. Verify your email and set a password to finish signing up.
-          </p>
-          <Link to="/" className="inline-block text-sm font-medium text-primary">
-            Go to sign in →
-          </Link>
-        </div>
-      </div>
+      <AuthLayout title="Check your email" subtitle="Your workspace is ready.">
+        <p className="text-sm text-muted-foreground">
+          We created your workspace. Verify your email and set a password to finish signing up.
+        </p>
+        <Link
+          to="/"
+          className="mt-6 block w-full rounded-md bg-primary px-3 py-2.5 text-center text-sm font-medium text-white transition hover:opacity-90"
+        >
+          Go to sign in
+        </Link>
+      </AuthLayout>
     );
   }
 
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <form
-        onSubmit={submit}
-        className="w-full max-w-md space-y-4 rounded-lg border border-border bg-surface p-6"
-      >
-        <div>
-          <h1 className="text-lg font-semibold text-foreground">Create your workspace</h1>
-          <p className="text-xs text-muted-foreground">Start a new live-rack organization.</p>
-        </div>
+  const field =
+    "w-full rounded-md border border-border bg-surface px-3 py-2.5 text-sm text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20";
 
+  return (
+    <AuthLayout title="Create your workspace" subtitle="Start a new live-rack organization.">
+      <form onSubmit={submit} className="space-y-4">
         <label className="block text-sm">
-          <span className="mb-1 block text-muted-foreground">Company</span>
+          <span className="mb-1.5 block font-medium text-foreground">Company</span>
           <input
             type="text"
             required
             value={company}
             onChange={(e) => setCompany(e.target.value)}
             placeholder="Acme Co"
-            className="w-full rounded border border-border bg-background px-3 py-2 text-sm text-foreground"
+            className={field}
           />
         </label>
 
         <label className="block text-sm">
-          <span className="mb-1 block text-muted-foreground">Work email</span>
+          <span className="mb-1.5 block font-medium text-foreground">Work email</span>
           <input
             type="email"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@company.com"
-            className="w-full rounded border border-border bg-background px-3 py-2 text-sm text-foreground"
+            className={field}
           />
         </label>
 
         <label className="block text-sm">
-          <span className="mb-1 block text-muted-foreground">Your name</span>
+          <span className="mb-1.5 block font-medium text-foreground">Your name</span>
           <input
             type="text"
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
             placeholder="Ada Lovelace"
-            className="w-full rounded border border-border bg-background px-3 py-2 text-sm text-foreground"
+            className={field}
           />
         </label>
 
@@ -90,7 +86,7 @@ export function SignupPage() {
         <button
           type="submit"
           disabled={signup.isPending}
-          className="w-full rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+          className="w-full rounded-md bg-primary px-3 py-2.5 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
         >
           {signup.isPending ? "Creating…" : "Create workspace"}
         </button>
@@ -102,6 +98,6 @@ export function SignupPage() {
           </Link>
         </p>
       </form>
-    </div>
+    </AuthLayout>
   );
 }

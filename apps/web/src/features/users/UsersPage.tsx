@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { useAuth } from "react-oidc-context";
 import { InviteUserModal } from "./InviteUserModal";
 import {
   PERMISSION_MATRIX,
   ROLE_COLUMNS,
   canInvite,
+  hasMfa,
   initials,
   useCapabilities,
   useUsers,
@@ -42,9 +44,11 @@ function UserRow({ u }: { u: OrgUser }) {
 export function UsersPage() {
   const usersQuery = useUsers();
   const me = useCapabilities();
+  const auth = useAuth();
   const users = usersQuery.data ?? [];
   const [inviting, setInviting] = useState(false);
   const showInvite = canInvite(me.data);
+  const mfaOn = hasMfa(auth.user?.profile);
 
   return (
     <div className="flex h-full flex-col">
@@ -53,7 +57,7 @@ export function UsersPage() {
           <h1 className="text-lg font-semibold text-foreground">Users &amp; Access</h1>
           <p className="text-xs text-muted-foreground">
             {users.length} members
-            {me.data ? ` · you: ${me.data.role}${me.data.mfa_verified ? " · 2FA on" : ""}` : ""}
+            {me.data ? ` · you: ${me.data.role}${mfaOn ? " · 2FA on" : ""}` : ""}
           </p>
         </div>
         {showInvite && (

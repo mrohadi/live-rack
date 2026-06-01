@@ -109,11 +109,13 @@ func TestInvite_NonAdminForbidden(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, rec.Code)
 }
 
-func TestInvite_AdminWithoutMFAForbidden(t *testing.T) {
-	p := &domain.Principal{UserID: uuid.New(), OrgID: uuid.New(), Role: domain.RoleAdmin, MFAVerified: false}
+func TestInvite_AdminWithoutTokenMFAStillAllowed(t *testing.T) {
+	// Access tokens carry no amr; MFA is enforced at the IdP login policy, so the
+	// gateway authorizes on the admin role alone.
+	p := &domain.Principal{UserID: uuid.New(), OrgID: uuid.New(), IDPOrgID: "zid-org-1", Role: domain.RoleAdmin, MFAVerified: false}
 	rec, _, _ := serveInvite(t, p, http.MethodPost, "/api/v1/users/invite",
 		`{"email":"x@acme.test","role":"staff"}`)
-	assert.Equal(t, http.StatusForbidden, rec.Code)
+	assert.Equal(t, http.StatusCreated, rec.Code)
 }
 
 func TestResend_AdminResends(t *testing.T) {

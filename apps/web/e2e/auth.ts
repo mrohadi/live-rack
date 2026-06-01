@@ -25,6 +25,7 @@ export async function seedOidcSession(page: Page) {
       sub: process.env.E2E_OIDC_USER_ID ?? "e2e-user",
       name: "E2E User",
       email: "e2e@localhost",
+      amr: ["pwd", "otp"],
       [ORG_CLAIM]: orgId,
       [ROLES_CLAIM]: { staff: { [orgId]: "localhost" } },
     },

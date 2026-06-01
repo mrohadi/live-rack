@@ -4,7 +4,13 @@ import { ZonePerfBars } from "../ZonePerfBars";
 import { barWidthPct, maxScans, type ZonePerf } from "../useAnalytics";
 
 const zones: ZonePerf[] = [
-  { zone_id: "aaaaaaaa-1111-2222-3333-444444444444", scans: 30, picks: 20, invalid: 2, spark: [10, 20] },
+  {
+    zone_id: "aaaaaaaa-1111-2222-3333-444444444444",
+    scans: 30,
+    picks: 20,
+    invalid: 2,
+    spark: [10, 20],
+  },
   { zone_id: "bbbbbbbb-1111-2222-3333-444444444444", scans: 15, picks: 5, invalid: 0, spark: [5] },
 ];
 

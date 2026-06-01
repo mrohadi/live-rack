@@ -15,6 +15,7 @@ import {
   relativeTime,
   useAudit,
   useCapabilities,
+  useResendInvite,
   useResetPassword,
   useRosterStats,
   useSyncMfa,
@@ -123,6 +124,7 @@ export function UsersPage() {
   const [enrolling, setEnrolling] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const resetPassword = useResetPassword();
+  const resendInvite = useResendInvite();
 
   const showInvite = canInvite(me.data);
   const mfaOn = hasMfa(auth.user?.profile);
@@ -389,6 +391,20 @@ export function UsersPage() {
                 />
 
                 <RecentActivity userId={selected.id} />
+
+                {showInvite && selected.status === "pending" && (
+                  <div className="mt-2 flex items-center justify-between gap-2 border-t border-border pt-3">
+                    <span className="text-xs text-muted-foreground">Invitation pending</span>
+                    <button
+                      type="button"
+                      disabled={resendInvite.isPending || !selected.idp_user_id}
+                      onClick={() => resendInvite.mutate(selected.idp_user_id)}
+                      className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-muted disabled:opacity-50"
+                    >
+                      {resendInvite.isSuccess ? "Invite resent ✓" : "Resend invite"}
+                    </button>
+                  </div>
+                )}
 
                 {showInvite && (
                   <div className="mt-2 flex items-center justify-between gap-2 border-t border-border pt-3">

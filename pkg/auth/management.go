@@ -39,6 +39,13 @@ type Management interface {
 	SetPassword(ctx context.Context, orgID, userID, password string) error
 	// GetLoginName returns a user's preferred login name.
 	GetLoginName(ctx context.Context, userID string) (string, error)
+	// FindUserByEmail resolves a user id from an email, or "" if none exists.
+	FindUserByEmail(ctx context.Context, email string) (string, error)
+	// SendPasswordResetCode emails a user a reset code linking to our own
+	// reset-password screen.
+	SendPasswordResetCode(ctx context.Context, userID string) error
+	// ResetPassword sets a new password using a reset verification code.
+	ResetPassword(ctx context.Context, userID, code, password string) error
 }
 
 // TokenSource yields a bearer token authorized for Zitadel management calls.
@@ -267,6 +274,45 @@ func (m *ZitadelManagement) SendPasswordReset(ctx context.Context, orgID, userID
 	return m.post(ctx,
 		fmt.Sprintf("/management/v1/users/%s/_reset_password", userID), orgID,
 		map[string]any{}, nil)
+}
+
+// FindUserByEmail resolves a user id from an email via the v2 search endpoint.
+// Returns "" (no error) when no user matches, so callers can avoid leaking
+// whether an address is registered.
+func (m *ZitadelManagement) FindUserByEmail(ctx context.Context, email string) (string, error) {
+	body := map[string]any{
+		"queries": []any{
+			map[string]any{"emailQuery": map[string]any{"emailAddress": email}},
+		},
+	}
+	var resp struct {
+		Result []struct {
+			UserID string `json:"userId"`
+		} `json:"result"`
+	}
+	if err := m.post(ctx, "/v2/users", "", body, &resp); err != nil {
+		return "", err
+	}
+	if len(resp.Result) == 0 {
+		return "", nil
+	}
+	return resp.Result[0].UserID, nil
+}
+
+// SendPasswordResetCode emails a reset code linking to our reset-password screen.
+func (m *ZitadelManagement) SendPasswordResetCode(ctx context.Context, userID string) error {
+	urlTemplate := m.appBaseURL + "/reset-password?code={{.Code}}&userID={{.UserID}}"
+	return m.post(ctx, fmt.Sprintf("/v2/users/%s/password_reset", userID), "",
+		map[string]any{"sendLink": map[string]any{"urlTemplate": urlTemplate}}, nil)
+}
+
+// ResetPassword sets a new password using the reset verification code.
+func (m *ZitadelManagement) ResetPassword(ctx context.Context, userID, code, password string) error {
+	return m.post(ctx, fmt.Sprintf("/v2/users/%s/password", userID), "",
+		map[string]any{
+			"newPassword":      map[string]any{"password": password},
+			"verificationCode": code,
+		}, nil)
 }
 
 // VerifyEmail confirms a user's email address with the code from their invite

@@ -48,6 +48,7 @@ import (
 	"github.com/live-rack/services/api/internal/login"
 	apimw "github.com/live-rack/services/api/internal/middleware"
 	"github.com/live-rack/services/api/internal/onboarding"
+	"github.com/live-rack/services/api/internal/passwordreset"
 	"github.com/live-rack/services/api/internal/pipelines"
 	"github.com/live-rack/services/api/internal/recommendations"
 	"github.com/live-rack/services/api/internal/sales"
@@ -210,6 +211,9 @@ func main() {
 
 	// Public invite acceptance — verify email + set password + enroll TOTP.
 	onboarding.New(mgmt, loginClient).Register(e)
+
+	// Public forgot/reset-password flow.
+	passwordreset.New(mgmt).Register(e)
 
 	// Authenticated API group.
 	api := e.Group("/api/v1", apimw.Auth(verifier, setSession))

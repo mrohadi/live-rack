@@ -24,6 +24,20 @@ export const routes: RouteObject[] = [
         Component: m.VerifyEmailPage,
       })),
   },
+  {
+    path: "/forgot-password",
+    lazy: () =>
+      import("./features/password/ForgotPasswordPage").then((m) => ({
+        Component: m.ForgotPasswordPage,
+      })),
+  },
+  {
+    path: "/reset-password",
+    lazy: () =>
+      import("./features/password/ResetPasswordPage").then((m) => ({
+        Component: m.ResetPasswordPage,
+      })),
+  },
   // Zitadel issues relative login redirects; if one lands on the app origin, recover to home.
   {
     path: "/ui/*",

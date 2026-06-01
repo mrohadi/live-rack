@@ -103,7 +103,7 @@ export function InviteUserModal({ onClose, onInvited }: InviteUserModalProps) {
           <button
             type="submit"
             disabled={invite.isPending}
-            className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground disabled:opacity-50"
+            className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
           >
             {invite.isPending ? "Sending…" : "Send invite"}
           </button>

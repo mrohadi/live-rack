@@ -22,14 +22,43 @@ export function InviteUserModal({ onClose, onInvited }: InviteUserModalProps) {
     e.preventDefault();
     invite.mutate(
       { email: email.trim(), display_name: displayName.trim(), role },
-      {
-        onSuccess: (r) => {
-          onInvited?.(r);
-          onClose();
-        },
-      },
+      { onSuccess: (r) => onInvited?.(r) },
     );
   };
+
+  if (invite.isSuccess) {
+    return (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Invite user"
+      >
+        <div className="w-full max-w-md space-y-4 rounded-lg border border-border bg-surface p-5 shadow-lg">
+          <div className="flex items-center gap-2">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-sm font-bold text-emerald-700">
+              ✓
+            </span>
+            <h2 className="text-base font-semibold text-foreground">Invitation sent</h2>
+          </div>
+          <p role="status" className="text-sm text-muted-foreground">
+            Verification link emailed to <strong>{invite.data.email}</strong> as{" "}
+            <strong>{invite.data.role}</strong>. They confirm the address, set a password, and enrol
+            2FA before first sign-in.
+          </p>
+          <div className="flex justify-end pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -88,7 +117,7 @@ export function InviteUserModal({ onClose, onInvited }: InviteUserModalProps) {
 
         {invite.isError && (
           <p role="alert" className="text-xs text-destructive">
-            Invite failed. Check the email and try again.
+            Invite failed: {invite.error.message}. Check the email and try again.
           </p>
         )}
 

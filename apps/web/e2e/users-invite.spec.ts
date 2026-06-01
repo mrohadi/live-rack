@@ -59,9 +59,11 @@ test.describe("Users — invite flow", () => {
     await page.getByLabel("Role").selectOption("manager");
     await page.getByRole("button", { name: "Send invite" }).click();
 
-    // Modal closes on success.
-    await expect(page.getByRole("dialog", { name: "Invite user" })).toBeHidden();
+    // Success confirmation, then dismiss.
+    await expect(page.getByText("Invitation sent")).toBeVisible();
     expect(posted).toMatchObject({ email: "new@acme.test", role: "manager" });
+    await page.getByRole("button", { name: "Done" }).click();
+    await expect(page.getByRole("dialog", { name: "Invite user" })).toBeHidden();
   });
 
   test("hides invite for non-admins", async ({ page }) => {

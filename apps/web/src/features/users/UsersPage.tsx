@@ -59,6 +59,7 @@ function StatusChip({ status }: { status: string }) {
     active: { c: "bg-success/15 text-success", label: "Active" },
     break: { c: "bg-warning/15 text-warning", label: "On break" },
     off: { c: "bg-muted text-muted-foreground", label: "Off" },
+    pending: { c: "bg-warning/15 text-warning", label: "Invited" },
   };
   const s = map[status] ?? map.off;
   return (

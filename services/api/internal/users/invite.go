@@ -11,6 +11,7 @@ import (
 	"github.com/live-rack/pkg/audit"
 	pkgauth "github.com/live-rack/pkg/auth"
 	"github.com/live-rack/pkg/domain"
+	"github.com/live-rack/pkg/store"
 )
 
 // Inviter is the Zitadel management surface invites need. *auth.ZitadelManagement
@@ -19,6 +20,13 @@ type Inviter interface {
 	CreateHumanUser(ctx context.Context, orgID, email, displayName string) (string, error)
 	GrantProjectRole(ctx context.Context, orgID, userID, role string) error
 	ResendInvite(ctx context.Context, orgID, userID string) error
+}
+
+// InviteStore persists the invitee locally so the roster shows them as pending
+// before their first login. *store.Queries satisfies it.
+type InviteStore interface {
+	CreateInvitedUser(ctx context.Context, arg store.CreateInvitedUserParams) (store.User, error)
+	BindUserRole(ctx context.Context, arg store.BindUserRoleParams) error
 }
 
 // Auditor records an append-only audit entry. *audit.Writer satisfies it.
@@ -38,12 +46,13 @@ var assignableRoles = map[string]bool{
 // InviteHandler serves admin-only user onboarding endpoints.
 type InviteHandler struct {
 	zit   Inviter
+	store InviteStore
 	audit Auditor
 }
 
 // NewInvite builds an InviteHandler.
-func NewInvite(zit Inviter, a Auditor) *InviteHandler {
-	return &InviteHandler{zit: zit, audit: a}
+func NewInvite(zit Inviter, s InviteStore, a Auditor) *InviteHandler {
+	return &InviteHandler{zit: zit, store: s, audit: a}
 }
 
 // Register mounts invite routes on the authenticated API group.
@@ -108,6 +117,23 @@ func (h *InviteHandler) Invite(c echo.Context) error {
 	}
 	if err := h.zit.GrantProjectRole(ctx, p.IDPOrgID, userID, role); err != nil {
 		return echo.NewHTTPError(http.StatusBadGateway, "grant role")
+	}
+
+	// Persist a local pending row so the roster shows the invitee before their
+	// first login (UpsertUser flips 'pending' → 'active' on first sign-in).
+	local, err := h.store.CreateInvitedUser(ctx, store.CreateInvitedUserParams{
+		OrgID:       p.OrgID,
+		IdpUserID:   userID,
+		Email:       email,
+		DisplayName: strings.TrimSpace(req.DisplayName),
+	})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "persist invite")
+	}
+	if err := h.store.BindUserRole(ctx, store.BindUserRoleParams{
+		OrgID: p.OrgID, UserID: local.ID, Name: role,
+	}); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "bind role")
 	}
 
 	_ = h.audit.Write(ctx, audit.Entry{

@@ -59,6 +59,39 @@ func (ns NullZoneType) Value() (driver.Value, error) {
 	return string(ns.ZoneType), nil
 }
 
+type AuditLog struct {
+	ID           uuid.UUID   `json:"id"`
+	Ts           time.Time   `json:"ts"`
+	OrgID        uuid.UUID   `json:"org_id"`
+	ActorUserID  pgtype.UUID `json:"actor_user_id"`
+	Action       string      `json:"action"`
+	ResourceType string      `json:"resource_type"`
+	ResourceID   string      `json:"resource_id"`
+	Metadata     []byte      `json:"metadata"`
+}
+
+type AuditLog202606 struct {
+	ID           uuid.UUID   `json:"id"`
+	Ts           time.Time   `json:"ts"`
+	OrgID        uuid.UUID   `json:"org_id"`
+	ActorUserID  pgtype.UUID `json:"actor_user_id"`
+	Action       string      `json:"action"`
+	ResourceType string      `json:"resource_type"`
+	ResourceID   string      `json:"resource_id"`
+	Metadata     []byte      `json:"metadata"`
+}
+
+type AuditLog202607 struct {
+	ID           uuid.UUID   `json:"id"`
+	Ts           time.Time   `json:"ts"`
+	OrgID        uuid.UUID   `json:"org_id"`
+	ActorUserID  pgtype.UUID `json:"actor_user_id"`
+	Action       string      `json:"action"`
+	ResourceType string      `json:"resource_type"`
+	ResourceID   string      `json:"resource_id"`
+	Metadata     []byte      `json:"metadata"`
+}
+
 type Integration struct {
 	ID         uuid.UUID `json:"id"`
 	OrgID      uuid.UUID `json:"org_id"`
@@ -174,6 +207,16 @@ type ScanEvent struct {
 	Reason    string    `json:"reason"`
 }
 
+type ServiceToken struct {
+	ID         uuid.UUID          `json:"id"`
+	OrgID      uuid.UUID          `json:"org_id"`
+	Name       string             `json:"name"`
+	TokenHash  string             `json:"token_hash"`
+	CreatedAt  time.Time          `json:"created_at"`
+	LastUsedAt pgtype.Timestamptz `json:"last_used_at"`
+	RevokedAt  pgtype.Timestamptz `json:"revoked_at"`
+}
+
 type Store struct {
 	ID        uuid.UUID     `json:"id"`
 	OrgID     uuid.UUID     `json:"org_id"`
@@ -201,14 +244,25 @@ type Task struct {
 }
 
 type User struct {
-	ID          uuid.UUID   `json:"id"`
-	OrgID       uuid.UUID   `json:"org_id"`
-	IdpUserID   string      `json:"idp_user_id"`
-	Email       string      `json:"email"`
-	DisplayName string      `json:"display_name"`
-	AvatarUrl   pgtype.Text `json:"avatar_url"`
-	CreatedAt   time.Time   `json:"created_at"`
-	UpdatedAt   time.Time   `json:"updated_at"`
+	ID          uuid.UUID          `json:"id"`
+	OrgID       uuid.UUID          `json:"org_id"`
+	IdpUserID   string             `json:"idp_user_id"`
+	Email       string             `json:"email"`
+	DisplayName string             `json:"display_name"`
+	AvatarUrl   pgtype.Text        `json:"avatar_url"`
+	CreatedAt   time.Time          `json:"created_at"`
+	UpdatedAt   time.Time          `json:"updated_at"`
+	Title       string             `json:"title"`
+	Shift       string             `json:"shift"`
+	Status      string             `json:"status"`
+	MfaEnabled  bool               `json:"mfa_enabled"`
+	LastSeenAt  pgtype.Timestamptz `json:"last_seen_at"`
+}
+
+type UserZone struct {
+	OrgID  uuid.UUID `json:"org_id"`
+	UserID uuid.UUID `json:"user_id"`
+	ZoneID uuid.UUID `json:"zone_id"`
 }
 
 type WebhooksInbound struct {

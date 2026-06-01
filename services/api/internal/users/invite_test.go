@@ -16,6 +16,7 @@ import (
 	"github.com/live-rack/pkg/audit"
 	pkgauth "github.com/live-rack/pkg/auth"
 	"github.com/live-rack/pkg/domain"
+	"github.com/live-rack/pkg/store"
 	"github.com/live-rack/services/api/internal/users"
 )
 
@@ -42,6 +43,20 @@ func (f *fakeInviter) ResendInvite(_ context.Context, _, userID string) error {
 	return nil
 }
 
+type fakeInviteStore struct {
+	createdEmail, boundRole string
+}
+
+func (f *fakeInviteStore) CreateInvitedUser(_ context.Context, arg store.CreateInvitedUserParams) (store.User, error) {
+	f.createdEmail = arg.Email
+	return store.User{ID: uuid.New(), OrgID: arg.OrgID, IdpUserID: arg.IdpUserID, Email: arg.Email}, nil
+}
+
+func (f *fakeInviteStore) BindUserRole(_ context.Context, arg store.BindUserRoleParams) error {
+	f.boundRole = arg.Name
+	return nil
+}
+
 type fakeAuditor struct{ actions []string }
 
 func (f *fakeAuditor) Write(_ context.Context, e audit.Entry) error {
@@ -53,8 +68,9 @@ func serveInvite(t *testing.T, p *domain.Principal, method, target, body string)
 	t.Helper()
 	zit := &fakeInviter{}
 	aud := &fakeAuditor{}
+	st := &fakeInviteStore{}
 	e := echo.New()
-	users.NewInvite(zit, aud).Register(e.Group("/api/v1"))
+	users.NewInvite(zit, st, aud).Register(e.Group("/api/v1"))
 	req := httptest.NewRequestWithContext(
 		pkgauth.WithPrincipal(context.Background(), p), method, target, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")

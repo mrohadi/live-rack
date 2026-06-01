@@ -75,9 +75,10 @@ func (h *MetricsHandler) Stats(c echo.Context) error {
 		coverage = s.MFAUsers * 100 / s.Members
 	}
 
-	// Pending invites come from Zitadel; degrade to 0 if the call fails.
-	pending := 0
-	if h.pending != nil && p.IDPOrgID != "" {
+	// Pending invites come from local pending rows (written at invite time). Fall
+	// back to Zitadel's count only when we have no local pending rows.
+	pending := s.Pending
+	if pending == 0 && h.pending != nil && p.IDPOrgID != "" {
 		if n, err := h.pending.PendingInvites(c.Request().Context(), p.IDPOrgID); err == nil {
 			pending = n
 		}

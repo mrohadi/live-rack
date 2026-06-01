@@ -216,7 +216,7 @@ func main() {
 	recommendations.New(q).Register(api)
 	users.New(q).Register(api)
 	users.NewMetrics(q, mgmt).Register(api)
-	users.NewInvite(mgmt, auditWriter).Register(api)
+	users.NewInvite(mgmt, q, auditWriter).Register(api)
 	users.NewAccess(q, mgmt, auditWriter).Register(api)
 	servicetokens.New(q).Register(api)
 

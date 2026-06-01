@@ -18,6 +18,16 @@ ON CONFLICT (idp_user_id) DO UPDATE
     SET email        = EXCLUDED.email,
         display_name = EXCLUDED.display_name,
         avatar_url   = EXCLUDED.avatar_url,
+        status       = CASE WHEN users.status = 'pending' THEN 'active' ELSE users.status END,
+        updated_at   = NOW()
+RETURNING *;
+
+-- name: CreateInvitedUser :one
+INSERT INTO users (org_id, idp_user_id, email, display_name, status)
+VALUES ($1, $2, $3, $4, 'pending')
+ON CONFLICT (idp_user_id) DO UPDATE
+    SET email        = EXCLUDED.email,
+        display_name = EXCLUDED.display_name,
         updated_at   = NOW()
 RETURNING *;
 

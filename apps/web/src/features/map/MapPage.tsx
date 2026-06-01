@@ -5,6 +5,7 @@ import { useCurrentStore } from "./useCurrentStore";
 import { useCreateZone, useUpdateZone, useZones, zoneKeys } from "./useZones";
 import { ZoneDetailSidebar } from "./ZoneDetailSidebar";
 import { ZoneMapView, type ZoneRect } from "./ZoneMapView";
+import { findOpenSlot, randomZoneColor } from "./zoneMath";
 import { useInventory } from "../inventory/useInventory";
 import { useScanStream } from "../../lib/useScanStream";
 import type { ScanRecorded } from "../../lib/ws";
@@ -54,15 +55,18 @@ export function MapPage() {
 
   const handleAddZone = () => {
     if (!newZoneName.trim()) return;
+    const width = 20;
+    const height = 14;
+    const { x, y } = findOpenSlot(zones, width, height);
     createZone.mutate(
       {
         name: newZoneName.trim(),
         type: "general",
-        x: 40,
-        y: 40,
-        width: 20,
-        height: 14,
-        color: "#2563eb",
+        x,
+        y,
+        width,
+        height,
+        color: randomZoneColor(),
         capacity: 100,
       },
       {

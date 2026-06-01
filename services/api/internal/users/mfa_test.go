@@ -46,7 +46,7 @@ func (f *fakeMFAStore) SetUserMFA(_ context.Context, userID, _ uuid.UUID, _ bool
 func serveMFA(t *testing.T, p *domain.Principal, e *fakeEnroller, s *fakeMFAStore, method, target, body string) *httptest.ResponseRecorder {
 	t.Helper()
 	srv := echo.New()
-	users.NewMFA(e, s).Register(srv.Group("/api/v1"))
+	users.NewMFA(e, s, &fakeAuditor{}).Register(srv.Group("/api/v1"))
 	req := httptest.NewRequestWithContext(
 		pkgauth.WithPrincipal(context.Background(), p), method, target, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")

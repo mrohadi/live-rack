@@ -13,9 +13,26 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/google/uuid"
+
+	"github.com/live-rack/pkg/audit"
 	pkgauth "github.com/live-rack/pkg/auth"
+	"github.com/live-rack/pkg/store"
 	"github.com/live-rack/services/api/internal/onboarding"
 )
+
+type fakeResolver struct{}
+
+func (fakeResolver) GetUserByIdpID(_ context.Context, _ string) (store.User, error) {
+	return store.User{ID: uuid.New(), OrgID: uuid.New()}, nil
+}
+
+type fakeAuditor struct{ actions []string }
+
+func (f *fakeAuditor) Write(_ context.Context, e audit.Entry) error {
+	f.actions = append(f.actions, e.Action)
+	return nil
+}
 
 type fakeCompleter struct {
 	verifiedUser, verifiedCode string
@@ -70,7 +87,7 @@ func (fakeChecker) CheckPassword(_ context.Context, _, _, password string) (pkga
 func serve(t *testing.T, f *fakeCompleter, path, body string) *httptest.ResponseRecorder {
 	t.Helper()
 	e := echo.New()
-	onboarding.New(f, fakeChecker{}).Register(e)
+	onboarding.New(f, fakeChecker{}, fakeResolver{}, &fakeAuditor{}).Register(e)
 	req := httptest.NewRequestWithContext(context.Background(),
 		http.MethodPost, path, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")

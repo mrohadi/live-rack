@@ -11,6 +11,9 @@ import (
 	"strings"
 
 	"github.com/labstack/echo/v4"
+
+	"github.com/live-rack/pkg/audit"
+	"github.com/live-rack/pkg/store"
 )
 
 // Resetter is the Zitadel surface the flow needs.
@@ -21,14 +24,27 @@ type Resetter interface {
 	ResetPassword(ctx context.Context, userID, code, password string) error
 }
 
+// Resolver maps an IdP user id to the local user (for audit attribution).
+// *store.Queries satisfies it.
+type Resolver interface {
+	GetUserByIdpID(ctx context.Context, idpUserID string) (store.User, error)
+}
+
+// Auditor records an append-only audit entry. *audit.Writer satisfies it.
+type Auditor interface {
+	Write(ctx context.Context, e audit.Entry) error
+}
+
 // Handler serves the public forgot/reset-password endpoints.
 type Handler struct {
-	zit Resetter
+	zit      Resetter
+	resolver Resolver
+	audit    Auditor
 }
 
 // New builds a Handler.
-func New(z Resetter) *Handler {
-	return &Handler{zit: z}
+func New(z Resetter, r Resolver, a Auditor) *Handler {
+	return &Handler{zit: z, resolver: r, audit: a}
 }
 
 // Register mounts the public routes on the root router (no auth middleware).
@@ -96,8 +112,19 @@ func (h *Handler) Reset(c echo.Context) error {
 	if len(req.Password) < 8 {
 		return echo.NewHTTPError(http.StatusBadRequest, "password too short")
 	}
-	if err := h.zit.ResetPassword(c.Request().Context(), userID, code, req.Password); err != nil {
+	ctx := c.Request().Context()
+	if err := h.zit.ResetPassword(ctx, userID, code, req.Password); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid or expired code")
+	}
+	// Best-effort audit attributed to the user who reset their password.
+	if u, err := h.resolver.GetUserByIdpID(ctx, userID); err == nil {
+		_ = h.audit.Write(ctx, audit.Entry{
+			OrgID:        u.OrgID,
+			ActorUserID:  u.ID,
+			Action:       "user.password_reset",
+			ResourceType: "user",
+			ResourceID:   userID,
+		})
 	}
 	return c.NoContent(http.StatusNoContent)
 }

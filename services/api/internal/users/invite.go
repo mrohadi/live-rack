@@ -81,8 +81,11 @@ func (h *InviteHandler) Invite(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
 	}
-	if !p.CanWithMFA(domain.PermEditUsers) {
-		return echo.NewHTTPError(http.StatusForbidden, "requires admin + 2FA")
+	// Authorize on the admin role. Per-request MFA is enforced at the Zitadel
+	// login policy: the access token carries no amr claim (it lives only in the
+	// ID token), so the gateway cannot re-verify a second factor here.
+	if !domain.Can(p.Role, domain.PermEditUsers) {
+		return echo.NewHTTPError(http.StatusForbidden, "requires admin")
 	}
 
 	var req InviteRequest
@@ -133,8 +136,11 @@ func (h *InviteHandler) Resend(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
 	}
-	if !p.CanWithMFA(domain.PermEditUsers) {
-		return echo.NewHTTPError(http.StatusForbidden, "requires admin + 2FA")
+	// Authorize on the admin role. Per-request MFA is enforced at the Zitadel
+	// login policy: the access token carries no amr claim (it lives only in the
+	// ID token), so the gateway cannot re-verify a second factor here.
+	if !domain.Can(p.Role, domain.PermEditUsers) {
+		return echo.NewHTTPError(http.StatusForbidden, "requires admin")
 	}
 	userID := c.Param("id")
 	if userID == "" {

@@ -80,9 +80,20 @@ export interface InviteResult {
   status: string;
 }
 
-/** True when the caller may invite users (admin + verified second factor). Pure. */
+// mfaMethods mark a second factor in an OIDC amr claim.
+const mfaMethods = new Set(["mfa", "otp", "totp", "webauthn", "u2f", "hwk"]);
+
+/** True when the OIDC profile's amr claim shows a second factor. Pure.
+ *  amr lives in the ID token (profile), not the access token. */
+export function hasMfa(profile: Record<string, unknown> | undefined): boolean {
+  const amr = profile?.amr;
+  return Array.isArray(amr) && amr.some((m) => mfaMethods.has(String(m).toLowerCase()));
+}
+
+/** True when the caller may invite users. Authorizes on the admin role; MFA is
+ *  enforced at the Zitadel login policy (the access token carries no amr). Pure. */
 export function canInvite(caps: Capabilities | undefined): boolean {
-  return Boolean(caps && caps.role === "admin" && caps.mfa_verified);
+  return Boolean(caps && caps.role === "admin");
 }
 
 /** Invite a teammate; refreshes the roster on success. */

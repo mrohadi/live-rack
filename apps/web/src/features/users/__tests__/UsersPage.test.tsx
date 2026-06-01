@@ -4,6 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const get = vi.fn();
 vi.mock("../../../lib/api", () => ({ useApi: () => ({ get }) }));
+vi.mock("react-oidc-context", () => ({
+  useAuth: () => ({ user: { profile: { amr: ["pwd", "otp"] } } }),
+}));
 
 import { UsersPage } from "../UsersPage";
 

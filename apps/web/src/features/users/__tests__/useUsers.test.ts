@@ -4,6 +4,7 @@ import {
   PERMISSION_MATRIX,
   ROLE_COLUMNS,
   canInvite,
+  hasMfa,
   initials,
 } from "../useUsers";
 
@@ -38,11 +39,20 @@ describe("canInvite", () => {
     store_scoped: false,
     zone_scoped: false,
   };
-  it("allows only admins with a verified second factor", () => {
-    expect(canInvite({ ...base, role: "admin", mfa_verified: true })).toBe(true);
-    expect(canInvite({ ...base, role: "admin", mfa_verified: false })).toBe(false);
+  it("allows admins (MFA enforced at the IdP, not per request)", () => {
+    expect(canInvite({ ...base, role: "admin", mfa_verified: false })).toBe(true);
     expect(canInvite({ ...base, role: "manager", mfa_verified: true })).toBe(false);
     expect(canInvite(undefined)).toBe(false);
+  });
+});
+
+describe("hasMfa", () => {
+  it("detects a second factor in the amr claim", () => {
+    expect(hasMfa({ amr: ["pwd", "otp"] })).toBe(true);
+    expect(hasMfa({ amr: ["mfa"] })).toBe(true);
+    expect(hasMfa({ amr: ["pwd"] })).toBe(false);
+    expect(hasMfa({})).toBe(false);
+    expect(hasMfa(undefined)).toBe(false);
   });
 });
 

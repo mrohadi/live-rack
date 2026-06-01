@@ -28,6 +28,11 @@ type Management interface {
 	PendingInvites(ctx context.Context, orgID string) (int, error)
 	// SendPasswordReset emails a user a password-reset link.
 	SendPasswordReset(ctx context.Context, orgID, userID string) error
+	// RegisterTOTP starts authenticator enrollment for a user, returning the
+	// otpauth:// provisioning URI (for a QR code) and the shared secret.
+	RegisterTOTP(ctx context.Context, userID string) (uri, secret string, err error)
+	// VerifyTOTP confirms enrollment by validating the user's first code.
+	VerifyTOTP(ctx context.Context, userID, code string) error
 }
 
 // TokenSource yields a bearer token authorized for Zitadel management calls.
@@ -199,4 +204,28 @@ func (m *ZitadelManagement) SendPasswordReset(ctx context.Context, orgID, userID
 	return m.post(ctx,
 		fmt.Sprintf("/management/v1/users/%s/_reset_password", userID), orgID,
 		map[string]any{}, nil)
+}
+
+// RegisterTOTP starts authenticator enrollment via the v2 user service. The
+// returned uri encodes the otpauth:// provisioning string for a QR code; secret
+// is the manual-entry fallback. Enrollment is not active until VerifyTOTP.
+func (m *ZitadelManagement) RegisterTOTP(ctx context.Context, userID string) (string, string, error) {
+	var resp struct {
+		URI    string `json:"uri"`
+		Secret string `json:"secret"`
+	}
+	if err := m.post(ctx, fmt.Sprintf("/v2/users/%s/totp", userID), "",
+		map[string]any{}, &resp); err != nil {
+		return "", "", err
+	}
+	if resp.URI == "" || resp.Secret == "" {
+		return "", "", fmt.Errorf("zitadel: register totp returned empty uri/secret")
+	}
+	return resp.URI, resp.Secret, nil
+}
+
+// VerifyTOTP confirms authenticator enrollment with the user's first code.
+func (m *ZitadelManagement) VerifyTOTP(ctx context.Context, userID, code string) error {
+	return m.post(ctx, fmt.Sprintf("/v2/users/%s/totp/verify", userID), "",
+		map[string]any{"code": code}, nil)
 }

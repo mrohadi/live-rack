@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useAuth } from "react-oidc-context";
 import { AuditLogModal } from "./AuditLogModal";
 import { EditAccessModal } from "./EditAccessModal";
+import { Enroll2FAModal } from "./Enroll2FAModal";
 import { InviteUserModal } from "./InviteUserModal";
 import {
   PERMISSION_MATRIX,
@@ -119,6 +120,7 @@ export function UsersPage() {
   const [inviting, setInviting] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [enrolling, setEnrolling] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const resetPassword = useResetPassword();
 
@@ -186,6 +188,7 @@ export function UsersPage() {
       {inviting && <InviteUserModal onClose={() => setInviting(false)} />}
       {auditOpen && <AuditLogModal onClose={() => setAuditOpen(false)} />}
       {editing && selected && <EditAccessModal user={selected} onClose={() => setEditing(false)} />}
+      {enrolling && <Enroll2FAModal onClose={() => setEnrolling(false)} />}
 
       <div className="flex-1 space-y-4 overflow-auto p-4">
         {/* Stat cards */}
@@ -371,6 +374,14 @@ export function UsersPage() {
                         <span className="h-1.5 w-1.5 rounded-full bg-current" />
                         Enabled
                       </span>
+                    ) : me.data?.user_id === selected.id ? (
+                      <button
+                        type="button"
+                        onClick={() => setEnrolling(true)}
+                        className="text-xs font-medium text-primary hover:underline"
+                      >
+                        Set up authenticator
+                      </button>
                     ) : (
                       <span className="text-xs text-muted-foreground">Not enabled</span>
                     )

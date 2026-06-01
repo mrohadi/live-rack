@@ -145,6 +145,7 @@ func (v *ZitadelVerifier) VerifyRequest(r *http.Request) (*domain.Principal, err
 
 	return &domain.Principal{
 		UserID:      user.ID,
+		IDPUserID:   claims.Subject,
 		OrgID:       org.ID,
 		IDPOrgID:    claims.IDPOrgID,
 		Role:        role,

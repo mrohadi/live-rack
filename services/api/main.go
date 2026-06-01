@@ -229,6 +229,7 @@ func main() {
 	users.New(q).Register(api)
 	users.NewMetrics(q, mgmt).Register(api)
 	users.NewInvite(mgmt, q, auditWriter).Register(api)
+	users.NewMFA(mgmt, q).Register(api)
 	users.NewAccess(q, mgmt, auditWriter).Register(api)
 	servicetokens.New(q).Register(api)
 

@@ -123,6 +123,32 @@ export function useRosterStats() {
   });
 }
 
+export interface TotpEnrollment {
+  uri: string;
+  secret: string;
+}
+
+/** Begin authenticator enrollment: returns the otpauth URI + manual secret. */
+export function useStartTotp() {
+  const { post } = useApi();
+  return useMutation({
+    mutationFn: () => post<TotpEnrollment>("/api/v1/me/2fa/totp", {}),
+  });
+}
+
+/** Confirm authenticator enrollment with the first code; refreshes coverage. */
+export function useVerifyTotp() {
+  const { post } = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (code: string) => post<void>("/api/v1/me/2fa/totp/verify", { code }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: userKeys.list });
+      void qc.invalidateQueries({ queryKey: userKeys.stats });
+    },
+  });
+}
+
 /** Sync the caller's 2FA state (from the ID-token amr) to the server. */
 export function useSyncMfa() {
   const { post } = useApi();

@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -182,6 +183,9 @@ func main() {
 	e.Use(echomw.Logger())
 	e.Use(echomw.CORS())
 	e.Use(otelecho.Middleware("api"))
+	// Per-IP throttle on the public auth endpoints (brute-force / enumeration).
+	e.Use(apimw.AuthRateLimiter(
+		envFloat("AUTH_RATE_LIMIT_RPS", 5), envInt("AUTH_RATE_LIMIT_BURST", 10)))
 
 	// Swagger UI — no auth, dev/staging only.
 	e.GET("/swagger/*", echoSwagger.WrapHandler)
@@ -289,6 +293,26 @@ func mustEnv(key string) string {
 func envOr(key, def string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
+	}
+	return def
+}
+
+// envFloat reads a float env var, falling back to def on missing/invalid input.
+func envFloat(key string, def float64) float64 {
+	if v := os.Getenv(key); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil {
+			return f
+		}
+	}
+	return def
+}
+
+// envInt reads an int env var, falling back to def on missing/invalid input.
+func envInt(key string, def int) int {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
 	}
 	return def
 }

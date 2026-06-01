@@ -30,9 +30,7 @@ export function isRecommendation(frame: unknown): frame is Recommendation {
   if (typeof frame !== "object" || frame === null) return false;
   const f = frame as Record<string, unknown>;
   return (
-    typeof f.suggested_task === "string" &&
-    typeof f.title === "string" &&
-    typeof f.id === "string"
+    typeof f.suggested_task === "string" && typeof f.title === "string" && typeof f.id === "string"
   );
 }
 

@@ -51,7 +51,12 @@ export interface Connector {
 export const CONNECTOR_CATALOG: Connector[] = [
   { kind: "shopify", label: "Shopify", direction: "inbound", webhookPath: "/webhooks/shopify" },
   { kind: "square", label: "Square", direction: "inbound", webhookPath: "/webhooks/square" },
-  { kind: "stripe", label: "Stripe Connect", direction: "inbound", webhookPath: "/webhooks/stripe" },
+  {
+    kind: "stripe",
+    label: "Stripe Connect",
+    direction: "inbound",
+    webhookPath: "/webhooks/stripe",
+  },
   { kind: "shippo", label: "Shippo", direction: "inbound", webhookPath: "/webhooks/shippo" },
   { kind: "klaviyo", label: "Klaviyo", direction: "outbound" },
   { kind: "netsuite", label: "NetSuite", direction: "inbound", comingSoon: true },

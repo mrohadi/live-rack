@@ -15,10 +15,7 @@ function basePath(storeId: string): string {
 }
 
 /** Bucket cards by their stage position. Pure. Every stage gets an entry. */
-export function cardsByStage(
-  stagePositions: number[],
-  cards: Card[],
-): Record<number, Card[]> {
+export function cardsByStage(stagePositions: number[], cards: Card[]): Record<number, Card[]> {
   const out: Record<number, Card[]> = {};
   for (const pos of stagePositions) out[pos] = [];
   for (const c of cards) (out[c.stage_position] ??= []).push(c);

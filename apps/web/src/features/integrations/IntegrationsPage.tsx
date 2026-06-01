@@ -75,7 +75,9 @@ export function IntegrationsPage() {
                         {e.event_id}
                       </td>
                       <td className="px-3 py-2">
-                        <span className={`rounded-full px-2 py-0.5 text-xs ${statusTone(e.status)}`}>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-xs ${statusTone(e.status)}`}
+                        >
                           {e.status}
                         </span>
                       </td>

@@ -33,7 +33,9 @@ function ConnectorRow({
           )}
         </div>
         {url && (
-          <code className="mt-0.5 block truncate font-mono text-[11px] text-muted-foreground">{url}</code>
+          <code className="mt-0.5 block truncate font-mono text-[11px] text-muted-foreground">
+            {url}
+          </code>
         )}
       </div>
 
@@ -58,7 +60,10 @@ function ConnectorRow({
 /** Marketplace connectors with inbound webhook URLs and outbound push toggles. */
 export function WebhookConfig({ outboundEnabled, onToggleOutbound }: WebhookConfigProps) {
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-surface" data-testid="webhook-config">
+    <div
+      className="overflow-hidden rounded-lg border border-border bg-surface"
+      data-testid="webhook-config"
+    >
       {CONNECTOR_CATALOG.map((c) => (
         <ConnectorRow
           key={c.kind}

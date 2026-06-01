@@ -36,7 +36,7 @@ test.describe("Users — invite flow", () => {
       await route.fulfill({ json: [] });
     });
 
-    await seedOidcSession(page);
+    await seedOidcSession(page, { role: "admin" });
     await page.goto("/users");
     await page.waitForLoadState("networkidle");
   });

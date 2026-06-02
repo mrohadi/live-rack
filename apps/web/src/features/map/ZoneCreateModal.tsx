@@ -1,17 +1,18 @@
 import { useState } from "react";
 import { useToast } from "../../components/feedback/toast-context";
+import { Select } from "../../components/ui/Select";
 import { useCreateZone } from "./useZones";
 import { useCurrentStore } from "./useCurrentStore";
 import { findOpenSlot, randomZoneColor } from "./zoneMath";
 import type { Zone } from "./types";
 
-const ZONE_TYPES: Zone["type"][] = [
-  "general",
-  "frozen",
-  "returns",
-  "staging",
-  "display",
-  "checkout",
+const ZONE_TYPE_OPTIONS = [
+  { value: "general", label: "General" },
+  { value: "frozen", label: "Frozen" },
+  { value: "returns", label: "Returns" },
+  { value: "staging", label: "Staging" },
+  { value: "display", label: "Display" },
+  { value: "checkout", label: "Checkout" },
 ];
 
 interface Props {
@@ -87,22 +88,16 @@ export function ZoneCreateModal({ zones, onClose }: Props) {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. Apparel"
-            className="w-full rounded border border-border bg-background px-3 py-2 text-sm text-foreground"
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
           />
         </Field>
 
         <Field label="Type">
-          <select
+          <Select
             value={type}
-            onChange={(e) => setType(e.target.value as Zone["type"])}
-            className="w-full rounded border border-border bg-background px-3 py-2 text-sm capitalize text-foreground"
-          >
-            {ZONE_TYPES.map((t) => (
-              <option key={t} value={t} className="capitalize">
-                {t}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => setType(v as Zone["type"])}
+            options={ZONE_TYPE_OPTIONS}
+          />
         </Field>
 
         <Field label="Capacity">
@@ -111,7 +106,7 @@ export function ZoneCreateModal({ zones, onClose }: Props) {
             min={0}
             value={capacity}
             onChange={(e) => setCapacity(e.target.value)}
-            className="w-full rounded border border-border bg-background px-3 py-2 text-sm text-foreground"
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
           />
         </Field>
 
@@ -119,14 +114,14 @@ export function ZoneCreateModal({ zones, onClose }: Props) {
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md border border-border px-3 py-1.5 text-sm text-foreground hover:bg-muted"
+            className="rounded-lg border border-border px-3 py-1.5 text-sm text-foreground transition hover:bg-muted"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={createZone.isPending}
-            className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+            className="rounded-lg bg-primary px-4 py-1.5 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
           >
             {createZone.isPending ? "Creating…" : "Create zone"}
           </button>
@@ -139,7 +134,9 @@ export function ZoneCreateModal({ zones, onClose }: Props) {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block text-sm">
-      <span className="mb-1 block text-muted-foreground">{label}</span>
+      <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </span>
       {children}
     </label>
   );

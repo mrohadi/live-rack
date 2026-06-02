@@ -12,6 +12,50 @@ export function formatCents(cents: number | undefined): string {
   return `$${((cents ?? 0) / 100).toFixed(2)}`;
 }
 
+/** Quote a CSV field when it contains a comma, quote, or newline. Pure. */
+function csvField(v: string): string {
+  return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+}
+
+const CSV_HEADERS = [
+  "sku",
+  "name",
+  "category",
+  "zone",
+  "status",
+  "stock_status",
+  "velocity",
+  "qty",
+  "reorder_point",
+  "unit_price",
+  "stock_value",
+];
+
+/**
+ * Serialise inventory rows to CSV text. zoneName resolves a zone_id to a label.
+ * Prices render as plain decimals (dollars). Pure — returns the file contents.
+ */
+export function toInventoryCsv(rows: InventoryRow[], zoneName: (zoneId: string) => string): string {
+  const lines = [CSV_HEADERS.join(",")];
+  for (const r of rows) {
+    const cells = [
+      r.sku,
+      r.name,
+      r.category,
+      zoneName(r.zone_id),
+      r.status,
+      rowStockStatus(r),
+      rowVelocity(r),
+      String(r.qty),
+      String(r.reorder_point ?? 0),
+      ((r.price_cents ?? 0) / 100).toFixed(2),
+      ((r.value_cents ?? 0) / 100).toFixed(2),
+    ];
+    lines.push(cells.map(csvField).join(","));
+  }
+  return lines.join("\n");
+}
+
 /** Derive on-hand stock band from qty vs reorder point. Pure. Mirrors the API. */
 export function rowStockStatus(r: InventoryRow): StockStatus {
   if (r.stock_status) return r.stock_status;

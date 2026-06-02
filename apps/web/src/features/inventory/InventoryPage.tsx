@@ -16,6 +16,7 @@ import {
   patchInventory,
   rowStockStatus,
   rowVelocity,
+  toInventoryCsv,
   useInventory,
 } from "./useInventory";
 import { AddItemModal } from "./AddItemModal";
@@ -116,6 +117,16 @@ export function InventoryPage() {
 
   const zoneNameById = useMemo(() => Object.fromEntries(zones.map((z) => [z.id, z.name])), [zones]);
 
+  const exportCsv = () => {
+    const csv = toInventoryCsv(visible, (id) => zoneNameById[id] ?? id);
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `inventory-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   if (isLoading) {
     return <div className="p-6 text-sm text-muted-foreground">Loading inventory…</div>;
   }
@@ -145,6 +156,14 @@ export function InventoryPage() {
               className="w-40"
             />
           </div>
+          <button
+            type="button"
+            onClick={exportCsv}
+            disabled={visible.length === 0}
+            className="rounded-lg border border-border px-3 py-1.5 text-sm text-foreground transition hover:bg-muted disabled:opacity-40"
+          >
+            Export CSV
+          </button>
           <button
             type="button"
             onClick={() => setShowAdd(true)}

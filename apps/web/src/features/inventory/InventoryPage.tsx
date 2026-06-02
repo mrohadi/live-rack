@@ -11,6 +11,7 @@ import {
   ITEM_STATUSES,
   VELOCITY_BANDS,
   filterInventory,
+  formatCents,
   inventoryKeys,
   patchInventory,
   rowStockStatus,
@@ -108,6 +109,11 @@ export function InventoryPage() {
     [rows],
   );
 
+  const visibleValue = useMemo(
+    () => visible.reduce((sum, r) => sum + (r.value_cents ?? 0), 0),
+    [visible],
+  );
+
   const zoneNameById = useMemo(() => Object.fromEntries(zones.map((z) => [z.id, z.name])), [zones]);
 
   if (isLoading) {
@@ -117,7 +123,10 @@ export function InventoryPage() {
   return (
     <div className="flex h-full flex-col">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
-        <h1 className="text-lg font-semibold text-foreground">Inventory</h1>
+        <div className="flex items-baseline gap-3">
+          <h1 className="text-lg font-semibold text-foreground">Inventory</h1>
+          <span className="text-xs text-muted-foreground">{formatCents(visibleValue)} on hand</span>
+        </div>
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">Zone</span>
@@ -178,6 +187,7 @@ export function InventoryPage() {
               <th className="px-2 py-1.5 font-medium">Stock</th>
               <th className="px-2 py-1.5 font-medium">Velocity</th>
               <th className="px-2 py-1.5 text-right font-medium">Qty</th>
+              <th className="px-2 py-1.5 text-right font-medium">Value</th>
               <th className="px-2 py-1.5" />
             </tr>
           </thead>
@@ -216,6 +226,9 @@ export function InventoryPage() {
                 >
                   {r.qty}
                 </td>
+                <td className="px-2 py-1.5 text-right text-muted-foreground">
+                  {formatCents(r.value_cents)}
+                </td>
                 <td className="px-2 py-1.5 text-right">
                   <button
                     type="button"
@@ -233,7 +246,7 @@ export function InventoryPage() {
             ))}
             {visible.length === 0 && (
               <tr>
-                <td colSpan={9} className="p-4 text-center text-muted-foreground">
+                <td colSpan={10} className="p-4 text-center text-muted-foreground">
                   No stock matches the current filters.
                 </td>
               </tr>

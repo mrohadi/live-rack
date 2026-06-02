@@ -7,6 +7,11 @@ export const ITEM_STATUSES: ItemStatus[] = ["active", "discontinued", "recalled"
 export const VELOCITY_BANDS: VelocityBand[] = ["hot", "warm", "cold", "dead"];
 export const STOCK_STATUSES: StockStatus[] = ["in_stock", "low", "out"];
 
+/** Format integer cents as a USD string. Pure. */
+export function formatCents(cents: number | undefined): string {
+  return `$${((cents ?? 0) / 100).toFixed(2)}`;
+}
+
 /** Derive on-hand stock band from qty vs reorder point. Pure. Mirrors the API. */
 export function rowStockStatus(r: InventoryRow): StockStatus {
   if (r.stock_status) return r.stock_status;
@@ -87,6 +92,8 @@ export interface AddItemBody {
   qty: number;
   /** Restock trigger threshold; 0 disables (LR-305). */
   reorder_point?: number;
+  /** Unit price in integer cents (LR-309). */
+  price_cents?: number;
 }
 
 /** Add or adjust an item's qty in a zone. */
@@ -124,6 +131,7 @@ export interface EditItemBody {
   category: string;
   status: string;
   reorder_point: number;
+  price_cents: number;
 }
 
 function invalidateItem(qc: ReturnType<typeof useQueryClient>, storeId: string, sku: string) {

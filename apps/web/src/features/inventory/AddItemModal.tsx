@@ -33,6 +33,7 @@ export function AddItemModal({ defaultZoneId, onClose }: Props) {
   const [zoneId, setZoneId] = useState(defaultZoneId ?? "");
   const [qty, setQty] = useState(1);
   const [reorderPoint, setReorderPoint] = useState(0);
+  const [price, setPrice] = useState("");
 
   const zoneOptions = zones.map((z) => ({ value: z.id, label: z.name }));
 
@@ -48,6 +49,7 @@ export function AddItemModal({ defaultZoneId, onClose }: Props) {
         status,
         qty,
         reorder_point: reorderPoint,
+        price_cents: Math.max(0, Math.round(Number(price) * 100)) || 0,
       },
       {
         onSuccess: () => {
@@ -145,6 +147,18 @@ export function AddItemModal({ defaultZoneId, onClose }: Props) {
             value={reorderPoint}
             onChange={(e) => setReorderPoint(Math.max(0, Number(e.target.value)))}
             placeholder="auto-restock when qty ≤ this"
+            className={INPUT}
+          />
+        </Field>
+
+        <Field label="Unit price ($)">
+          <input
+            type="number"
+            min={0}
+            step="0.01"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            placeholder="0.00"
             className={INPUT}
           />
         </Field>

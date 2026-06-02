@@ -100,6 +100,7 @@ SELECT
     COALESCE(i.category, '')  AS category,
     COALESCE(i.status, '')    AS status,
     COALESCE(i.reorder_point, 0)::int AS reorder_point,
+    COALESCE(i.price_cents, 0)::int   AS price_cents,
     COALESCE((
         SELECT count(*) FROM scan_events se
         WHERE se.org_id = il.org_id AND se.zone_id = il.zone_id AND se.sku = il.sku
@@ -135,6 +136,7 @@ type ListInventoryByStoreRow struct {
 	Category     string    `json:"category"`
 	Status       string    `json:"status"`
 	ReorderPoint int32     `json:"reorder_point"`
+	PriceCents   int32     `json:"price_cents"`
 	Picks7d      int32     `json:"picks_7d"`
 	Picks30d     int32     `json:"picks_30d"`
 }
@@ -160,6 +162,7 @@ func (q *Queries) ListInventoryByStore(ctx context.Context, arg ListInventoryByS
 			&i.Category,
 			&i.Status,
 			&i.ReorderPoint,
+			&i.PriceCents,
 			&i.Picks7d,
 			&i.Picks30d,
 		); err != nil {

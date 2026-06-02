@@ -21,6 +21,9 @@ type Store interface {
 	UpsertItem(ctx context.Context, arg store.UpsertItemParams) (store.Item, error)
 	AdjustItemLocationQty(ctx context.Context, arg store.AdjustItemLocationQtyParams) (store.ItemLocation, error)
 	DecrementItemLocationQty(ctx context.Context, arg store.DecrementItemLocationQtyParams) (store.ItemLocation, error)
+	GetItemBySKU(ctx context.Context, arg store.GetItemBySKUParams) (store.Item, error)
+	ListItemLocationsBySKU(ctx context.Context, arg store.ListItemLocationsBySKUParams) ([]store.ListItemLocationsBySKURow, error)
+	ListScanEventsBySKU(ctx context.Context, arg store.ListScanEventsBySKUParams) ([]store.ScanEvent, error)
 }
 
 // Handler serves inventory endpoints.
@@ -38,6 +41,7 @@ func (h *Handler) Register(g *echo.Group) {
 	g.GET("/:storeID/inventory", h.List)
 	g.POST("/:storeID/inventory", h.Add)
 	g.POST("/:storeID/inventory/transfer", h.Transfer)
+	g.GET("/:storeID/inventory/:sku", h.Detail)
 }
 
 // Row is one on-hand line returned to the client.
@@ -293,5 +297,133 @@ func (h *Handler) Transfer(c echo.Context) error {
 		FromZoneID: fromZone,
 		ToZoneID:   toZone,
 		Qty:        req.Qty,
+	})
+}
+
+const detailScanLimit = 20
+
+// LocationRow is one zone's on-hand line in the item detail view.
+type LocationRow struct {
+	ZoneID      uuid.UUID `json:"zone_id"`
+	ZoneName    string    `json:"zone_name"`
+	Qty         int32     `json:"qty"`
+	StockStatus string    `json:"stock_status"`
+	UpdatedAt   string    `json:"updated_at"`
+}
+
+// ScanRow is one scan-timeline entry in the item detail view.
+type ScanRow struct {
+	TS        string `json:"ts"`
+	ZoneID    string `json:"zone_id"`
+	ScannerID string `json:"scanner_id"`
+	Action    string `json:"action"`
+	Valid     bool   `json:"valid"`
+	Reason    string `json:"reason,omitempty"`
+}
+
+// DetailResponse is the full item drawer payload.
+type DetailResponse struct {
+	SKU          string        `json:"sku"`
+	Name         string        `json:"name"`
+	Category     string        `json:"category"`
+	Status       string        `json:"status"`
+	ReorderPoint int32         `json:"reorder_point"`
+	TotalQty     int32         `json:"total_qty"`
+	StockStatus  string        `json:"stock_status"`
+	Locations    []LocationRow `json:"locations"`
+	RecentScans  []ScanRow     `json:"recent_scans"`
+}
+
+// Detail godoc
+//
+//	@Summary		Item detail — per-zone on-hand + recent scan timeline
+//	@Tags			inventory
+//	@Produce		json
+//	@Param			storeID	path		string	true	"Store UUID"
+//	@Param			sku		path		string	true	"SKU"
+//	@Success		200		{object}	DetailResponse
+//	@Failure		400		{object}	map[string]string
+//	@Failure		404		{object}	map[string]string
+//	@Router			/stores/{storeID}/inventory/{sku} [get]
+func (h *Handler) Detail(c echo.Context) error {
+	p, err := pkgauth.PrincipalFrom(c.Request().Context())
+	if err != nil {
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
+	}
+
+	storeID, err := uuid.Parse(c.Param("storeID"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid store id")
+	}
+	sku := c.Param("sku")
+	if sku == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "sku required")
+	}
+
+	ctx := c.Request().Context()
+
+	item, err := h.q.GetItemBySKU(ctx, store.GetItemBySKUParams{OrgID: p.OrgID, Sku: sku})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusNotFound, "item not found")
+		}
+		return echo.NewHTTPError(http.StatusInternalServerError, "get item")
+	}
+
+	locs, err := h.q.ListItemLocationsBySKU(ctx, store.ListItemLocationsBySKUParams{
+		OrgID:   p.OrgID,
+		StoreID: storeID,
+		Sku:     sku,
+	})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "list locations")
+	}
+
+	scans, err := h.q.ListScanEventsBySKU(ctx, store.ListScanEventsBySKUParams{
+		OrgID:   p.OrgID,
+		StoreID: storeID,
+		Sku:     sku,
+		Limit:   detailScanLimit,
+	})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "list scans")
+	}
+
+	rp := int(item.ReorderPoint)
+	var total int32
+	locations := make([]LocationRow, 0, len(locs))
+	for _, l := range locs {
+		total += l.Qty
+		locations = append(locations, LocationRow{
+			ZoneID:      l.ZoneID,
+			ZoneName:    l.ZoneName,
+			Qty:         l.Qty,
+			StockStatus: string(domain.StockStatusFromQty(int(l.Qty), rp)),
+			UpdatedAt:   l.UpdatedAt.UTC().Format("2006-01-02T15:04:05Z07:00"),
+		})
+	}
+
+	recent := make([]ScanRow, 0, len(scans))
+	for _, s := range scans {
+		recent = append(recent, ScanRow{
+			TS:        s.Ts.UTC().Format("2006-01-02T15:04:05Z07:00"),
+			ZoneID:    s.ZoneID.String(),
+			ScannerID: s.ScannerID,
+			Action:    s.Action,
+			Valid:     s.Valid,
+			Reason:    s.Reason,
+		})
+	}
+
+	return c.JSON(http.StatusOK, DetailResponse{
+		SKU:          item.Sku,
+		Name:         item.Name,
+		Category:     item.Category,
+		Status:       item.Status,
+		ReorderPoint: item.ReorderPoint,
+		TotalQty:     total,
+		StockStatus:  string(domain.StockStatusFromQty(int(total), rp)),
+		Locations:    locations,
+		RecentScans:  recent,
 	})
 }

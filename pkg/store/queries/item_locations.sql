@@ -15,6 +15,18 @@ WHERE org_id = @org_id AND zone_id = @zone_id AND sku = @sku
   AND qty >= @qty::int
 RETURNING *;
 
+-- name: ListItemLocationsBySKU :many
+-- Per-zone on-hand for a single SKU across a store (item detail drawer).
+SELECT
+    il.zone_id,
+    il.qty,
+    il.updated_at,
+    COALESCE(z.name, '') AS zone_name
+FROM item_locations il
+LEFT JOIN zones z ON z.id = il.zone_id AND z.org_id = il.org_id
+WHERE il.org_id = $1 AND il.store_id = $2 AND il.sku = $3
+ORDER BY il.qty DESC;
+
 -- name: ListInventoryByStore :many
 SELECT
     il.id,

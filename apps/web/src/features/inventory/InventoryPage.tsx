@@ -19,6 +19,7 @@ import {
 } from "./useInventory";
 import { AddItemModal } from "./AddItemModal";
 import { TransferStockModal } from "./TransferStockModal";
+import { ItemDetailDrawer } from "./ItemDetailDrawer";
 
 const VELOCITY_STYLES: Record<string, string> = {
   hot: "bg-destructive/15 text-destructive",
@@ -87,6 +88,7 @@ export function InventoryPage() {
   const [stock, setStock] = useState("all");
   const [showAdd, setShowAdd] = useState(false);
   const [transferRow, setTransferRow] = useState<InventoryRow | null>(null);
+  const [detailSku, setDetailSku] = useState<string | null>(null);
 
   const zoneOptions = useMemo(
     () => [
@@ -181,7 +183,12 @@ export function InventoryPage() {
           </thead>
           <tbody>
             {visible.map((r) => (
-              <tr key={r.id} data-testid="inventory-row" className="border-t border-border">
+              <tr
+                key={r.id}
+                data-testid="inventory-row"
+                onClick={() => setDetailSku(r.sku)}
+                className="cursor-pointer border-t border-border hover:bg-muted/40"
+              >
                 <td className="px-2 py-1.5 font-mono text-xs">{r.sku}</td>
                 <td className="px-2 py-1.5 text-foreground">{r.name}</td>
                 <td className="px-2 py-1.5 text-muted-foreground">{r.category}</td>
@@ -212,7 +219,10 @@ export function InventoryPage() {
                 <td className="px-2 py-1.5 text-right">
                   <button
                     type="button"
-                    onClick={() => setTransferRow(r)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setTransferRow(r);
+                    }}
                     disabled={r.qty <= 0}
                     className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-40"
                   >
@@ -234,6 +244,7 @@ export function InventoryPage() {
 
       {showAdd && <AddItemModal onClose={() => setShowAdd(false)} />}
       {transferRow && <TransferStockModal row={transferRow} onClose={() => setTransferRow(null)} />}
+      {detailSku && <ItemDetailDrawer sku={detailSku} onClose={() => setDetailSku(null)} />}
     </div>
   );
 }

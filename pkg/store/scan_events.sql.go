@@ -89,6 +89,57 @@ func (q *Queries) GetLastScanForSKU(ctx context.Context, arg GetLastScanForSKUPa
 	return i, err
 }
 
+const listScanEventsBySKU = `-- name: ListScanEventsBySKU :many
+SELECT id, ts, org_id, store_id, zone_id, scanner_id, sku, action, valid, reason FROM scan_events
+WHERE org_id = $1 AND store_id = $2 AND sku = $3
+ORDER BY ts DESC
+LIMIT $4
+`
+
+type ListScanEventsBySKUParams struct {
+	OrgID   uuid.UUID `json:"org_id"`
+	StoreID uuid.UUID `json:"store_id"`
+	Sku     string    `json:"sku"`
+	Limit   int32     `json:"limit"`
+}
+
+// Recent scan timeline for one SKU across a store (item detail drawer).
+func (q *Queries) ListScanEventsBySKU(ctx context.Context, arg ListScanEventsBySKUParams) ([]ScanEvent, error) {
+	rows, err := q.db.Query(ctx, listScanEventsBySKU,
+		arg.OrgID,
+		arg.StoreID,
+		arg.Sku,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ScanEvent
+	for rows.Next() {
+		var i ScanEvent
+		if err := rows.Scan(
+			&i.ID,
+			&i.Ts,
+			&i.OrgID,
+			&i.StoreID,
+			&i.ZoneID,
+			&i.ScannerID,
+			&i.Sku,
+			&i.Action,
+			&i.Valid,
+			&i.Reason,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listScanEventsByZone = `-- name: ListScanEventsByZone :many
 SELECT id, ts, org_id, store_id, zone_id, scanner_id, sku, action, valid, reason FROM scan_events
 WHERE org_id = $1 AND zone_id = $2

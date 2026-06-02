@@ -18,6 +18,7 @@ import {
   useInventory,
 } from "./useInventory";
 import { AddItemModal } from "./AddItemModal";
+import { TransferStockModal } from "./TransferStockModal";
 
 const VELOCITY_STYLES: Record<string, string> = {
   hot: "bg-destructive/15 text-destructive",
@@ -85,6 +86,7 @@ export function InventoryPage() {
   const [velocity, setVelocity] = useState("all");
   const [stock, setStock] = useState("all");
   const [showAdd, setShowAdd] = useState(false);
+  const [transferRow, setTransferRow] = useState<InventoryRow | null>(null);
 
   const zoneOptions = useMemo(
     () => [
@@ -174,6 +176,7 @@ export function InventoryPage() {
               <th className="px-2 py-1.5 font-medium">Stock</th>
               <th className="px-2 py-1.5 font-medium">Velocity</th>
               <th className="px-2 py-1.5 text-right font-medium">Qty</th>
+              <th className="px-2 py-1.5" />
             </tr>
           </thead>
           <tbody>
@@ -206,11 +209,21 @@ export function InventoryPage() {
                 >
                   {r.qty}
                 </td>
+                <td className="px-2 py-1.5 text-right">
+                  <button
+                    type="button"
+                    onClick={() => setTransferRow(r)}
+                    disabled={r.qty <= 0}
+                    className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-40"
+                  >
+                    ⇄ Transfer
+                  </button>
+                </td>
               </tr>
             ))}
             {visible.length === 0 && (
               <tr>
-                <td colSpan={8} className="p-4 text-center text-muted-foreground">
+                <td colSpan={9} className="p-4 text-center text-muted-foreground">
                   No stock matches the current filters.
                 </td>
               </tr>
@@ -220,6 +233,7 @@ export function InventoryPage() {
       </div>
 
       {showAdd && <AddItemModal onClose={() => setShowAdd(false)} />}
+      {transferRow && <TransferStockModal row={transferRow} onClose={() => setTransferRow(null)} />}
     </div>
   );
 }

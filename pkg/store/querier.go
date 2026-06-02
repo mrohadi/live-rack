@@ -11,15 +11,19 @@ import (
 )
 
 type Querier interface {
+	AddPickLine(ctx context.Context, arg AddPickLineParams) (PickListLine, error)
 	AdjustItemLocationQty(ctx context.Context, arg AdjustItemLocationQtyParams) (ItemLocation, error)
 	AssignTask(ctx context.Context, arg AssignTaskParams) (Task, error)
 	BindUserRole(ctx context.Context, arg BindUserRoleParams) error
+	CancelPickList(ctx context.Context, arg CancelPickListParams) (PickList, error)
 	CompleteCycleCount(ctx context.Context, arg CompleteCycleCountParams) (CycleCount, error)
+	CompletePickList(ctx context.Context, arg CompletePickListParams) (PickList, error)
 	CountOpenTasksByTitle(ctx context.Context, arg CountOpenTasksByTitleParams) (int64, error)
 	CountZonesByStore(ctx context.Context, arg CountZonesByStoreParams) (int64, error)
 	CreateCard(ctx context.Context, arg CreateCardParams) (PipelineCard, error)
 	CreateCycleCount(ctx context.Context, arg CreateCycleCountParams) (CycleCount, error)
 	CreateInvitedUser(ctx context.Context, arg CreateInvitedUserParams) (User, error)
+	CreatePickList(ctx context.Context, arg CreatePickListParams) (PickList, error)
 	CreatePipeline(ctx context.Context, arg CreatePipelineParams) (Pipeline, error)
 	CreateSaleEvent(ctx context.Context, arg CreateSaleEventParams) (SalesEvent, error)
 	CreateScanEvent(ctx context.Context, arg CreateScanEventParams) (ScanEvent, error)
@@ -39,6 +43,7 @@ type Querier interface {
 	GetItemBySKU(ctx context.Context, arg GetItemBySKUParams) (Item, error)
 	GetLastScanForSKU(ctx context.Context, arg GetLastScanForSKUParams) (ScanEvent, error)
 	GetOrgByIdpID(ctx context.Context, idpOrgID string) (Org, error)
+	GetPickList(ctx context.Context, arg GetPickListParams) (PickList, error)
 	GetPipeline(ctx context.Context, arg GetPipelineParams) (Pipeline, error)
 	GetStore(ctx context.Context, arg GetStoreParams) (Store, error)
 	GetTask(ctx context.Context, arg GetTaskParams) (Task, error)
@@ -56,6 +61,8 @@ type Querier interface {
 	ListItemLocationsBySKU(ctx context.Context, arg ListItemLocationsBySKUParams) ([]ListItemLocationsBySKURow, error)
 	ListItems(ctx context.Context, orgID uuid.UUID) ([]Item, error)
 	ListOpenCycleCountsByStore(ctx context.Context, arg ListOpenCycleCountsByStoreParams) ([]CycleCount, error)
+	ListPickListLines(ctx context.Context, listID uuid.UUID) ([]ListPickListLinesRow, error)
+	ListPickListsByStore(ctx context.Context, arg ListPickListsByStoreParams) ([]ListPickListsByStoreRow, error)
 	ListPipelinesByStore(ctx context.Context, arg ListPipelinesByStoreParams) ([]Pipeline, error)
 	// Recent scan timeline for one SKU across a store (item detail drawer).
 	ListScanEventsBySKU(ctx context.Context, arg ListScanEventsBySKUParams) ([]ScanEvent, error)
@@ -66,6 +73,10 @@ type Querier interface {
 	ListZonesByStore(ctx context.Context, arg ListZonesByStoreParams) ([]Zone, error)
 	MarkWebhookStatus(ctx context.Context, arg MarkWebhookStatusParams) error
 	MoveCard(ctx context.Context, arg MoveCardParams) (PipelineCard, error)
+	// Best source location for a SKU: the zone holding the most on-hand units, with
+	// its map coordinates so the route can be optimised. Returns no rows when the
+	// SKU has zero on-hand anywhere in the store.
+	ResolvePickSource(ctx context.Context, arg ResolvePickSourceParams) (ResolvePickSourceRow, error)
 	SalesByDay(ctx context.Context, arg SalesByDayParams) ([]SalesByDayRow, error)
 	SalesSummary(ctx context.Context, arg SalesSummaryParams) (SalesSummaryRow, error)
 	// Fuzzy ⌘K search across items (sku + name) and zones (name) for one org.
@@ -76,8 +87,10 @@ type Querier interface {
 	// Absolute on-hand correction for one zone (shrinkage, damage, cycle count).
 	// Returns no rows when the location does not exist (caller maps to 404).
 	SetItemLocationQty(ctx context.Context, arg SetItemLocationQtyParams) (ItemLocation, error)
+	SetPickLinePicked(ctx context.Context, arg SetPickLinePickedParams) (PickListLine, error)
 	// Seed one line per SKU currently on-hand in the zone, capturing system_qty.
 	SnapshotCountLines(ctx context.Context, arg SnapshotCountLinesParams) error
+	StartPickList(ctx context.Context, arg StartPickListParams) (PickList, error)
 	// Edit master-catalog fields for an existing SKU (LR-310).
 	UpdateItem(ctx context.Context, arg UpdateItemParams) (Item, error)
 	UpdateTaskStatus(ctx context.Context, arg UpdateTaskStatusParams) (Task, error)

@@ -156,6 +156,30 @@ type Org struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+type PickList struct {
+	ID          uuid.UUID          `json:"id"`
+	OrgID       uuid.UUID          `json:"org_id"`
+	StoreID     uuid.UUID          `json:"store_id"`
+	Reference   string             `json:"reference"`
+	Status      string             `json:"status"`
+	CreatedBy   pgtype.UUID        `json:"created_by"`
+	AssigneeID  pgtype.UUID        `json:"assignee_id"`
+	CreatedAt   time.Time          `json:"created_at"`
+	CompletedAt pgtype.Timestamptz `json:"completed_at"`
+}
+
+type PickListLine struct {
+	ID           uuid.UUID   `json:"id"`
+	ListID       uuid.UUID   `json:"list_id"`
+	OrgID        uuid.UUID   `json:"org_id"`
+	ZoneID       pgtype.UUID `json:"zone_id"`
+	Sku          string      `json:"sku"`
+	QtyRequested int32       `json:"qty_requested"`
+	QtyPicked    int32       `json:"qty_picked"`
+	Seq          int32       `json:"seq"`
+	Status       string      `json:"status"`
+}
+
 type Pipeline struct {
 	ID        uuid.UUID `json:"id"`
 	OrgID     uuid.UUID `json:"org_id"`

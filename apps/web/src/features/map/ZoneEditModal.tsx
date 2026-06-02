@@ -4,6 +4,9 @@ import { useUpdateZone } from "./useZones";
 import { useCurrentStore } from "./useCurrentStore";
 import type { Zone } from "./types";
 
+const INPUT =
+  "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20";
+
 interface Props {
   zone: Zone;
   onClose: () => void;
@@ -88,7 +91,7 @@ export function ZoneEditModal({ zone, onClose }: Props) {
             required
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full rounded border border-border bg-background px-3 py-2 text-sm text-foreground"
+            className={INPUT}
           />
         </Field>
 
@@ -99,11 +102,11 @@ export function ZoneEditModal({ zone, onClose }: Props) {
             min={0}
             value={capacity}
             onChange={(e) => setCapacity(e.target.value)}
-            className="w-full rounded border border-border bg-background px-3 py-2 text-sm text-foreground"
+            className={INPUT}
           />
         </Field>
 
-        <div className="border-t border-border pt-3">
+        <div className="rounded-lg border border-border p-3">
           <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Constraints
           </p>
@@ -113,17 +116,17 @@ export function ZoneEditModal({ zone, onClose }: Props) {
                 value={cats}
                 onChange={(e) => setCats(e.target.value)}
                 placeholder="e.g. frozen, apparel"
-                className="w-full rounded border border-border bg-background px-3 py-2 text-sm text-foreground"
+                className={INPUT}
               />
             </Field>
-            <Field label="Max SKUs (leave blank for unlimited)">
+            <Field label="Max SKUs (blank = unlimited)">
               <input
                 type="number"
                 min={0}
                 value={maxSKUs}
                 onChange={(e) => setMaxSKUs(e.target.value)}
                 placeholder="unlimited"
-                className="w-full rounded border border-border bg-background px-3 py-2 text-sm text-foreground"
+                className={INPUT}
               />
             </Field>
             <Field label="Climate control">
@@ -131,7 +134,7 @@ export function ZoneEditModal({ zone, onClose }: Props) {
                 value={climate}
                 onChange={(e) => setClimate(e.target.value)}
                 placeholder="e.g. refrigerated, ambient"
-                className="w-full rounded border border-border bg-background px-3 py-2 text-sm text-foreground"
+                className={INPUT}
               />
             </Field>
           </div>
@@ -141,14 +144,14 @@ export function ZoneEditModal({ zone, onClose }: Props) {
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md border border-border px-3 py-1.5 text-sm text-foreground hover:bg-muted"
+            className="rounded-lg border border-border px-3 py-1.5 text-sm text-foreground transition hover:bg-muted"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={updateZone.isPending}
-            className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+            className="rounded-lg bg-primary px-4 py-1.5 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
           >
             {updateZone.isPending ? "Saving…" : "Save changes"}
           </button>
@@ -161,7 +164,9 @@ export function ZoneEditModal({ zone, onClose }: Props) {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block text-sm">
-      <span className="mb-1 block text-muted-foreground">{label}</span>
+      <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </span>
       {children}
     </label>
   );

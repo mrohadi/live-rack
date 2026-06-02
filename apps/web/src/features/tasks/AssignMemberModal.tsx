@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useToast } from "../../components/feedback/toast-context";
+import { Select } from "../../components/ui/Select";
 import { useMembers } from "../users/useUsers";
 import { useAssignTask } from "./useTasks";
 import { useCurrentStore } from "../map/useCurrentStore";
@@ -18,6 +19,13 @@ export function AssignMemberModal({ task, onClose }: Props) {
 
   const [assigneeId, setAssigneeId] = useState(task.assignee_id ?? "");
 
+  const memberOptions = members.map((m) => ({
+    value: m.id,
+    label: m.display_name || m.email,
+    sub: m.email !== (m.display_name || m.email) ? m.email : undefined,
+    avatar: (m.display_name || m.email)[0].toUpperCase(),
+  }));
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!assigneeId) return;
@@ -32,8 +40,6 @@ export function AssignMemberModal({ task, onClose }: Props) {
       },
     );
   };
-
-  const currentMember = members.find((m) => m.id === task.assignee_id);
 
   return (
     <div
@@ -59,50 +65,37 @@ export function AssignMemberModal({ task, onClose }: Props) {
           </button>
         </div>
 
-        <div className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
-          Task: <span className="font-medium text-foreground">{task.title}</span>
+        <div className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-sm">
+          <span className="text-muted-foreground">Task</span>
+          <span className="font-medium text-foreground">{task.title}</span>
         </div>
 
-        {currentMember && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary/20 text-xs font-semibold text-primary">
-              {(currentMember.display_name || currentMember.email)[0].toUpperCase()}
-            </span>
-            Currently: {currentMember.display_name || currentMember.email}
-          </div>
-        )}
-
         <label className="block text-sm">
-          <span className="mb-1 block text-muted-foreground">Select member *</span>
-          <select
-            autoFocus
-            required
+          <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Select member *
+          </span>
+          <Select
             value={assigneeId}
-            onChange={(e) => setAssigneeId(e.target.value)}
+            onChange={setAssigneeId}
+            options={memberOptions}
+            placeholder={isLoading ? "Loading…" : "— pick a member —"}
+            searchable={members.length > 5}
             disabled={isLoading}
-            className="w-full rounded border border-border bg-background px-3 py-2 text-sm text-foreground disabled:opacity-50"
-          >
-            <option value="">— pick a member —</option>
-            {members.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.display_name || m.email}
-              </option>
-            ))}
-          </select>
+          />
         </label>
 
         <div className="flex justify-end gap-2 pt-1">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md border border-border px-3 py-1.5 text-sm text-foreground hover:bg-muted"
+            className="rounded-lg border border-border px-3 py-1.5 text-sm text-foreground transition hover:bg-muted"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={assignTask.isPending || !assigneeId}
-            className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+            className="rounded-lg bg-primary px-4 py-1.5 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
           >
             {assignTask.isPending ? "Saving…" : "Assign"}
           </button>

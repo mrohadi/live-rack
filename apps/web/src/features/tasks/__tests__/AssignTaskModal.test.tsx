@@ -53,9 +53,10 @@ describe("AssignTaskModal", () => {
     fireEvent.change(screen.getByPlaceholderText("e.g. Restock frozen section"), {
       target: { value: "Restock frozen" },
     });
-    fireEvent.change(screen.getByDisplayValue("Medium"), {
-      target: { value: "high" },
-    });
+
+    // Custom Select — open priority dropdown then click "High" option.
+    fireEvent.click(screen.getByText("Medium"));
+    fireEvent.click(screen.getByRole("option", { name: /high/i }));
 
     fireEvent.click(screen.getByRole("button", { name: "Create task" }));
 

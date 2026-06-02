@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useToast } from "../../components/feedback/toast-context";
+import { Select } from "../../components/ui/Select";
+import { DatePicker } from "../../components/ui/DatePicker";
 import { useMembers } from "../users/useUsers";
 import { useCreateTask } from "./useTasks";
 import { useCurrentStore } from "../map/useCurrentStore";
@@ -11,10 +13,25 @@ interface Props {
   onClose: () => void;
 }
 
-const PRIORITIES: { value: TaskPriority; label: string }[] = [
-  { value: "low", label: "Low" },
-  { value: "med", label: "Medium" },
-  { value: "high", label: "High" },
+const PRIORITY_OPTIONS = [
+  {
+    value: "low",
+    label: "Low",
+    badge: "low",
+    badgeClass: "bg-muted/40 text-muted-foreground",
+  },
+  {
+    value: "med",
+    label: "Medium",
+    badge: "med",
+    badgeClass: "bg-warning/15 text-warning",
+  },
+  {
+    value: "high",
+    label: "High",
+    badge: "high",
+    badgeClass: "bg-destructive/15 text-destructive",
+  },
 ];
 
 export function AssignTaskModal({ zoneId, zoneName, onClose }: Props) {
@@ -27,6 +44,16 @@ export function AssignTaskModal({ zoneId, zoneName, onClose }: Props) {
   const [priority, setPriority] = useState<TaskPriority>("med");
   const [dueAt, setDueAt] = useState("");
   const [assigneeId, setAssigneeId] = useState("");
+
+  const memberOptions = [
+    { value: "", label: "Unassigned", sub: "no assignee" },
+    ...members.map((m) => ({
+      value: m.id,
+      label: m.display_name || m.email,
+      sub: m.email !== (m.display_name || m.email) ? m.email : undefined,
+      avatar: (m.display_name || m.email)[0].toUpperCase(),
+    })),
+  ];
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,8 +100,9 @@ export function AssignTaskModal({ zoneId, zoneName, onClose }: Props) {
           </button>
         </div>
 
-        <div className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
-          Zone: <span className="font-medium text-foreground">{zoneName}</span>
+        <div className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-sm">
+          <span className="text-muted-foreground">Zone</span>
+          <span className="font-medium text-foreground">{zoneName}</span>
         </div>
 
         <Field label="Task title *">
@@ -84,60 +112,44 @@ export function AssignTaskModal({ zoneId, zoneName, onClose }: Props) {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="e.g. Restock frozen section"
-            className="w-full rounded border border-border bg-background px-3 py-2 text-sm text-foreground"
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
           />
         </Field>
 
         <Field label="Priority">
-          <select
+          <Select
             value={priority}
-            onChange={(e) => setPriority(e.target.value as TaskPriority)}
-            className="w-full rounded border border-border bg-background px-3 py-2 text-sm text-foreground"
-          >
-            {PRIORITIES.map((p) => (
-              <option key={p.value} value={p.value}>
-                {p.label}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => setPriority(v as TaskPriority)}
+            options={PRIORITY_OPTIONS}
+          />
         </Field>
 
         <Field label="Assign to (optional)">
-          <select
+          <Select
             value={assigneeId}
-            onChange={(e) => setAssigneeId(e.target.value)}
-            className="w-full rounded border border-border bg-background px-3 py-2 text-sm text-foreground"
-          >
-            <option value="">Unassigned</option>
-            {members.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.display_name || m.email}
-              </option>
-            ))}
-          </select>
+            onChange={setAssigneeId}
+            options={memberOptions}
+            placeholder="Unassigned"
+            searchable={members.length > 5}
+          />
         </Field>
 
         <Field label="Due date (optional)">
-          <input
-            type="date"
-            value={dueAt}
-            onChange={(e) => setDueAt(e.target.value)}
-            className="w-full rounded border border-border bg-background px-3 py-2 text-sm text-foreground"
-          />
+          <DatePicker value={dueAt} onChange={setDueAt} />
         </Field>
 
         <div className="flex justify-end gap-2 pt-1">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md border border-border px-3 py-1.5 text-sm text-foreground hover:bg-muted"
+            className="rounded-lg border border-border px-3 py-1.5 text-sm text-foreground transition hover:bg-muted"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={createTask.isPending}
-            className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+            className="rounded-lg bg-primary px-4 py-1.5 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
           >
             {createTask.isPending ? "Creating…" : "Create task"}
           </button>
@@ -150,7 +162,9 @@ export function AssignTaskModal({ zoneId, zoneName, onClose }: Props) {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block text-sm">
-      <span className="mb-1 block text-muted-foreground">{label}</span>
+      <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </span>
       {children}
     </label>
   );

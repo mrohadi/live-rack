@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useToast } from "../../components/feedback/toast-context";
+import { nextScanQty, resolveScan } from "./pickScan";
 import { PickRoute } from "./PickRoute";
+import { ScanConfirm } from "./ScanConfirm";
 import type { PickBoard, PickLine } from "./types";
 import {
   lineStatusLabel,
@@ -87,6 +89,31 @@ export function PickRunView({ storeId, board }: { storeId: string; board: PickBo
 
   const { done, total, pct } = pickProgress(board.lines);
   const finished = board.status === "completed" || board.status === "cancelled";
+  const picking = board.status === "picking";
+
+  const [scanMode, setScanMode] = useState(false);
+  // Cumulative scanned qty per line, surviving rapid scans between refetches.
+  const tally = useRef<Record<string, number>>({});
+
+  function handleScan(code: string) {
+    const line = resolveScan(code, board.lines);
+    if (!line) {
+      toast.error(`No pending stop for ${code}`);
+      return;
+    }
+    const current = tally.current[line.id] ?? line.qty_picked;
+    const qty = nextScanQty(current, line.qty_requested);
+    tally.current[line.id] = qty;
+    confirm.mutate(
+      { lineId: line.id, qtyPicked: qty },
+      {
+        onSuccess: () => {
+          if (qty >= line.qty_requested) toast.success(`Picked ${line.sku}`);
+        },
+        onError: () => toast.error("Failed to confirm pick"),
+      },
+    );
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -98,6 +125,18 @@ export function PickRunView({ storeId, board }: { storeId: string; board: PickBo
           <div className="text-xs text-muted-foreground capitalize">{board.status}</div>
         </div>
         <div className="flex items-center gap-2">
+          {picking && (
+            <button
+              type="button"
+              onClick={() => setScanMode((s) => !s)}
+              aria-pressed={scanMode}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium ${
+                scanMode ? "bg-primary text-white" : "border border-border text-foreground"
+              }`}
+            >
+              {scanMode ? "Scanning…" : "Scan to pick"}
+            </button>
+          )}
           {board.status === "open" && (
             <button
               type="button"
@@ -140,6 +179,8 @@ export function PickRunView({ storeId, board }: { storeId: string; board: PickBo
             <div className="h-full bg-primary transition-all" style={{ width: `${pct}%` }} />
           </div>
         </div>
+
+        {scanMode && picking && <ScanConfirm active={scanMode} onScan={handleScan} />}
 
         <PickRoute lines={board.lines} />
 

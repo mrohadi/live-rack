@@ -166,6 +166,7 @@ type PickList struct {
 	AssigneeID  pgtype.UUID        `json:"assignee_id"`
 	CreatedAt   time.Time          `json:"created_at"`
 	CompletedAt pgtype.Timestamptz `json:"completed_at"`
+	WaveID      pgtype.UUID        `json:"wave_id"`
 }
 
 type PickListLine struct {
@@ -309,6 +310,17 @@ type UserZone struct {
 	OrgID  uuid.UUID `json:"org_id"`
 	UserID uuid.UUID `json:"user_id"`
 	ZoneID uuid.UUID `json:"zone_id"`
+}
+
+type Wave struct {
+	ID          uuid.UUID          `json:"id"`
+	OrgID       uuid.UUID          `json:"org_id"`
+	StoreID     uuid.UUID          `json:"store_id"`
+	Reference   string             `json:"reference"`
+	Status      string             `json:"status"`
+	CreatedBy   pgtype.UUID        `json:"created_by"`
+	CreatedAt   time.Time          `json:"created_at"`
+	CompletedAt pgtype.Timestamptz `json:"completed_at"`
 }
 
 type WebhooksInbound struct {

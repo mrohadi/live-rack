@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { InventoryRow } from "../types";
-import { filterInventory, formatCents, rowStockStatus, rowVelocity } from "../useInventory";
+import {
+  filterInventory,
+  formatCents,
+  rowStockStatus,
+  rowVelocity,
+  toInventoryCsv,
+} from "../useInventory";
 
 function row(over: Partial<InventoryRow>): InventoryRow {
   return {
@@ -39,6 +45,29 @@ describe("formatCents", () => {
   });
   it("treats undefined as zero", () => {
     expect(formatCents(undefined)).toBe("$0.00");
+  });
+});
+
+describe("toInventoryCsv", () => {
+  const zoneName = (id: string) => (id === "z1" ? "Frozen" : id);
+
+  it("emits a header plus one line per row", () => {
+    const csv = toInventoryCsv(
+      [row({ sku: "SKU-1", qty: 4, price_cents: 250, value_cents: 1000 })],
+      zoneName,
+    );
+    const lines = csv.split("\n");
+    expect(lines[0]).toContain("sku,name,category,zone");
+    expect(lines).toHaveLength(2);
+    expect(lines[1]).toContain("SKU-1");
+    expect(lines[1]).toContain("Frozen");
+    expect(lines[1]).toContain("2.50");
+    expect(lines[1]).toContain("10.00");
+  });
+
+  it("quotes fields containing commas", () => {
+    const csv = toInventoryCsv([row({ name: "Widget, Blue" })], zoneName);
+    expect(csv).toContain('"Widget, Blue"');
   });
 });
 

@@ -54,3 +54,40 @@ describe("openScanSocket", () => {
     expect(events).toHaveLength(0);
   });
 });
+
+describe("isTaskNotification", () => {
+  it("accepts assigned and deadline frames", async () => {
+    const { isTaskNotification } = await import("../ws");
+    expect(isTaskNotification({ task_id: "t1", title: "Restock", kind: "assigned" })).toBe(true);
+    expect(isTaskNotification({ task_id: "t1", title: "Restock", kind: "deadline" })).toBe(true);
+  });
+
+  it("rejects non-task frames", async () => {
+    const { isTaskNotification } = await import("../ws");
+    expect(isTaskNotification({ sku: "X", action: "place" })).toBe(false);
+    expect(isTaskNotification({ task_id: "t1", title: "x", kind: "other" })).toBe(false);
+    expect(isTaskNotification(null)).toBe(false);
+  });
+});
+
+describe("openTaskNotificationSocket", () => {
+  it("forwards only task-notification frames", async () => {
+    const { openTaskNotificationSocket } = await import("../ws");
+    const got: unknown[] = [];
+    const close = openTaskNotificationSocket(
+      async () => "tok",
+      (n) => got.push(n),
+    );
+
+    await vi.waitFor(() => expect(FakeWebSocket.last).not.toBeNull());
+    // a scan frame must be ignored
+    FakeWebSocket.last!.onmessage?.({ data: JSON.stringify({ sku: "X", action: "place" }) });
+    // a task notification must pass
+    FakeWebSocket.last!.onmessage?.({
+      data: JSON.stringify({ task_id: "t1", title: "Restock", kind: "assigned", ts: "t" }),
+    });
+
+    expect(got).toHaveLength(1);
+    close();
+  });
+});

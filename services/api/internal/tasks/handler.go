@@ -118,10 +118,11 @@ func (h *Handler) List(c echo.Context) error {
 }
 
 type createRequest struct {
-	ZoneID   string `json:"zone_id"`
-	Title    string `json:"title"`
-	Priority string `json:"priority"`
-	DueAt    string `json:"due_at"`
+	ZoneID     string `json:"zone_id"`
+	Title      string `json:"title"`
+	Priority   string `json:"priority"`
+	DueAt      string `json:"due_at"`
+	AssigneeID string `json:"assignee_id"`
 }
 
 // Create godoc
@@ -184,6 +185,13 @@ func (h *Handler) Create(c echo.Context) error {
 			return echo.NewHTTPError(http.StatusBadRequest, "invalid due_at: must be RFC3339")
 		}
 		arg.DueAt = pgtype.Timestamptz{Time: t.UTC(), Valid: true}
+	}
+	if req.AssigneeID != "" {
+		aid, err := uuid.Parse(req.AssigneeID)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid assignee_id")
+		}
+		arg.AssigneeID = pgtype.UUID{Bytes: aid, Valid: true}
 	}
 
 	task, err := h.q.CreateTask(c.Request().Context(), arg)

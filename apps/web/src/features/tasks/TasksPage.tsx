@@ -1,15 +1,21 @@
+import { useState } from "react";
 import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { useToast } from "../../components/feedback/toast-context";
 import { useCurrentStore } from "../map/useCurrentStore";
+import { useUsers } from "../users/useUsers";
 import { KanbanColumn } from "./KanbanColumn";
-import { TASK_COLUMNS, type TaskStatus } from "./types";
+import { AssignMemberModal } from "./AssignMemberModal";
+import { TASK_COLUMNS, type Task, type TaskStatus } from "./types";
 import { groupByStatus, useMoveTask, useTasks } from "./useTasks";
 
 export function TasksPage() {
   const storeId = useCurrentStore();
   const { data: tasks = [], isLoading } = useTasks(storeId);
+  const { data: members = [] } = useUsers();
   const move = useMoveTask(storeId);
   const toast = useToast();
+
+  const [assignTask, setAssignTask] = useState<Task | null>(null);
 
   // Require a small drag distance so clicks don't trigger a move.
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
@@ -47,11 +53,15 @@ export function TasksPage() {
                 status={col.status}
                 label={col.label}
                 tasks={columns[col.status]}
+                members={members}
+                onAssign={(t) => setAssignTask(t)}
               />
             ))}
           </div>
         </DndContext>
       </div>
+
+      {assignTask && <AssignMemberModal task={assignTask} onClose={() => setAssignTask(null)} />}
     </div>
   );
 }

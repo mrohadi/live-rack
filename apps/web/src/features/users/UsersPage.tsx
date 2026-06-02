@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "react-oidc-context";
+import { useToast } from "../../components/feedback/toast-context";
 import { AuditLogModal } from "./AuditLogModal";
 import { EditAccessModal } from "./EditAccessModal";
 import { Enroll2FAModal } from "./Enroll2FAModal";
@@ -125,6 +126,7 @@ export function UsersPage() {
   const [linkCopied, setLinkCopied] = useState(false);
   const resetPassword = useResetPassword();
   const resendInvite = useResendInvite();
+  const toast = useToast();
 
   const showInvite = canInvite(me.data);
   const mfaOn = hasMfa(auth.user?.profile);
@@ -398,10 +400,15 @@ export function UsersPage() {
                     <button
                       type="button"
                       disabled={resendInvite.isPending || !selected.idp_user_id}
-                      onClick={() => resendInvite.mutate(selected.idp_user_id)}
+                      onClick={() =>
+                        resendInvite.mutate(selected.idp_user_id, {
+                          onSuccess: () => toast.success("Invite resent"),
+                          onError: () => toast.error("Failed to resend invite"),
+                        })
+                      }
                       className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-muted disabled:opacity-50"
                     >
-                      {resendInvite.isSuccess ? "Invite resent ✓" : "Resend invite"}
+                      {resendInvite.isPending ? "Sending…" : "Resend invite"}
                     </button>
                   </div>
                 )}
@@ -411,10 +418,15 @@ export function UsersPage() {
                     <button
                       type="button"
                       disabled={resetPassword.isPending || !selected.idp_user_id}
-                      onClick={() => resetPassword.mutate(selected.idp_user_id)}
+                      onClick={() =>
+                        resetPassword.mutate(selected.idp_user_id, {
+                          onSuccess: () => toast.success("Password reset email sent"),
+                          onError: () => toast.error("Failed to send reset email"),
+                        })
+                      }
                       className="text-sm font-medium text-foreground hover:underline disabled:opacity-50"
                     >
-                      {resetPassword.isSuccess ? "Reset sent ✓" : "Reset password"}
+                      {resetPassword.isPending ? "Sending…" : "Reset password"}
                     </button>
                     <button
                       type="button"

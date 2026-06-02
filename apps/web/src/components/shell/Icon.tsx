@@ -65,6 +65,13 @@ export const Icons = {
       <path d="M9 11l1.5 1.5L13 10M9 16l1.5 1.5L13 15" />
     </>
   ),
+  truck: (
+    <>
+      <path d="M1 3h11v11H1zM12 7h5l4 4v3h-9z" />
+      <circle cx="6" cy="18" r="1.6" />
+      <circle cx="17" cy="18" r="1.6" />
+    </>
+  ),
   wave: (
     <>
       <path d="M2 7h7M2 12h12M2 17h9" />

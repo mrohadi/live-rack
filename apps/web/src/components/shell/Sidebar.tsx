@@ -25,6 +25,7 @@ const NAV_SECTIONS = [
       { to: "/tasks", name: "Tasks", icon: Icons.task, badge: "6", end: false },
       { to: "/picking", name: "Picking", icon: Icons.pick, badge: null, end: false },
       { to: "/waves", name: "Waves", icon: Icons.wave, badge: null, end: false },
+      { to: "/shipments", name: "Dispatch", icon: Icons.truck, badge: null, end: false },
       { to: "/pipelines", name: "Pipelines", icon: Icons.pipe, badge: null, end: false },
     ],
   },

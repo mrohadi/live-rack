@@ -44,6 +44,7 @@ import (
 	"github.com/live-rack/services/api/internal/analytics"
 	"github.com/live-rack/services/api/internal/authadapter"
 	"github.com/live-rack/services/api/internal/billing"
+	"github.com/live-rack/services/api/internal/counts"
 	integrationsapi "github.com/live-rack/services/api/internal/integrations"
 	"github.com/live-rack/services/api/internal/inventory"
 	"github.com/live-rack/services/api/internal/login"
@@ -225,6 +226,7 @@ func main() {
 	zones.New(q).Register(api.Group("/stores"))
 	scans.New(q, q, q, q, publisher).Register(api.Group("/stores"))
 	inventory.New(q, auditWriter).Register(api.Group("/stores"))
+	counts.New(q, auditWriter).Register(api.Group("/stores"))
 	tasks.New(q, publisher).Register(api.Group("/stores"))
 	pipelines.New(q, publisher).Register(api.Group("/stores"))
 	sales.New(q).Register(api)

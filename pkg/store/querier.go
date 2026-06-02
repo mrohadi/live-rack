@@ -14,9 +14,11 @@ type Querier interface {
 	AdjustItemLocationQty(ctx context.Context, arg AdjustItemLocationQtyParams) (ItemLocation, error)
 	AssignTask(ctx context.Context, arg AssignTaskParams) (Task, error)
 	BindUserRole(ctx context.Context, arg BindUserRoleParams) error
+	CompleteCycleCount(ctx context.Context, arg CompleteCycleCountParams) (CycleCount, error)
 	CountOpenTasksByTitle(ctx context.Context, arg CountOpenTasksByTitleParams) (int64, error)
 	CountZonesByStore(ctx context.Context, arg CountZonesByStoreParams) (int64, error)
 	CreateCard(ctx context.Context, arg CreateCardParams) (PipelineCard, error)
+	CreateCycleCount(ctx context.Context, arg CreateCycleCountParams) (CycleCount, error)
 	CreateInvitedUser(ctx context.Context, arg CreateInvitedUserParams) (User, error)
 	CreatePipeline(ctx context.Context, arg CreatePipelineParams) (Pipeline, error)
 	CreateSaleEvent(ctx context.Context, arg CreateSaleEventParams) (SalesEvent, error)
@@ -32,6 +34,7 @@ type Querier interface {
 	DeleteTask(ctx context.Context, arg DeleteTaskParams) error
 	DeleteZone(ctx context.Context, arg DeleteZoneParams) error
 	GetCard(ctx context.Context, arg GetCardParams) (PipelineCard, error)
+	GetCycleCount(ctx context.Context, arg GetCycleCountParams) (CycleCount, error)
 	GetIntegration(ctx context.Context, arg GetIntegrationParams) (Integration, error)
 	GetItemBySKU(ctx context.Context, arg GetItemBySKUParams) (Item, error)
 	GetLastScanForSKU(ctx context.Context, arg GetLastScanForSKUParams) (ScanEvent, error)
@@ -45,12 +48,14 @@ type Querier interface {
 	GetZone(ctx context.Context, arg GetZoneParams) (Zone, error)
 	InsertInboundWebhook(ctx context.Context, arg InsertInboundWebhookParams) (WebhooksInbound, error)
 	ListCardsByPipeline(ctx context.Context, arg ListCardsByPipelineParams) ([]PipelineCard, error)
+	ListCountLines(ctx context.Context, countID uuid.UUID) ([]CycleCountLine, error)
 	ListInboundWebhooks(ctx context.Context, arg ListInboundWebhooksParams) ([]WebhooksInbound, error)
 	ListIntegrations(ctx context.Context, orgID uuid.UUID) ([]ListIntegrationsRow, error)
 	ListInventoryByStore(ctx context.Context, arg ListInventoryByStoreParams) ([]ListInventoryByStoreRow, error)
 	// Per-zone on-hand for a single SKU across a store (item detail drawer).
 	ListItemLocationsBySKU(ctx context.Context, arg ListItemLocationsBySKUParams) ([]ListItemLocationsBySKURow, error)
 	ListItems(ctx context.Context, orgID uuid.UUID) ([]Item, error)
+	ListOpenCycleCountsByStore(ctx context.Context, arg ListOpenCycleCountsByStoreParams) ([]CycleCount, error)
 	ListPipelinesByStore(ctx context.Context, arg ListPipelinesByStoreParams) ([]Pipeline, error)
 	// Recent scan timeline for one SKU across a store (item detail drawer).
 	ListScanEventsBySKU(ctx context.Context, arg ListScanEventsBySKUParams) ([]ScanEvent, error)
@@ -67,9 +72,12 @@ type Querier interface {
 	// Trigram similarity ranks fuzzy hits; ILIKE catches short substrings GIN trigram
 	// can still serve. Results ordered by best score, capped by max_results.
 	SearchEntities(ctx context.Context, arg SearchEntitiesParams) ([]SearchEntitiesRow, error)
+	SetCountedQty(ctx context.Context, arg SetCountedQtyParams) (CycleCountLine, error)
 	// Absolute on-hand correction for one zone (shrinkage, damage, cycle count).
 	// Returns no rows when the location does not exist (caller maps to 404).
 	SetItemLocationQty(ctx context.Context, arg SetItemLocationQtyParams) (ItemLocation, error)
+	// Seed one line per SKU currently on-hand in the zone, capturing system_qty.
+	SnapshotCountLines(ctx context.Context, arg SnapshotCountLinesParams) error
 	// Edit master-catalog fields for an existing SKU (LR-310).
 	UpdateItem(ctx context.Context, arg UpdateItemParams) (Item, error)
 	UpdateTaskStatus(ctx context.Context, arg UpdateTaskStatusParams) (Task, error)

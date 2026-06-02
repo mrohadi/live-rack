@@ -264,6 +264,28 @@ type ServiceToken struct {
 	RevokedAt  pgtype.Timestamptz `json:"revoked_at"`
 }
 
+type Shipment struct {
+	ID             uuid.UUID          `json:"id"`
+	OrgID          uuid.UUID          `json:"org_id"`
+	StoreID        uuid.UUID          `json:"store_id"`
+	PickListID     pgtype.UUID        `json:"pick_list_id"`
+	Reference      string             `json:"reference"`
+	Carrier        string             `json:"carrier"`
+	TrackingNumber string             `json:"tracking_number"`
+	Status         string             `json:"status"`
+	CreatedBy      pgtype.UUID        `json:"created_by"`
+	CreatedAt      time.Time          `json:"created_at"`
+	DispatchedAt   pgtype.Timestamptz `json:"dispatched_at"`
+}
+
+type ShipmentItem struct {
+	ID         uuid.UUID `json:"id"`
+	ShipmentID uuid.UUID `json:"shipment_id"`
+	OrgID      uuid.UUID `json:"org_id"`
+	Sku        string    `json:"sku"`
+	Qty        int32     `json:"qty"`
+}
+
 type Store struct {
 	ID        uuid.UUID     `json:"id"`
 	OrgID     uuid.UUID     `json:"org_id"`

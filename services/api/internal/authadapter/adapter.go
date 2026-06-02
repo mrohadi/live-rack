@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	pkgauth "github.com/live-rack/pkg/auth"
+	"github.com/live-rack/pkg/domain"
 	"github.com/live-rack/pkg/store"
 )
 
@@ -16,6 +17,16 @@ type Adapter struct {
 }
 
 func New(q *store.Queries) *Adapter { return &Adapter{q: q} }
+
+// ResolveServiceToken implements pkgauth.ServiceTokenLookup: it maps a token
+// hash to a service principal (the token id doubles as the principal user id).
+func (a *Adapter) ResolveServiceToken(ctx context.Context, hash string) (*domain.Principal, error) {
+	row, err := a.q.ResolveServiceToken(ctx, hash)
+	if err != nil {
+		return nil, err
+	}
+	return &domain.Principal{UserID: row.ID, OrgID: row.OrgID, Role: domain.RoleService}, nil
+}
 
 func (a *Adapter) GetOrgByIdpID(ctx context.Context, idpOrgID string) (pkgauth.OrgRow, error) {
 	org, err := a.q.GetOrgByIdpID(ctx, idpOrgID)

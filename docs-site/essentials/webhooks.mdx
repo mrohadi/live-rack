@@ -1,0 +1,27 @@
+---
+title: Webhooks
+description: "Inbound connectors and signature verification."
+---
+
+## Inbound endpoints
+
+| Connector | Path | Verification |
+|---|---|---|
+| Shopify | `/webhooks/shopify` | base64 HMAC-SHA256 of body |
+| Square | `/webhooks/square` | HMAC over URL + body |
+| Stripe | `/webhooks/stripe` | `Stripe-Signature` over `<t>.<body>` |
+| Shippo | `/webhooks/shippo` | shared `X-Shippo-Token` |
+| Billing | `/webhooks/billing` | Stripe signature → plan change |
+
+All inbound bodies must be raw bytes — any proxy that reformats JSON breaks the
+HMAC. Idempotency uses the vendor's event id, so safe to replay.
+
+## Outbound
+
+**Klaviyo** receives a "Placed Order" event per sale. Toggle outbound per
+connector on the Integrations screen.
+
+<Warning>
+NetSuite is a registered skeleton (coming soon) and rejects webhooks until
+implemented.
+</Warning>

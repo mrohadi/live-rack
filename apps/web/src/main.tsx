@@ -7,6 +7,7 @@ import { RouterProvider, createBrowserRouter } from "react-router-dom";
 import "./styles/index.css";
 import { routes } from "./routes";
 import { ToastProvider } from "./components/feedback/toast";
+import { ConfirmProvider } from "./components/feedback/confirm";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -41,7 +42,9 @@ createRoot(document.getElementById("root")!).render(
     <AuthProvider {...oidcConfig}>
       <QueryClientProvider client={queryClient}>
         <ToastProvider>
-          <RouterProvider router={router} />
+          <ConfirmProvider>
+            <RouterProvider router={router} />
+          </ConfirmProvider>
         </ToastProvider>
       </QueryClientProvider>
     </AuthProvider>

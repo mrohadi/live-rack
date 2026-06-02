@@ -1,11 +1,19 @@
 go 1.26.3
 
 use (
+	./pkg/audit
 	./pkg/auth
+	./pkg/chstore
 	./pkg/domain
 	./pkg/events
+	./pkg/insight
+	./pkg/integrations
 	./pkg/observability
 	./pkg/store
 	./scripts/seed
 	./services/api
+	./services/ingest
+	./services/insight
+	./services/rollup
+	./services/signals
 )

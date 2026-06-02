@@ -9,8 +9,8 @@ interface Props {
   onAddItem?: (zoneId: string) => void;
 }
 
-/** Right-hand zone inspector with capacity, fill, sales, dwell, misplaced, last
- *  scan, constraint chips, and Open / Add item / Assign task actions. */
+/** Right-hand zone inspector: capacity, fill, sales, dwell, misplaced, last
+ *  scan, and constraint chips, with Open / Add item / Assign task actions. */
 export function ZoneDetailSidebar({ zone, onRename, onDelete, onOpen, onAddItem }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
@@ -128,7 +128,7 @@ export function ZoneDetailSidebar({ zone, onRename, onDelete, onOpen, onAddItem 
       </div>
 
       <div className="flex flex-col gap-2 border-t border-border p-4">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between gap-2">
           <button
             type="button"
             onClick={() => onOpen?.(zone.id)}
@@ -138,7 +138,7 @@ export function ZoneDetailSidebar({ zone, onRename, onDelete, onOpen, onAddItem 
           </button>
           <button
             type="button"
-            className="ml-auto rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white transition hover:opacity-90"
+            className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white transition hover:opacity-90"
           >
             Assign task
           </button>

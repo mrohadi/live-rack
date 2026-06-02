@@ -1,5 +1,6 @@
 import { useAuth } from "react-oidc-context";
 import { NavLink } from "react-router-dom";
+import { isAdmin } from "../../lib/roles";
 import { BrandMark } from "./BrandMark";
 import { Icon, Icons } from "./Icon";
 
@@ -30,7 +31,14 @@ const NAV_SECTIONS = [
     items: [
       { to: "/analytics", name: "Analytics", icon: Icons.chart, badge: null, end: false },
       { to: "/integrations", name: "Integrations", icon: Icons.plug, badge: "7", end: false },
-      { to: "/users", name: "Users & Access", icon: Icons.user, badge: null, end: false },
+      {
+        to: "/users",
+        name: "Users & Access",
+        icon: Icons.user,
+        badge: null,
+        end: false,
+        adminOnly: true,
+      },
     ],
   },
 ] as const;
@@ -38,6 +46,7 @@ const NAV_SECTIONS = [
 export function Sidebar({ accent = "#2563eb", onNavigate }: SidebarProps) {
   const auth = useAuth();
   const profile = auth.user?.profile;
+  const admin = isAdmin(profile);
   const fullName = (profile?.name as string | undefined) ?? "";
   const email = (profile?.email as string | undefined) ?? "";
   const initials =
@@ -59,19 +68,21 @@ export function Sidebar({ accent = "#2563eb", onNavigate }: SidebarProps) {
       {NAV_SECTIONS.map((section) => (
         <div className="nav-section" key={section.label}>
           <div className="nav-label">{section.label}</div>
-          {section.items.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              onClick={onNavigate}
-              className={({ isActive }) => `nav-item${isActive ? " active" : ""}`}
-            >
-              <Icon d={item.icon} />
-              <span>{item.name}</span>
-              {item.badge && <span className="nav-badge">{item.badge}</span>}
-            </NavLink>
-          ))}
+          {section.items
+            .filter((item) => admin || !("adminOnly" in item && item.adminOnly))
+            .map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                onClick={onNavigate}
+                className={({ isActive }) => `nav-item${isActive ? " active" : ""}`}
+              >
+                <Icon d={item.icon} />
+                <span>{item.name}</span>
+                {item.badge && <span className="nav-badge">{item.badge}</span>}
+              </NavLink>
+            ))}
         </div>
       ))}
 
@@ -82,6 +93,30 @@ export function Sidebar({ accent = "#2563eb", onNavigate }: SidebarProps) {
             <div className="user-name">{fullName || "—"}</div>
             <div className="user-role">{email}</div>
           </div>
+          <button
+            type="button"
+            aria-label="Sign out"
+            title="Sign out"
+            onClick={() => {
+              void auth.signoutRedirect();
+            }}
+            className="ml-auto rounded-md p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+          </button>
         </div>
       </div>
     </aside>

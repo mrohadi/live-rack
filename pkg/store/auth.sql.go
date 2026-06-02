@@ -29,6 +29,49 @@ func (q *Queries) BindUserRole(ctx context.Context, arg BindUserRoleParams) erro
 	return err
 }
 
+const createInvitedUser = `-- name: CreateInvitedUser :one
+INSERT INTO users (org_id, idp_user_id, email, display_name, status)
+VALUES ($1, $2, $3, $4, 'pending')
+ON CONFLICT (idp_user_id) DO UPDATE
+    SET email        = EXCLUDED.email,
+        display_name = EXCLUDED.display_name,
+        updated_at   = NOW()
+RETURNING id, org_id, idp_user_id, email, display_name, avatar_url, created_at, updated_at, title, shift, status, mfa_enabled, last_seen_at
+`
+
+type CreateInvitedUserParams struct {
+	OrgID       uuid.UUID `json:"org_id"`
+	IdpUserID   string    `json:"idp_user_id"`
+	Email       string    `json:"email"`
+	DisplayName string    `json:"display_name"`
+}
+
+func (q *Queries) CreateInvitedUser(ctx context.Context, arg CreateInvitedUserParams) (User, error) {
+	row := q.db.QueryRow(ctx, createInvitedUser,
+		arg.OrgID,
+		arg.IdpUserID,
+		arg.Email,
+		arg.DisplayName,
+	)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.IdpUserID,
+		&i.Email,
+		&i.DisplayName,
+		&i.AvatarUrl,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Title,
+		&i.Shift,
+		&i.Status,
+		&i.MfaEnabled,
+		&i.LastSeenAt,
+	)
+	return i, err
+}
+
 const createStore = `-- name: CreateStore :one
 INSERT INTO stores (org_id, name, address, lat, lon, timezone)
 VALUES ($1, $2, $3, $4, $5, $6)
@@ -113,7 +156,7 @@ func (q *Queries) GetStore(ctx context.Context, arg GetStoreParams) (Store, erro
 }
 
 const getUserByIdpID = `-- name: GetUserByIdpID :one
-SELECT id, org_id, idp_user_id, email, display_name, avatar_url, created_at, updated_at FROM users WHERE idp_user_id = $1
+SELECT id, org_id, idp_user_id, email, display_name, avatar_url, created_at, updated_at, title, shift, status, mfa_enabled, last_seen_at FROM users WHERE idp_user_id = $1
 `
 
 func (q *Queries) GetUserByIdpID(ctx context.Context, idpUserID string) (User, error) {
@@ -128,6 +171,11 @@ func (q *Queries) GetUserByIdpID(ctx context.Context, idpUserID string) (User, e
 		&i.AvatarUrl,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Title,
+		&i.Shift,
+		&i.Status,
+		&i.MfaEnabled,
+		&i.LastSeenAt,
 	)
 	return i, err
 }
@@ -247,11 +295,12 @@ const upsertUser = `-- name: UpsertUser :one
 INSERT INTO users (org_id, idp_user_id, email, display_name, avatar_url)
 VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT (idp_user_id) DO UPDATE
-    SET email        = EXCLUDED.email,
-        display_name = EXCLUDED.display_name,
-        avatar_url   = EXCLUDED.avatar_url,
+    SET email        = COALESCE(NULLIF(EXCLUDED.email, ''), users.email),
+        display_name = COALESCE(NULLIF(EXCLUDED.display_name, ''), users.display_name),
+        avatar_url   = COALESCE(NULLIF(EXCLUDED.avatar_url, ''), users.avatar_url),
+        status       = CASE WHEN users.status = 'pending' THEN 'active' ELSE users.status END,
         updated_at   = NOW()
-RETURNING id, org_id, idp_user_id, email, display_name, avatar_url, created_at, updated_at
+RETURNING id, org_id, idp_user_id, email, display_name, avatar_url, created_at, updated_at, title, shift, status, mfa_enabled, last_seen_at
 `
 
 type UpsertUserParams struct {
@@ -280,6 +329,11 @@ func (q *Queries) UpsertUser(ctx context.Context, arg UpsertUserParams) (User, e
 		&i.AvatarUrl,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Title,
+		&i.Shift,
+		&i.Status,
+		&i.MfaEnabled,
+		&i.LastSeenAt,
 	)
 	return i, err
 }

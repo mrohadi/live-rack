@@ -42,6 +42,11 @@ export function useApi() {
       if (!token) throw new Error("Not authenticated");
       return request<T>(path, token, { method: "PUT", body: JSON.stringify(body) });
     },
+    patch: async <T>(path: string, body: unknown): Promise<T> => {
+      const token = getToken();
+      if (!token) throw new Error("Not authenticated");
+      return request<T>(path, token, { method: "PATCH", body: JSON.stringify(body) });
+    },
     del: async <T>(path: string): Promise<T> => {
       const token = getToken();
       if (!token) throw new Error("Not authenticated");

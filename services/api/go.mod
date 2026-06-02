@@ -8,6 +8,7 @@ require (
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/labstack/echo/v4 v4.12.0
 	github.com/live-rack/pkg/auth v0.0.0
+	github.com/live-rack/pkg/chstore v0.0.0
 	github.com/live-rack/pkg/domain v0.0.0
 	github.com/live-rack/pkg/events v0.0.0-00010101000000-000000000000
 	github.com/live-rack/pkg/observability v0.0.0
@@ -42,6 +43,7 @@ require (
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/klauspost/compress v1.18.5 // indirect
 	github.com/labstack/gommon v0.4.2 // indirect
+	github.com/live-rack/pkg/integrations v0.0.0
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
@@ -86,8 +88,11 @@ require (
 
 replace (
 	github.com/live-rack/pkg/auth => ../../pkg/auth
+	github.com/live-rack/pkg/chstore => ../../pkg/chstore
 	github.com/live-rack/pkg/domain => ../../pkg/domain
 	github.com/live-rack/pkg/events => ../../pkg/events
 	github.com/live-rack/pkg/observability => ../../pkg/observability
 	github.com/live-rack/pkg/store => ../../pkg/store
 )
+
+replace github.com/live-rack/pkg/integrations => ../../pkg/integrations

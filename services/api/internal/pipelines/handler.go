@@ -1,0 +1,380 @@
+// Package pipelines serves pipeline board read + card-move endpoints.
+package pipelines
+
+import (
+	"context"
+	"net/http"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/labstack/echo/v4"
+
+	pkgauth "github.com/live-rack/pkg/auth"
+	"github.com/live-rack/pkg/domain"
+	"github.com/live-rack/pkg/events"
+	"github.com/live-rack/pkg/store"
+)
+
+// Store is the narrow store dependency the handler needs.
+type Store interface {
+	ListPipelinesByStore(ctx context.Context, arg store.ListPipelinesByStoreParams) ([]store.Pipeline, error)
+	GetPipeline(ctx context.Context, arg store.GetPipelineParams) (store.Pipeline, error)
+	ListStagesByPipeline(ctx context.Context, arg store.ListStagesByPipelineParams) ([]store.PipelineStage, error)
+	ListCardsByPipeline(ctx context.Context, arg store.ListCardsByPipelineParams) ([]store.PipelineCard, error)
+	MoveCard(ctx context.Context, arg store.MoveCardParams) (store.PipelineCard, error)
+	CreatePipeline(ctx context.Context, arg store.CreatePipelineParams) (store.Pipeline, error)
+	CreateStage(ctx context.Context, arg store.CreateStageParams) (store.PipelineStage, error)
+}
+
+// Handler serves pipeline endpoints.
+type Handler struct {
+	q   Store
+	pub events.Publisher
+}
+
+// New creates a Handler.
+func New(q Store, pub events.Publisher) *Handler {
+	return &Handler{q: q, pub: pub}
+}
+
+// stageDefs builds the domain stage definitions from stored stage rows.
+func stageDefs(stages []store.PipelineStage) []domain.StageDef {
+	defs := make([]domain.StageDef, len(stages))
+	for _, s := range stages {
+		if int(s.Position) < len(defs) {
+			defs[s.Position] = domain.StageDef{Name: s.Name, SLA: time.Duration(s.SlaSeconds) * time.Second}
+		}
+	}
+	return defs
+}
+
+// detectBottleneck computes the worst SLA-breaching stage for a board.
+func detectBottleneck(stages []store.PipelineStage, cards []store.PipelineCard, now time.Time) *domain.Bottleneck {
+	defs := stageDefs(stages)
+	ages := make([]domain.CardAge, 0, len(cards))
+	for _, cd := range cards {
+		ages = append(ages, domain.CardAge{
+			StagePosition: int(cd.StagePosition),
+			Age:           now.Sub(cd.EnteredStageAt),
+		})
+	}
+	return domain.DetectBottleneck(defs, ages)
+}
+
+// Register mounts pipeline routes onto g (expected: /api/v1/stores).
+func (h *Handler) Register(g *echo.Group) {
+	g.GET("/:storeID/pipelines", h.List)
+	g.POST("/:storeID/pipelines/from-template", h.CreateFromTemplate)
+	g.GET("/:storeID/pipelines/:id", h.Board)
+	g.PATCH("/:storeID/pipelines/:id/cards/:cardID", h.MoveCard)
+}
+
+// PipelineRow is one pipeline in the selector list.
+type PipelineRow struct {
+	ID   uuid.UUID `json:"id"`
+	Key  string    `json:"key"`
+	Name string    `json:"name"`
+}
+
+// StageRow is one column of the board.
+type StageRow struct {
+	Position   int32  `json:"position"`
+	Name       string `json:"name"`
+	SLASeconds int64  `json:"sla_seconds"`
+}
+
+// CardRow is one card on the board. AgeSeconds + Ageing are derived server-side
+// so every client renders ageing alerts identically.
+type CardRow struct {
+	ID             uuid.UUID `json:"id"`
+	StagePosition  int32     `json:"stage_position"`
+	Title          string    `json:"title"`
+	SKU            string    `json:"sku,omitempty"`
+	Priority       string    `json:"priority"`
+	OwnerID        *string   `json:"owner_id,omitempty"`
+	EnteredStageAt string    `json:"entered_stage_at"`
+	AgeSeconds     int64     `json:"age_seconds"`
+	Ageing         bool      `json:"ageing"`
+}
+
+// BoardResponse is the full board for one pipeline. Bottleneck is non-nil when a
+// stage is breaching its SLA.
+type BoardResponse struct {
+	Pipeline   PipelineRow        `json:"pipeline"`
+	Stages     []StageRow         `json:"stages"`
+	Cards      []CardRow          `json:"cards"`
+	Bottleneck *domain.Bottleneck `json:"bottleneck,omitempty"`
+}
+
+func rfc3339(t time.Time) string {
+	return t.UTC().Format("2006-01-02T15:04:05Z07:00")
+}
+
+// List godoc
+//
+//	@Summary	List pipelines for a store
+//	@Tags		pipelines
+//	@Produce	json
+//	@Param		storeID	path		string	true	"Store UUID"
+//	@Success	200		{array}		PipelineRow
+//	@Router		/stores/{storeID}/pipelines [get]
+func (h *Handler) List(c echo.Context) error {
+	p, err := pkgauth.PrincipalFrom(c.Request().Context())
+	if err != nil {
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
+	}
+	storeID, err := uuid.Parse(c.Param("storeID"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid store id")
+	}
+
+	rows, err := h.q.ListPipelinesByStore(c.Request().Context(), store.ListPipelinesByStoreParams{
+		OrgID: p.OrgID, StoreID: storeID,
+	})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "list pipelines")
+	}
+	out := make([]PipelineRow, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, PipelineRow{ID: r.ID, Key: r.Key, Name: r.Name})
+	}
+	return c.JSON(http.StatusOK, out)
+}
+
+type fromTemplateRequest struct {
+	TemplateKey string `json:"template_key"`
+}
+
+// CreateFromTemplate godoc
+//
+//	@Summary	Instantiate a pipeline from a built-in template (e.g. item-restoration)
+//	@Tags		pipelines
+//	@Accept		json
+//	@Produce	json
+//	@Param		storeID	path		string				true	"Store UUID"
+//	@Param		body	body		fromTemplateRequest	true	"Template key"
+//	@Success	201		{object}	PipelineRow
+//	@Failure	400		{object}	map[string]string
+//	@Failure	403		{object}	map[string]string
+//	@Router		/stores/{storeID}/pipelines/from-template [post]
+func (h *Handler) CreateFromTemplate(c echo.Context) error {
+	p, err := pkgauth.PrincipalFrom(c.Request().Context())
+	if err != nil {
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
+	}
+	if !domain.CanMutatePipeline(p) {
+		return echo.NewHTTPError(http.StatusForbidden, "forbidden")
+	}
+	storeID, err := uuid.Parse(c.Param("storeID"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid store id")
+	}
+	var req fromTemplateRequest
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
+	}
+	def, ok := domain.PipelineTemplate(req.TemplateKey)
+	if !ok {
+		return echo.NewHTTPError(http.StatusBadRequest, "unknown template")
+	}
+
+	ctx := c.Request().Context()
+	pipe, err := h.q.CreatePipeline(ctx, store.CreatePipelineParams{
+		OrgID: p.OrgID, StoreID: storeID, Key: def.Key, Name: def.Name,
+	})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "create pipeline")
+	}
+	for i, s := range def.Stages {
+		if _, err := h.q.CreateStage(ctx, store.CreateStageParams{
+			OrgID: p.OrgID, PipelineID: pipe.ID, Position: int32(i),
+			Name: s.Name, SlaSeconds: int64(s.SLA.Seconds()),
+		}); err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "create stage")
+		}
+	}
+	return c.JSON(http.StatusCreated, PipelineRow{ID: pipe.ID, Key: pipe.Key, Name: pipe.Name})
+}
+
+// Board godoc
+//
+//	@Summary	Get a pipeline board — stages + cards with ageing flags
+//	@Tags		pipelines
+//	@Produce	json
+//	@Param		storeID	path		string	true	"Store UUID"
+//	@Param		id		path		string	true	"Pipeline UUID"
+//	@Success	200		{object}	BoardResponse
+//	@Failure	404		{object}	map[string]string
+//	@Router		/stores/{storeID}/pipelines/{id} [get]
+func (h *Handler) Board(c echo.Context) error {
+	p, err := pkgauth.PrincipalFrom(c.Request().Context())
+	if err != nil {
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
+	}
+	pipeID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid pipeline id")
+	}
+	ctx := c.Request().Context()
+
+	pipe, err := h.q.GetPipeline(ctx, store.GetPipelineParams{OrgID: p.OrgID, ID: pipeID})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "pipeline not found")
+	}
+	stageRows, err := h.q.ListStagesByPipeline(ctx, store.ListStagesByPipelineParams{OrgID: p.OrgID, PipelineID: pipeID})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "list stages")
+	}
+	cardRows, err := h.q.ListCardsByPipeline(ctx, store.ListCardsByPipelineParams{OrgID: p.OrgID, PipelineID: pipeID})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "list cards")
+	}
+
+	return c.JSON(http.StatusOK, buildBoard(pipe, stageRows, cardRows, time.Now().UTC()))
+}
+
+// buildBoard assembles the board response and computes ageing per card against
+// the SLA of the stage the card currently sits in.
+func buildBoard(pipe store.Pipeline, stages []store.PipelineStage, cards []store.PipelineCard, now time.Time) BoardResponse {
+	slaByPos := make(map[int32]int64, len(stages))
+	stageRows := make([]StageRow, 0, len(stages))
+	for _, s := range stages {
+		slaByPos[s.Position] = s.SlaSeconds
+		stageRows = append(stageRows, StageRow{Position: s.Position, Name: s.Name, SLASeconds: s.SlaSeconds})
+	}
+
+	cardRows := make([]CardRow, 0, len(cards))
+	for _, cd := range cards {
+		age := int64(now.Sub(cd.EnteredStageAt).Seconds())
+		if age < 0 {
+			age = 0
+		}
+		sla := slaByPos[cd.StagePosition]
+		row := CardRow{
+			ID:             cd.ID,
+			StagePosition:  cd.StagePosition,
+			Title:          cd.Title,
+			SKU:            cd.Sku,
+			Priority:       cd.Priority,
+			EnteredStageAt: rfc3339(cd.EnteredStageAt),
+			AgeSeconds:     age,
+			Ageing:         sla > 0 && age > sla,
+		}
+		if cd.OwnerID.Valid {
+			s := uuid.UUID(cd.OwnerID.Bytes).String()
+			row.OwnerID = &s
+		}
+		cardRows = append(cardRows, row)
+	}
+
+	return BoardResponse{
+		Pipeline:   PipelineRow{ID: pipe.ID, Key: pipe.Key, Name: pipe.Name},
+		Stages:     stageRows,
+		Cards:      cardRows,
+		Bottleneck: detectBottleneck(stages, cards, now),
+	}
+}
+
+type moveCardRequest struct {
+	StagePosition int32 `json:"stage_position"`
+}
+
+// MoveCard godoc
+//
+//	@Summary	Move a card to a different stage
+//	@Tags		pipelines
+//	@Accept		json
+//	@Produce	json
+//	@Param		storeID	path		string			true	"Store UUID"
+//	@Param		id		path		string			true	"Pipeline UUID"
+//	@Param		cardID	path		string			true	"Card UUID"
+//	@Param		body	body		moveCardRequest	true	"Target stage"
+//	@Success	200		{object}	CardRow
+//	@Failure	400		{object}	map[string]string
+//	@Failure	403		{object}	map[string]string
+//	@Failure	404		{object}	map[string]string
+//	@Router		/stores/{storeID}/pipelines/{id}/cards/{cardID} [patch]
+func (h *Handler) MoveCard(c echo.Context) error {
+	p, err := pkgauth.PrincipalFrom(c.Request().Context())
+	if err != nil {
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
+	}
+	if !domain.CanMutatePipeline(p) {
+		return echo.NewHTTPError(http.StatusForbidden, "forbidden")
+	}
+	pipeID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid pipeline id")
+	}
+	cardID, err := uuid.Parse(c.Param("cardID"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid card id")
+	}
+	var req moveCardRequest
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
+	}
+	if req.StagePosition < 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "stage_position must be >= 0")
+	}
+
+	ctx := c.Request().Context()
+	cd, err := h.q.MoveCard(ctx, store.MoveCardParams{
+		OrgID: p.OrgID, ID: cardID, StagePosition: req.StagePosition,
+	})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "card not found")
+	}
+
+	if err := h.publishBottleneck(ctx, p.OrgID, pipeID); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "publish bottleneck")
+	}
+
+	row := CardRow{
+		ID:             cd.ID,
+		StagePosition:  cd.StagePosition,
+		Title:          cd.Title,
+		SKU:            cd.Sku,
+		Priority:       cd.Priority,
+		EnteredStageAt: rfc3339(cd.EnteredStageAt),
+		AgeSeconds:     0,
+		Ageing:         false,
+	}
+	if cd.OwnerID.Valid {
+		s := uuid.UUID(cd.OwnerID.Bytes).String()
+		row.OwnerID = &s
+	}
+	return c.JSON(http.StatusOK, row)
+}
+
+// publishBottleneck recomputes the pipeline's bottleneck after a move and emits
+// a PipelineBottleneck event when a stage is breaching its SLA.
+func (h *Handler) publishBottleneck(ctx context.Context, orgID, pipeID uuid.UUID) error {
+	pipe, err := h.q.GetPipeline(ctx, store.GetPipelineParams{OrgID: orgID, ID: pipeID})
+	if err != nil {
+		return err
+	}
+	stages, err := h.q.ListStagesByPipeline(ctx, store.ListStagesByPipelineParams{OrgID: orgID, PipelineID: pipeID})
+	if err != nil {
+		return err
+	}
+	cards, err := h.q.ListCardsByPipeline(ctx, store.ListCardsByPipelineParams{OrgID: orgID, PipelineID: pipeID})
+	if err != nil {
+		return err
+	}
+
+	b := detectBottleneck(stages, cards, time.Now().UTC())
+	if b == nil {
+		return nil
+	}
+	return h.pub.Publish(ctx, events.PipelineBottleneckSubject(orgID), events.PipelineBottleneck{
+		OrgID:       orgID,
+		StoreID:     pipe.StoreID,
+		PipelineID:  pipeID,
+		StagePos:    b.Position,
+		StageName:   b.Name,
+		AgeingCount: b.AgeingCount,
+		OldestAgeS:  int64(b.OldestAge.Seconds()),
+		TS:          time.Now().UTC(),
+	})
+}

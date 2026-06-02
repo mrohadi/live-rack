@@ -3,18 +3,15 @@ import type { Zone } from "./types";
 
 interface Props {
   zone: Zone | null;
-  onRename?: (id: string, name: string) => void;
   onDelete?: (id: string) => void;
   onOpen?: (id: string) => void;
   onAddItem?: (zoneId: string) => void;
+  onEdit?: (zone: Zone) => void;
 }
 
-/** Right-hand zone inspector: capacity, fill, sales, dwell, misplaced, last
- *  scan, and constraint chips, with Open / Add item / Assign task actions. */
-export function ZoneDetailSidebar({ zone, onRename, onDelete, onOpen, onAddItem }: Props) {
+/** Right-hand zone inspector. All mutating actions go through onEdit / onDelete / onAddItem. */
+export function ZoneDetailSidebar({ zone, onDelete, onOpen, onAddItem, onEdit }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [renaming, setRenaming] = useState(false);
-  const [draftName, setDraftName] = useState("");
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -40,52 +37,52 @@ export function ZoneDetailSidebar({ zone, onRename, onDelete, onOpen, onAddItem 
 
   return (
     <aside className="flex w-72 shrink-0 flex-col border-l border-border bg-surface">
+      {/* Header */}
       <div className="flex items-start gap-2 border-b border-border p-4">
         <div className="min-w-0 flex-1">
-          {renaming ? (
-            <input
-              autoFocus
-              value={draftName}
-              onChange={(e) => setDraftName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && draftName.trim()) {
-                  onRename?.(zone.id, draftName.trim());
-                  setRenaming(false);
-                }
-                if (e.key === "Escape") setRenaming(false);
-              }}
-              onBlur={() => setRenaming(false)}
-              className="w-full rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground"
-            />
-          ) : (
-            <div className="truncate text-sm font-semibold text-foreground">{zone.name}</div>
-          )}
+          <div className="truncate text-sm font-semibold text-foreground">{zone.name}</div>
           <div className="mt-0.5 text-xs capitalize text-muted-foreground">
             {zone.type} · zone {zone.id}
           </div>
         </div>
+
+        {/* ⋯ actions menu */}
         <div ref={menuRef} className="relative">
           <button
             type="button"
-            aria-label="more"
+            aria-label="Zone actions"
             onClick={() => setMenuOpen((o) => !o)}
-            className="rounded-md p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            className={`flex items-center gap-1 rounded-md border px-2 py-1 text-sm font-medium transition ${
+              menuOpen
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-border bg-muted text-foreground hover:border-primary hover:text-primary"
+            }`}
           >
             ⋯
           </button>
           {menuOpen && (
-            <div className="absolute right-0 z-20 mt-1 w-32 overflow-hidden rounded-md border border-border bg-surface shadow-md">
+            <div className="absolute right-0 z-20 mt-1 w-40 overflow-hidden rounded-md border border-border bg-surface shadow-md">
               <button
                 type="button"
                 onClick={() => {
-                  setDraftName(zone.name);
-                  setRenaming(true);
+                  onEdit?.(zone);
                   setMenuOpen(false);
                 }}
                 className="block w-full px-3 py-2 text-left text-sm text-foreground hover:bg-muted"
               >
-                Rename
+                Edit zone…
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onAddItem?.(zone.id);
+                  setMenuOpen(false);
+                }}
+                className="block w-full px-3 py-2 text-left text-sm text-foreground hover:bg-muted"
+              >
+                + Add item…
+              </button>
+              <div className="my-1 border-t border-border" />
               <button
                 type="button"
                 onClick={() => {
@@ -94,13 +91,14 @@ export function ZoneDetailSidebar({ zone, onRename, onDelete, onOpen, onAddItem 
                 }}
                 className="block w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-muted"
               >
-                Delete
+                Delete zone
               </button>
             </div>
           )}
         </div>
       </div>
 
+      {/* Stats */}
       <div className="flex-1 overflow-y-auto p-4">
         <KV label="Capacity" value={`${zone.items ?? 0} / ${zone.capacity ?? 0}`} />
         <KV label="Fill" value={`${fill}%`} />
@@ -109,46 +107,41 @@ export function ZoneDetailSidebar({ zone, onRename, onDelete, onOpen, onAddItem 
         {zone.misplaced != null && <KV label="Misplaced" value={String(zone.misplaced)} />}
         {zone.lastScan && <KV label="Last scan" value={zone.lastScan} mono />}
 
-        {constraints && (
-          <>
-            <div className="mt-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Constraints
-            </div>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {constraints.allowedCategories?.map((cat) => (
-                <Chip key={cat} accent>
-                  {cat} only
-                </Chip>
-              ))}
-              {constraints.maxSKUs != null && <Chip>Max {constraints.maxSKUs} SKUs</Chip>}
-              {constraints.climate && <Chip>Climate: {constraints.climate}</Chip>}
-            </div>
-          </>
+        <div className="mt-4">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Constraints
+          </div>
+        </div>
+
+        {constraints && Object.keys(constraints).length > 0 ? (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {constraints.allowedCategories?.map((cat) => (
+              <Chip key={cat} accent>
+                {cat} only
+              </Chip>
+            ))}
+            {constraints.maxSKUs != null && <Chip>Max {constraints.maxSKUs} SKUs</Chip>}
+            {constraints.climate && <Chip>Climate: {constraints.climate}</Chip>}
+          </div>
+        ) : (
+          <p className="mt-2 text-xs text-muted-foreground">No constraints set.</p>
         )}
       </div>
 
-      <div className="flex flex-col gap-2 border-t border-border p-4">
-        <div className="flex items-center justify-between gap-2">
-          <button
-            type="button"
-            onClick={() => onOpen?.(zone.id)}
-            className="text-sm font-medium text-foreground hover:underline"
-          >
-            Open zone
-          </button>
-          <button
-            type="button"
-            className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white transition hover:opacity-90"
-          >
-            Assign task
-          </button>
-        </div>
+      {/* Footer */}
+      <div className="flex items-center gap-2 border-t border-border p-4">
         <button
           type="button"
-          onClick={() => onAddItem?.(zone.id)}
-          className="w-full rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-muted"
+          onClick={() => onOpen?.(zone.id)}
+          className="flex-1 rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-muted"
         >
-          + Add item to zone
+          Open zone
+        </button>
+        <button
+          type="button"
+          className="flex-1 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white transition hover:opacity-90"
+        >
+          Assign task
         </button>
       </div>
     </aside>

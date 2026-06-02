@@ -74,6 +74,47 @@ func (q *Queries) ListItems(ctx context.Context, orgID uuid.UUID) ([]Item, error
 	return items, nil
 }
 
+const updateItem = `-- name: UpdateItem :one
+UPDATE items
+SET name = $1, category = $2, status = $3, reorder_point = $4::int
+WHERE org_id = $5 AND sku = $6
+RETURNING id, org_id, sku, name, category, status, created_at, updated_at, reorder_point
+`
+
+type UpdateItemParams struct {
+	Name         string    `json:"name"`
+	Category     string    `json:"category"`
+	Status       string    `json:"status"`
+	ReorderPoint int32     `json:"reorder_point"`
+	OrgID        uuid.UUID `json:"org_id"`
+	Sku          string    `json:"sku"`
+}
+
+// Edit master-catalog fields for an existing SKU (LR-310).
+func (q *Queries) UpdateItem(ctx context.Context, arg UpdateItemParams) (Item, error) {
+	row := q.db.QueryRow(ctx, updateItem,
+		arg.Name,
+		arg.Category,
+		arg.Status,
+		arg.ReorderPoint,
+		arg.OrgID,
+		arg.Sku,
+	)
+	var i Item
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.Sku,
+		&i.Name,
+		&i.Category,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ReorderPoint,
+	)
+	return i, err
+}
+
 const upsertItem = `-- name: UpsertItem :one
 INSERT INTO items (org_id, sku, name, category, status, reorder_point)
 VALUES ($1, $2, $3, $4, $5, $6)

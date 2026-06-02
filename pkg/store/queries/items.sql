@@ -14,3 +14,10 @@ WHERE org_id = $1 AND sku = $2;
 SELECT * FROM items
 WHERE org_id = $1
 ORDER BY name;
+
+-- name: UpdateItem :one
+-- Edit master-catalog fields for an existing SKU (LR-310).
+UPDATE items
+SET name = @name, category = @category, status = @status, reorder_point = @reorder_point::int
+WHERE org_id = @org_id AND sku = @sku
+RETURNING *;

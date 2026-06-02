@@ -31,6 +31,22 @@ type fakeStore struct {
 	rows        []store.Task
 	updated     store.Task
 	assigned    store.Task
+	created     store.Task
+	createArg   store.CreateTaskParams
+}
+
+func (f *fakeStore) CreateTask(_ context.Context, arg store.CreateTaskParams) (store.Task, error) {
+	f.createArg = arg
+	f.created.ID = uuid.New()
+	f.created.OrgID = arg.OrgID
+	f.created.StoreID = arg.StoreID
+	f.created.ZoneID = arg.ZoneID
+	f.created.Title = arg.Title
+	f.created.Status = arg.Status
+	f.created.Priority = arg.Priority
+	f.created.DueAt = arg.DueAt
+	f.created.UpdatedAt = time.Now().UTC()
+	return f.created, nil
 }
 
 func (f *fakeStore) ListTasksByStore(_ context.Context, arg store.ListTasksByStoreParams) ([]store.Task, error) {
@@ -248,6 +264,96 @@ func TestTasksHandler_UpdateStatus_ReadonlyForbidden(t *testing.T) {
 	c.SetParamValues(storeID.String(), taskID.String())
 
 	err := h.UpdateStatus(c)
+	require.Error(t, err)
+	he, ok := err.(*echo.HTTPError)
+	require.True(t, ok)
+	assert.Equal(t, http.StatusForbidden, he.Code)
+}
+
+func TestTasksHandler_Create(t *testing.T) {
+	orgID, storeID, zoneID := uuid.New(), uuid.New(), uuid.New()
+	fs := &fakeStore{}
+	e := echo.New()
+	e.HideBanner = true
+	h := tasks.New(fs, &fakePublisher{})
+
+	body := `{"zone_id":"` + zoneID.String() + `","title":"Restock frozen","priority":"high","due_at":"2026-12-01T09:00:00Z"}`
+	p := &domain.Principal{UserID: uuid.New(), OrgID: orgID, Role: domain.RoleStaff}
+	c, rec := newContext(t, e, http.MethodPost,
+		"/api/v1/stores/"+storeID.String()+"/tasks", body, p)
+	c.SetParamNames("storeID")
+	c.SetParamValues(storeID.String())
+
+	require.NoError(t, h.Create(c))
+	assert.Equal(t, http.StatusCreated, rec.Code)
+
+	assert.Equal(t, orgID, fs.createArg.OrgID)
+	assert.Equal(t, storeID, fs.createArg.StoreID)
+	assert.Equal(t, "Restock frozen", fs.createArg.Title)
+	assert.Equal(t, "todo", fs.createArg.Status)
+	assert.Equal(t, "high", fs.createArg.Priority)
+	assert.True(t, fs.createArg.ZoneID.Valid)
+	assert.Equal(t, zoneID, uuid.UUID(fs.createArg.ZoneID.Bytes))
+	assert.True(t, fs.createArg.DueAt.Valid)
+
+	var out tasks.Row
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &out))
+	assert.Equal(t, "Restock frozen", out.Title)
+	assert.Equal(t, "todo", out.Status)
+	assert.Equal(t, "high", out.Priority)
+}
+
+func TestTasksHandler_Create_DefaultPriority(t *testing.T) {
+	orgID, storeID := uuid.New(), uuid.New()
+	fs := &fakeStore{}
+	e := echo.New()
+	h := tasks.New(fs, &fakePublisher{})
+
+	body := `{"title":"Quick check","priority":"bogus"}`
+	p := &domain.Principal{UserID: uuid.New(), OrgID: orgID, Role: domain.RoleStaff}
+	c, rec := newContext(t, e, http.MethodPost,
+		"/api/v1/stores/"+storeID.String()+"/tasks", body, p)
+	c.SetParamNames("storeID")
+	c.SetParamValues(storeID.String())
+
+	require.NoError(t, h.Create(c))
+	assert.Equal(t, http.StatusCreated, rec.Code)
+	// Invalid priority falls back to med.
+	assert.Equal(t, "med", fs.createArg.Priority)
+}
+
+func TestTasksHandler_Create_MissingTitle(t *testing.T) {
+	orgID, storeID := uuid.New(), uuid.New()
+	fs := &fakeStore{}
+	e := echo.New()
+	h := tasks.New(fs, &fakePublisher{})
+
+	p := &domain.Principal{UserID: uuid.New(), OrgID: orgID, Role: domain.RoleStaff}
+	c, _ := newContext(t, e, http.MethodPost,
+		"/api/v1/stores/"+storeID.String()+"/tasks", `{"priority":"high"}`, p)
+	c.SetParamNames("storeID")
+	c.SetParamValues(storeID.String())
+
+	err := h.Create(c)
+	require.Error(t, err)
+	he, ok := err.(*echo.HTTPError)
+	require.True(t, ok)
+	assert.Equal(t, http.StatusBadRequest, he.Code)
+}
+
+func TestTasksHandler_Create_ReadonlyForbidden(t *testing.T) {
+	orgID, storeID := uuid.New(), uuid.New()
+	fs := &fakeStore{}
+	e := echo.New()
+	h := tasks.New(fs, &fakePublisher{})
+
+	p := &domain.Principal{UserID: uuid.New(), OrgID: orgID, Role: domain.RoleReadonly}
+	c, _ := newContext(t, e, http.MethodPost,
+		"/api/v1/stores/"+storeID.String()+"/tasks", `{"title":"X","priority":"low"}`, p)
+	c.SetParamNames("storeID")
+	c.SetParamValues(storeID.String())
+
+	err := h.Create(c)
 	require.Error(t, err)
 	he, ok := err.(*echo.HTTPError)
 	require.True(t, ok)

@@ -21,6 +21,7 @@ const deadlineWindow = 24 * time.Hour
 
 // Store is the narrow store dependency the handler needs.
 type Store interface {
+	CreateTask(ctx context.Context, arg store.CreateTaskParams) (store.Task, error)
 	ListTasksByStore(ctx context.Context, arg store.ListTasksByStoreParams) ([]store.Task, error)
 	UpdateTaskStatus(ctx context.Context, arg store.UpdateTaskStatusParams) (store.Task, error)
 	AssignTask(ctx context.Context, arg store.AssignTaskParams) (store.Task, error)
@@ -39,6 +40,7 @@ func New(q Store, pub events.Publisher) *Handler {
 
 // Register mounts task routes onto g (expected: /api/v1/stores).
 func (h *Handler) Register(g *echo.Group) {
+	g.POST("/:storeID/tasks", h.Create)
 	g.GET("/:storeID/tasks", h.List)
 	g.PATCH("/:storeID/tasks/:id", h.UpdateStatus)
 	g.PATCH("/:storeID/tasks/:id/assignee", h.Assign)
@@ -113,6 +115,82 @@ func (h *Handler) List(c echo.Context) error {
 		out = append(out, toRow(t))
 	}
 	return c.JSON(http.StatusOK, out)
+}
+
+type createRequest struct {
+	ZoneID   string `json:"zone_id"`
+	Title    string `json:"title"`
+	Priority string `json:"priority"`
+	DueAt    string `json:"due_at"`
+}
+
+// Create godoc
+//
+//	@Summary		Create a new task, optionally scoped to a zone
+//	@Tags			tasks
+//	@Accept			json
+//	@Produce		json
+//	@Param			storeID	path		string			true	"Store UUID"
+//	@Param			body	body		createRequest	true	"Task payload"
+//	@Success		201		{object}	Row
+//	@Failure		400		{object}	map[string]string
+//	@Failure		403		{object}	map[string]string
+//	@Router			/stores/{storeID}/tasks [post]
+func (h *Handler) Create(c echo.Context) error {
+	p, err := pkgauth.PrincipalFrom(c.Request().Context())
+	if err != nil {
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
+	}
+	if !domain.CanMutateTask(p) {
+		return echo.NewHTTPError(http.StatusForbidden, "forbidden")
+	}
+	storeID, err := uuid.Parse(c.Param("storeID"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid store id")
+	}
+
+	var req createRequest
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
+	}
+	if req.Title == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "title required")
+	}
+
+	priority := domain.TaskPriority(req.Priority)
+	switch priority {
+	case domain.TaskPriorityLow, domain.TaskPriorityMed, domain.TaskPriorityHigh:
+	default:
+		priority = domain.TaskPriorityMed
+	}
+
+	arg := store.CreateTaskParams{
+		OrgID:    p.OrgID,
+		StoreID:  storeID,
+		Title:    req.Title,
+		Status:   string(domain.TaskStatusTodo),
+		Priority: string(priority),
+	}
+	if req.ZoneID != "" {
+		zid, err := uuid.Parse(req.ZoneID)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid zone_id")
+		}
+		arg.ZoneID = pgtype.UUID{Bytes: zid, Valid: true}
+	}
+	if req.DueAt != "" {
+		t, err := time.Parse(time.RFC3339, req.DueAt)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid due_at: must be RFC3339")
+		}
+		arg.DueAt = pgtype.Timestamptz{Time: t.UTC(), Valid: true}
+	}
+
+	task, err := h.q.CreateTask(c.Request().Context(), arg)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "create task")
+	}
+	return c.JSON(http.StatusCreated, toRow(task))
 }
 
 type updateStatusRequest struct {

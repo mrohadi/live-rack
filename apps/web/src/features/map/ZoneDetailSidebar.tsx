@@ -7,10 +7,18 @@ interface Props {
   onOpen?: (id: string) => void;
   onAddItem?: (zoneId: string) => void;
   onEdit?: (zone: Zone) => void;
+  onAssignTask?: (zone: Zone) => void;
 }
 
-/** Right-hand zone inspector. All mutating actions go through onEdit / onDelete / onAddItem. */
-export function ZoneDetailSidebar({ zone, onDelete, onOpen, onAddItem, onEdit }: Props) {
+/** Right-hand zone inspector. All mutating actions go through onEdit / onDelete / onAddItem / onAssignTask. */
+export function ZoneDetailSidebar({
+  zone,
+  onDelete,
+  onOpen,
+  onAddItem,
+  onEdit,
+  onAssignTask,
+}: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -139,6 +147,7 @@ export function ZoneDetailSidebar({ zone, onDelete, onOpen, onAddItem, onEdit }:
         </button>
         <button
           type="button"
+          onClick={() => onAssignTask?.(zone)}
           className="flex-1 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white transition hover:opacity-90"
         >
           Assign task

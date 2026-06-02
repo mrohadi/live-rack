@@ -67,6 +67,11 @@ type Querier interface {
 	// Trigram similarity ranks fuzzy hits; ILIKE catches short substrings GIN trigram
 	// can still serve. Results ordered by best score, capped by max_results.
 	SearchEntities(ctx context.Context, arg SearchEntitiesParams) ([]SearchEntitiesRow, error)
+	// Absolute on-hand correction for one zone (shrinkage, damage, cycle count).
+	// Returns no rows when the location does not exist (caller maps to 404).
+	SetItemLocationQty(ctx context.Context, arg SetItemLocationQtyParams) (ItemLocation, error)
+	// Edit master-catalog fields for an existing SKU (LR-310).
+	UpdateItem(ctx context.Context, arg UpdateItemParams) (Item, error)
 	UpdateTaskStatus(ctx context.Context, arg UpdateTaskStatusParams) (Task, error)
 	UpdateZone(ctx context.Context, arg UpdateZoneParams) (Zone, error)
 	UpsertIntegration(ctx context.Context, arg UpsertIntegrationParams) (Integration, error)

@@ -45,6 +45,12 @@ type fakeStore struct {
 	itemErr  error
 	skuLocs  []store.ListItemLocationsBySKURow
 	skuScans []store.ScanEvent
+
+	// edit / adjust
+	updateArg store.UpdateItemParams
+	updateErr error
+	setArg    store.SetItemLocationQtyParams
+	setErr    error
 }
 
 func (f *fakeStore) ListInventoryByStore(_ context.Context, arg store.ListInventoryByStoreParams) ([]store.ListInventoryByStoreRow, error) {
@@ -95,6 +101,25 @@ func (f *fakeStore) ListItemLocationsBySKU(_ context.Context, _ store.ListItemLo
 
 func (f *fakeStore) ListScanEventsBySKU(_ context.Context, _ store.ListScanEventsBySKUParams) ([]store.ScanEvent, error) {
 	return f.skuScans, nil
+}
+
+func (f *fakeStore) UpdateItem(_ context.Context, arg store.UpdateItemParams) (store.Item, error) {
+	f.updateArg = arg
+	if f.updateErr != nil {
+		return store.Item{}, f.updateErr
+	}
+	return store.Item{
+		OrgID: arg.OrgID, Sku: arg.Sku, Name: arg.Name,
+		Category: arg.Category, Status: arg.Status, ReorderPoint: arg.ReorderPoint,
+	}, nil
+}
+
+func (f *fakeStore) SetItemLocationQty(_ context.Context, arg store.SetItemLocationQtyParams) (store.ItemLocation, error) {
+	f.setArg = arg
+	if f.setErr != nil {
+		return store.ItemLocation{}, f.setErr
+	}
+	return store.ItemLocation{ID: uuid.New(), OrgID: arg.OrgID, ZoneID: arg.ZoneID, Sku: arg.Sku, Qty: arg.Qty}, nil
 }
 
 func newCtx(orgID uuid.UUID) context.Context {

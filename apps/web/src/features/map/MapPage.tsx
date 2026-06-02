@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { KonvaZoneCanvas } from "./renderers/KonvaZoneCanvas";
 import type { ViewMode, Zone, ZoneUpdate } from "./types";
@@ -7,6 +8,7 @@ import { useCreateZone, useUpdateZone, useZones, zoneKeys } from "./useZones";
 import { ZoneDetailSidebar } from "./ZoneDetailSidebar";
 import { useScanStream } from "../../lib/useScanStream";
 import type { ScanRecorded } from "../../lib/ws";
+import { AddItemModal } from "../inventory/AddItemModal";
 
 export function MapPage() {
   const storeId = useCurrentStore();
@@ -34,10 +36,12 @@ export function MapPage() {
   );
   useScanStream(onScan);
 
+  const navigate = useNavigate();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [view, setView] = useState<ViewMode>("zones");
   const [showAddForm, setShowAddForm] = useState(false);
   const [newZoneName, setNewZoneName] = useState("");
+  const [addItemZoneId, setAddItemZoneId] = useState<string | null>(null);
 
   /** Merge drag/resize delta into the full zone, then PUT. */
   const handleChange = (updates: ZoneUpdate[]) => {
@@ -221,8 +225,19 @@ export function MapPage() {
             viewMode={view}
           />
         </div>
-        <ZoneDetailSidebar zone={selectedZone} />
+        <ZoneDetailSidebar
+          zone={selectedZone}
+          onOpen={(id) => navigate(`/inventory?zone=${encodeURIComponent(id)}`)}
+          onAddItem={(id) => setAddItemZoneId(id)}
+        />
       </div>
+
+      {addItemZoneId && (
+        <AddItemModal
+          defaultZoneId={addItemZoneId}
+          onClose={() => setAddItemZoneId(null)}
+        />
+      )}
     </div>
   );
 }

@@ -1,76 +1,107 @@
+import { useEffect, useRef, useState } from "react";
 import type { Zone } from "./types";
 
 interface Props {
   zone: Zone | null;
+  onRename?: (id: string, name: string) => void;
+  onDelete?: (id: string) => void;
+  onOpen?: (id: string) => void;
+  onAddItem?: (zoneId: string) => void;
 }
 
-export function ZoneDetailSidebar({ zone }: Props) {
+/** Right-hand zone inspector with capacity, fill, sales, dwell, misplaced, last
+ *  scan, constraint chips, and Open / Add item / Assign task actions. */
+export function ZoneDetailSidebar({ zone, onRename, onDelete, onOpen, onAddItem }: Props) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [draftName, setDraftName] = useState("");
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const close = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [menuOpen]);
+
   if (!zone) {
     return (
-      <div
-        style={{
-          width: 280,
-          borderLeft: "1px solid #1f2937",
-          background: "#0f172a",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: "#475569",
-          fontSize: 13,
-        }}
-      >
+      <aside className="flex w-72 shrink-0 items-center justify-center border-l border-border bg-surface text-sm text-muted-foreground">
         Select a zone to inspect
-      </div>
+      </aside>
     );
   }
 
   const fill =
     zone.items != null && zone.capacity ? Math.round((zone.items / zone.capacity) * 100) : 0;
-
   const { constraints } = zone;
 
   return (
-    <div
-      style={{
-        width: 280,
-        borderLeft: "1px solid #1f2937",
-        background: "#0f172a",
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
-      {/* Header */}
-      <div
-        style={{
-          padding: "12px 16px",
-          borderBottom: "1px solid #1f2937",
-          display: "flex",
-          alignItems: "flex-start",
-        }}
-      >
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 600, fontSize: 15, color: "#f1f5f9" }}>{zone.name}</div>
-          <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
+    <aside className="flex w-72 shrink-0 flex-col border-l border-border bg-surface">
+      <div className="flex items-start gap-2 border-b border-border p-4">
+        <div className="min-w-0 flex-1">
+          {renaming ? (
+            <input
+              autoFocus
+              value={draftName}
+              onChange={(e) => setDraftName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && draftName.trim()) {
+                  onRename?.(zone.id, draftName.trim());
+                  setRenaming(false);
+                }
+                if (e.key === "Escape") setRenaming(false);
+              }}
+              onBlur={() => setRenaming(false)}
+              className="w-full rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground"
+            />
+          ) : (
+            <div className="truncate text-sm font-semibold text-foreground">{zone.name}</div>
+          )}
+          <div className="mt-0.5 text-xs capitalize text-muted-foreground">
             {zone.type} · zone {zone.id}
           </div>
         </div>
-        <button
-          aria-label="more"
-          style={{
-            background: "transparent",
-            border: "none",
-            cursor: "pointer",
-            color: "#64748b",
-            fontSize: 18,
-            lineHeight: 1,
-          }}
-        >
-          ⋯
-        </button>
+        <div ref={menuRef} className="relative">
+          <button
+            type="button"
+            aria-label="more"
+            onClick={() => setMenuOpen((o) => !o)}
+            className="rounded-md p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          >
+            ⋯
+          </button>
+          {menuOpen && (
+            <div className="absolute right-0 z-20 mt-1 w-32 overflow-hidden rounded-md border border-border bg-surface shadow-md">
+              <button
+                type="button"
+                onClick={() => {
+                  setDraftName(zone.name);
+                  setRenaming(true);
+                  setMenuOpen(false);
+                }}
+                className="block w-full px-3 py-2 text-left text-sm text-foreground hover:bg-muted"
+              >
+                Rename
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onDelete?.(zone.id);
+                  setMenuOpen(false);
+                }}
+                className="block w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-muted"
+              >
+                Delete
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Body */}
-      <div style={{ flex: 1, padding: "10px 16px", overflowY: "auto" }}>
+      <div className="flex-1 overflow-y-auto p-4">
         <KV label="Capacity" value={`${zone.items ?? 0} / ${zone.capacity ?? 0}`} />
         <KV label="Fill" value={`${fill}%`} />
         {zone.sales != null && <KV label="Sales today" value={`$${zone.sales.toLocaleString()}`} />}
@@ -80,18 +111,10 @@ export function ZoneDetailSidebar({ zone }: Props) {
 
         {constraints && (
           <>
-            <div
-              style={{
-                marginTop: 14,
-                fontSize: 11,
-                fontWeight: 700,
-                color: "#64748b",
-                letterSpacing: "0.08em",
-              }}
-            >
-              CONSTRAINTS
+            <div className="mt-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Constraints
             </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+            <div className="mt-2 flex flex-wrap gap-1.5">
               {constraints.allowedCategories?.map((cat) => (
                 <Chip key={cat} accent>
                   {cat} only
@@ -104,58 +127,39 @@ export function ZoneDetailSidebar({ zone }: Props) {
         )}
       </div>
 
-      {/* Footer */}
-      <div
-        style={{
-          padding: "10px 16px",
-          borderTop: "1px solid #1f2937",
-          display: "flex",
-          gap: 8,
-        }}
-      >
+      <div className="flex flex-col gap-2 border-t border-border p-4">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onOpen?.(zone.id)}
+            className="text-sm font-medium text-foreground hover:underline"
+          >
+            Open zone
+          </button>
+          <button
+            type="button"
+            className="ml-auto rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white transition hover:opacity-90"
+          >
+            Assign task
+          </button>
+        </div>
         <button
-          style={{
-            flex: 1,
-            padding: "6px 0",
-            borderRadius: 6,
-            border: "1px solid #334155",
-            background: "transparent",
-            color: "#cbd5e1",
-            cursor: "pointer",
-            fontSize: 13,
-          }}
+          type="button"
+          onClick={() => onAddItem?.(zone.id)}
+          className="w-full rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-muted"
         >
-          Open zone
-        </button>
-        <button
-          style={{
-            flex: 1,
-            padding: "6px 0",
-            borderRadius: 6,
-            border: "none",
-            background: "#6366f1",
-            color: "#fff",
-            cursor: "pointer",
-            fontSize: 13,
-            fontWeight: 600,
-          }}
-        >
-          Assign task
+          + Add item to zone
         </button>
       </div>
-    </div>
+    </aside>
   );
 }
 
 function KV({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div
-      style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 13 }}
-    >
-      <span style={{ color: "#64748b" }}>{label}</span>
-      <span style={{ color: "#f1f5f9", fontFamily: mono ? "var(--mono, monospace)" : undefined }}>
-        {value}
-      </span>
+    <div className="flex items-center justify-between py-1 text-sm">
+      <span className="text-muted-foreground">{label}</span>
+      <span className={`text-foreground ${mono ? "font-mono text-xs" : ""}`}>{value}</span>
     </div>
   );
 }
@@ -163,15 +167,11 @@ function KV({ label, value, mono }: { label: string; value: string; mono?: boole
 function Chip({ children, accent }: { children: React.ReactNode; accent?: boolean }) {
   return (
     <span
-      style={{
-        padding: "2px 8px",
-        borderRadius: 999,
-        fontSize: 12,
-        background: accent ? "#312e81" : "#1e293b",
-        color: accent ? "#a5b4fc" : "#94a3b8",
-        border: `1px solid ${accent ? "#4338ca" : "#334155"}`,
-      }}
+      className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs ${
+        accent ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
+      }`}
     >
+      <span className="h-1.5 w-1.5 rounded-full bg-current" />
       {children}
     </span>
   );

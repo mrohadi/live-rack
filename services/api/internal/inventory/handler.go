@@ -24,6 +24,8 @@ type Store interface {
 	GetItemBySKU(ctx context.Context, arg store.GetItemBySKUParams) (store.Item, error)
 	ListItemLocationsBySKU(ctx context.Context, arg store.ListItemLocationsBySKUParams) ([]store.ListItemLocationsBySKURow, error)
 	ListScanEventsBySKU(ctx context.Context, arg store.ListScanEventsBySKUParams) ([]store.ScanEvent, error)
+	UpdateItem(ctx context.Context, arg store.UpdateItemParams) (store.Item, error)
+	SetItemLocationQty(ctx context.Context, arg store.SetItemLocationQtyParams) (store.ItemLocation, error)
 }
 
 // Handler serves inventory endpoints.
@@ -42,6 +44,8 @@ func (h *Handler) Register(g *echo.Group) {
 	g.POST("/:storeID/inventory", h.Add)
 	g.POST("/:storeID/inventory/transfer", h.Transfer)
 	g.GET("/:storeID/inventory/:sku", h.Detail)
+	g.PATCH("/:storeID/inventory/:sku", h.EditItem)
+	g.PATCH("/:storeID/inventory/:sku/qty", h.AdjustQty)
 }
 
 // Row is one on-hand line returned to the client.
@@ -425,5 +429,139 @@ func (h *Handler) Detail(c echo.Context) error {
 		StockStatus:  string(domain.StockStatusFromQty(int(total), rp)),
 		Locations:    locations,
 		RecentScans:  recent,
+	})
+}
+
+// EditItemRequest is the PATCH /inventory/:sku body.
+type EditItemRequest struct {
+	Name         string `json:"name"`
+	Category     string `json:"category"`
+	Status       string `json:"status"`
+	ReorderPoint int32  `json:"reorder_point"`
+}
+
+// EditItem godoc
+//
+//	@Summary		Edit master-catalog fields for a SKU
+//	@Tags			inventory
+//	@Accept			json
+//	@Produce		json
+//	@Param			storeID	path		string			true	"Store UUID"
+//	@Param			sku		path		string			true	"SKU"
+//	@Param			body	body		EditItemRequest	true	"Item fields"
+//	@Success		200		{object}	map[string]any
+//	@Failure		400		{object}	map[string]string
+//	@Failure		404		{object}	map[string]string
+//	@Router			/stores/{storeID}/inventory/{sku} [patch]
+func (h *Handler) EditItem(c echo.Context) error {
+	p, err := pkgauth.PrincipalFrom(c.Request().Context())
+	if err != nil {
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
+	}
+
+	sku := c.Param("sku")
+	if sku == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "sku required")
+	}
+
+	var req EditItemRequest
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid body")
+	}
+	if !domain.ItemStatus(req.Status).Valid() {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid status")
+	}
+	if req.ReorderPoint < 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "reorder_point must be non-negative")
+	}
+
+	item, err := h.q.UpdateItem(c.Request().Context(), store.UpdateItemParams{
+		OrgID:        p.OrgID,
+		Sku:          sku,
+		Name:         req.Name,
+		Category:     req.Category,
+		Status:       req.Status,
+		ReorderPoint: req.ReorderPoint,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusNotFound, "item not found")
+		}
+		return echo.NewHTTPError(http.StatusInternalServerError, "update item")
+	}
+
+	return c.JSON(http.StatusOK, map[string]any{
+		"sku":           item.Sku,
+		"name":          item.Name,
+		"category":      item.Category,
+		"status":        item.Status,
+		"reorder_point": item.ReorderPoint,
+	})
+}
+
+// AdjustQtyRequest is the PATCH /inventory/:sku/qty body — absolute set.
+type AdjustQtyRequest struct {
+	ZoneID string `json:"zone_id"`
+	Qty    int32  `json:"qty"`
+}
+
+// AdjustQty godoc
+//
+//	@Summary		Manually correct on-hand qty in a zone (shrinkage, damage, count)
+//	@Tags			inventory
+//	@Accept			json
+//	@Produce		json
+//	@Param			storeID	path		string				true	"Store UUID"
+//	@Param			sku		path		string				true	"SKU"
+//	@Param			body	body		AdjustQtyRequest	true	"Zone + absolute qty"
+//	@Success		200		{object}	map[string]any
+//	@Failure		400		{object}	map[string]string
+//	@Failure		404		{object}	map[string]string
+//	@Router			/stores/{storeID}/inventory/{sku}/qty [patch]
+func (h *Handler) AdjustQty(c echo.Context) error {
+	p, err := pkgauth.PrincipalFrom(c.Request().Context())
+	if err != nil {
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
+	}
+
+	storeID, err := uuid.Parse(c.Param("storeID"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid store id")
+	}
+	sku := c.Param("sku")
+	if sku == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "sku required")
+	}
+
+	var req AdjustQtyRequest
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid body")
+	}
+	if req.Qty < 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "qty must be non-negative")
+	}
+	zoneID, err := uuid.Parse(req.ZoneID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid zone_id")
+	}
+
+	loc, err := h.q.SetItemLocationQty(c.Request().Context(), store.SetItemLocationQtyParams{
+		OrgID:   p.OrgID,
+		StoreID: storeID,
+		ZoneID:  zoneID,
+		Sku:     sku,
+		Qty:     req.Qty,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusNotFound, "location not found")
+		}
+		return echo.NewHTTPError(http.StatusInternalServerError, "set qty")
+	}
+
+	return c.JSON(http.StatusOK, map[string]any{
+		"sku":     loc.Sku,
+		"zone_id": loc.ZoneID,
+		"qty":     loc.Qty,
 	})
 }

@@ -223,3 +223,41 @@ func (q *Queries) ListItemLocationsBySKU(ctx context.Context, arg ListItemLocati
 	}
 	return items, nil
 }
+
+const setItemLocationQty = `-- name: SetItemLocationQty :one
+UPDATE item_locations
+SET qty = GREATEST($1::int, 0)
+WHERE org_id = $2 AND store_id = $3 AND zone_id = $4 AND sku = $5
+RETURNING id, org_id, store_id, zone_id, sku, qty, updated_at
+`
+
+type SetItemLocationQtyParams struct {
+	Qty     int32     `json:"qty"`
+	OrgID   uuid.UUID `json:"org_id"`
+	StoreID uuid.UUID `json:"store_id"`
+	ZoneID  uuid.UUID `json:"zone_id"`
+	Sku     string    `json:"sku"`
+}
+
+// Absolute on-hand correction for one zone (shrinkage, damage, cycle count).
+// Returns no rows when the location does not exist (caller maps to 404).
+func (q *Queries) SetItemLocationQty(ctx context.Context, arg SetItemLocationQtyParams) (ItemLocation, error) {
+	row := q.db.QueryRow(ctx, setItemLocationQty,
+		arg.Qty,
+		arg.OrgID,
+		arg.StoreID,
+		arg.ZoneID,
+		arg.Sku,
+	)
+	var i ItemLocation
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.StoreID,
+		&i.ZoneID,
+		&i.Sku,
+		&i.Qty,
+		&i.UpdatedAt,
+	)
+	return i, err
+}

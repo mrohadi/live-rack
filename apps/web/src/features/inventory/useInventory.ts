@@ -118,6 +118,41 @@ export function useTransferStock(storeId: string) {
   });
 }
 
+/** Editable master-catalog fields (LR-310). */
+export interface EditItemBody {
+  name: string;
+  category: string;
+  status: string;
+  reorder_point: number;
+}
+
+function invalidateItem(qc: ReturnType<typeof useQueryClient>, storeId: string, sku: string) {
+  void qc.invalidateQueries({ queryKey: inventoryKeys.list(storeId) });
+  void qc.invalidateQueries({ queryKey: inventoryKeys.detail(storeId, sku) });
+}
+
+/** Edit catalog fields for a SKU. */
+export function useEditItem(storeId: string, sku: string) {
+  const { patch } = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: EditItemBody) =>
+      patch<EditItemBody>(`${inventoryPath(storeId)}/${encodeURIComponent(sku)}`, body),
+    onSuccess: () => invalidateItem(qc, storeId, sku),
+  });
+}
+
+/** Absolute on-hand correction for one zone (shrinkage, damage, count). */
+export function useAdjustQty(storeId: string, sku: string) {
+  const { patch } = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { zone_id: string; qty: number }) =>
+      patch(`${inventoryPath(storeId)}/${encodeURIComponent(sku)}/qty`, body),
+    onSuccess: () => invalidateItem(qc, storeId, sku),
+  });
+}
+
 /** Apply a live scan event to the cached inventory rows. Pure — returns next state. */
 export function patchInventory(
   rows: InventoryRow[] | undefined,

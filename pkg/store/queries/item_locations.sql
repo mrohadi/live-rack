@@ -15,6 +15,14 @@ WHERE org_id = @org_id AND zone_id = @zone_id AND sku = @sku
   AND qty >= @qty::int
 RETURNING *;
 
+-- name: SetItemLocationQty :one
+-- Absolute on-hand correction for one zone (shrinkage, damage, cycle count).
+-- Returns no rows when the location does not exist (caller maps to 404).
+UPDATE item_locations
+SET qty = GREATEST(@qty::int, 0)
+WHERE org_id = @org_id AND store_id = @store_id AND zone_id = @zone_id AND sku = @sku
+RETURNING *;
+
 -- name: ListItemLocationsBySKU :many
 -- Per-zone on-hand for a single SKU across a store (item detail drawer).
 SELECT

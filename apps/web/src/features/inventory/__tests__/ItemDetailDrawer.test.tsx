@@ -1,12 +1,14 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
+import { ToastProvider } from "../../../components/feedback/toast";
 import { ItemDetailDrawer } from "../ItemDetailDrawer";
 import type { ItemDetail } from "../types";
 
 const mockGet = vi.fn();
+const mockPatch = vi.fn();
 
-vi.mock("../../../lib/api", () => ({ useApi: () => ({ get: mockGet }) }));
+vi.mock("../../../lib/api", () => ({ useApi: () => ({ get: mockGet, patch: mockPatch }) }));
 vi.mock("react-oidc-context", () => ({ useAuth: () => ({ user: { profile: {} } }) }));
 vi.mock("../../map/useCurrentStore", () => ({ useCurrentStore: () => "store-1" }));
 
@@ -38,7 +40,9 @@ function renderDrawer(onClose = vi.fn()) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <ItemDetailDrawer sku="SKU-7" onClose={onClose} />
+      <ToastProvider>
+        <ItemDetailDrawer sku="SKU-7" onClose={onClose} />
+      </ToastProvider>
     </QueryClientProvider>,
   );
 }
@@ -61,5 +65,40 @@ describe("ItemDetailDrawer", () => {
     await screen.findByText("Widget");
     fireEvent.click(screen.getByLabelText("Close"));
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it("edits catalog fields via PATCH /inventory/:sku", async () => {
+    mockPatch.mockResolvedValue({});
+    renderDrawer();
+    await screen.findByText("Widget");
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByDisplayValue("Widget"), { target: { value: "Widget Pro" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(mockPatch).toHaveBeenCalledWith(
+        "/api/v1/stores/store-1/inventory/SKU-7",
+        expect.objectContaining({ name: "Widget Pro", reorder_point: 5 }),
+      ),
+    );
+  });
+
+  it("corrects a zone qty via PATCH /inventory/:sku/qty", async () => {
+    mockPatch.mockResolvedValue({});
+    renderDrawer();
+    await screen.findByText("Widget");
+
+    // zone-1 (Frozen) shows qty 3 as a button; click to edit
+    fireEvent.click(screen.getByRole("button", { name: "3" }));
+    fireEvent.change(screen.getByDisplayValue("3"), { target: { value: "2" } });
+    fireEvent.click(screen.getByRole("button", { name: "✓" }));
+
+    await waitFor(() =>
+      expect(mockPatch).toHaveBeenCalledWith("/api/v1/stores/store-1/inventory/SKU-7/qty", {
+        zone_id: "z1",
+        qty: 2,
+      }),
+    );
   });
 });

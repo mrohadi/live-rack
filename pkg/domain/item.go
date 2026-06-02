@@ -15,6 +15,17 @@ const (
 	ItemStatusRecalled     ItemStatus = "recalled"
 )
 
+// Valid reports whether s is a known item lifecycle state. Mirrors the
+// items.status CHECK constraint.
+func (s ItemStatus) Valid() bool {
+	switch s {
+	case ItemStatusActive, ItemStatusDiscontinued, ItemStatusRecalled:
+		return true
+	default:
+		return false
+	}
+}
+
 // Item is a master-catalog product, unique per org by SKU.
 type Item struct {
 	ID       uuid.UUID  `json:"id"`

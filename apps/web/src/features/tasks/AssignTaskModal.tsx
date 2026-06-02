@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useToast } from "../../components/feedback/toast-context";
+import { useUsers } from "../users/useUsers";
 import { useCreateTask } from "./useTasks";
 import { useCurrentStore } from "../map/useCurrentStore";
 import type { TaskPriority } from "./types";
@@ -19,11 +20,13 @@ const PRIORITIES: { value: TaskPriority; label: string }[] = [
 export function AssignTaskModal({ zoneId, zoneName, onClose }: Props) {
   const storeId = useCurrentStore();
   const createTask = useCreateTask(storeId);
+  const { data: members = [] } = useUsers();
   const toast = useToast();
 
   const [title, setTitle] = useState("");
   const [priority, setPriority] = useState<TaskPriority>("med");
   const [dueAt, setDueAt] = useState("");
+  const [assigneeId, setAssigneeId] = useState("");
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,6 +37,7 @@ export function AssignTaskModal({ zoneId, zoneName, onClose }: Props) {
         title: title.trim(),
         priority,
         due_at: dueAt ? new Date(dueAt).toISOString() : undefined,
+        assignee_id: assigneeId || undefined,
       },
       {
         onSuccess: () => {
@@ -93,6 +97,21 @@ export function AssignTaskModal({ zoneId, zoneName, onClose }: Props) {
             {PRIORITIES.map((p) => (
               <option key={p.value} value={p.value}>
                 {p.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        <Field label="Assign to (optional)">
+          <select
+            value={assigneeId}
+            onChange={(e) => setAssigneeId(e.target.value)}
+            className="w-full rounded border border-border bg-background px-3 py-2 text-sm text-foreground"
+          >
+            <option value="">Unassigned</option>
+            {members.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.display_name || m.email}
               </option>
             ))}
           </select>

@@ -30,6 +30,7 @@ export interface CreateTaskInput {
   title: string;
   priority: TaskPriority;
   due_at?: string;
+  assignee_id?: string;
 }
 
 /** Create a new task, optionally scoped to a zone. */
@@ -38,6 +39,17 @@ export function useCreateTask(storeId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: CreateTaskInput) => post<Task>(tasksPath(storeId), input),
+    onSettled: () => void qc.invalidateQueries({ queryKey: taskKeys.list(storeId) }),
+  });
+}
+
+/** Assign (or re-assign) a member to an existing task. */
+export function useAssignTask(storeId: string) {
+  const { patch } = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ taskId, assigneeId }: { taskId: string; assigneeId: string }) =>
+      patch<Task>(`${tasksPath(storeId)}/${taskId}/assignee`, { assignee_id: assigneeId }),
     onSettled: () => void qc.invalidateQueries({ queryKey: taskKeys.list(storeId) }),
   });
 }

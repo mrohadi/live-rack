@@ -1,15 +1,20 @@
 import { useDroppable } from "@dnd-kit/core";
 import { TaskCard } from "./TaskCard";
 import type { Task, TaskStatus } from "./types";
+import type { OrgUser } from "../users/useUsers";
 
 export function KanbanColumn({
   status,
   label,
   tasks,
+  members,
+  onAssign,
 }: {
   status: TaskStatus;
   label: string;
   tasks: Task[];
+  members?: OrgUser[];
+  onAssign?: (task: Task) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
 
@@ -28,7 +33,7 @@ export function KanbanColumn({
         </span>
       </div>
       {tasks.map((t) => (
-        <TaskCard key={t.id} task={t} />
+        <TaskCard key={t.id} task={t} members={members} onAssign={onAssign} />
       ))}
     </div>
   );

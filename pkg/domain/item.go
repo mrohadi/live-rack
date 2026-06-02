@@ -17,14 +17,16 @@ const (
 
 // Item is a master-catalog product, unique per org by SKU.
 type Item struct {
-	ID        uuid.UUID  `json:"id"`
-	OrgID     uuid.UUID  `json:"org_id"`
-	SKU       string     `json:"sku"`
-	Name      string     `json:"name"`
-	Category  string     `json:"category"`
-	Status    ItemStatus `json:"status"`
-	CreatedAt time.Time  `json:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at"`
+	ID       uuid.UUID  `json:"id"`
+	OrgID    uuid.UUID  `json:"org_id"`
+	SKU      string     `json:"sku"`
+	Name     string     `json:"name"`
+	Category string     `json:"category"`
+	Status   ItemStatus `json:"status"`
+	// ReorderPoint is the qty at/below which a restock is triggered. 0 disables.
+	ReorderPoint int       `json:"reorder_point"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 // ItemLocation is the current on-hand quantity of a SKU in one zone.

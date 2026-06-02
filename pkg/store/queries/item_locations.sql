@@ -14,9 +14,10 @@ SELECT
     il.sku,
     il.qty,
     il.updated_at,
-    COALESCE(i.name, '')     AS name,
-    COALESCE(i.category, '') AS category,
-    COALESCE(i.status, '')   AS status,
+    COALESCE(i.name, '')      AS name,
+    COALESCE(i.category, '')  AS category,
+    COALESCE(i.status, '')    AS status,
+    COALESCE(i.reorder_point, 0)::int AS reorder_point,
     COALESCE((
         SELECT count(*) FROM scan_events se
         WHERE se.org_id = il.org_id AND se.zone_id = il.zone_id AND se.sku = il.sku

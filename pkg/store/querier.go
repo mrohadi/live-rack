@@ -14,6 +14,7 @@ type Querier interface {
 	AdjustItemLocationQty(ctx context.Context, arg AdjustItemLocationQtyParams) (ItemLocation, error)
 	AssignTask(ctx context.Context, arg AssignTaskParams) (Task, error)
 	BindUserRole(ctx context.Context, arg BindUserRoleParams) error
+	CountOpenTasksByTitle(ctx context.Context, arg CountOpenTasksByTitleParams) (int64, error)
 	CountZonesByStore(ctx context.Context, arg CountZonesByStoreParams) (int64, error)
 	CreateCard(ctx context.Context, arg CreateCardParams) (PipelineCard, error)
 	CreateInvitedUser(ctx context.Context, arg CreateInvitedUserParams) (User, error)

@@ -27,3 +27,8 @@ RETURNING *;
 -- name: DeleteTask :exec
 DELETE FROM tasks
 WHERE org_id = $1 AND id = $2;
+
+-- name: CountOpenTasksByTitle :one
+SELECT count(*) FROM tasks
+WHERE org_id = $1 AND store_id = $2 AND zone_id = $3
+  AND title = $4 AND status <> 'done';

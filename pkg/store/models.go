@@ -105,14 +105,15 @@ type Integration struct {
 }
 
 type Item struct {
-	ID        uuid.UUID `json:"id"`
-	OrgID     uuid.UUID `json:"org_id"`
-	Sku       string    `json:"sku"`
-	Name      string    `json:"name"`
-	Category  string    `json:"category"`
-	Status    string    `json:"status"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID           uuid.UUID `json:"id"`
+	OrgID        uuid.UUID `json:"org_id"`
+	Sku          string    `json:"sku"`
+	Name         string    `json:"name"`
+	Category     string    `json:"category"`
+	Status       string    `json:"status"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+	ReorderPoint int32     `json:"reorder_point"`
 }
 
 type ItemLocation struct {

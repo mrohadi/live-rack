@@ -44,6 +44,31 @@ func (q *Queries) AssignTask(ctx context.Context, arg AssignTaskParams) (Task, e
 	return i, err
 }
 
+const countOpenTasksByTitle = `-- name: CountOpenTasksByTitle :one
+SELECT count(*) FROM tasks
+WHERE org_id = $1 AND store_id = $2 AND zone_id = $3
+  AND title = $4 AND status <> 'done'
+`
+
+type CountOpenTasksByTitleParams struct {
+	OrgID   uuid.UUID   `json:"org_id"`
+	StoreID uuid.UUID   `json:"store_id"`
+	ZoneID  pgtype.UUID `json:"zone_id"`
+	Title   string      `json:"title"`
+}
+
+func (q *Queries) CountOpenTasksByTitle(ctx context.Context, arg CountOpenTasksByTitleParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countOpenTasksByTitle,
+		arg.OrgID,
+		arg.StoreID,
+		arg.ZoneID,
+		arg.Title,
+	)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createTask = `-- name: CreateTask :one
 INSERT INTO tasks (org_id, store_id, zone_id, title, status, priority, assignee_id, due_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)

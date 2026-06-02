@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { InventoryRow } from "../types";
-import { filterInventory, rowStockStatus, rowVelocity } from "../useInventory";
+import { filterInventory, formatCents, rowStockStatus, rowVelocity } from "../useInventory";
 
 function row(over: Partial<InventoryRow>): InventoryRow {
   return {
@@ -28,6 +28,17 @@ describe("rowVelocity", () => {
   it("defaults missing velocity to cold", () => {
     expect(rowVelocity(row({ velocity: undefined }))).toBe("cold");
     expect(rowVelocity(row({ velocity: "hot" }))).toBe("hot");
+  });
+});
+
+describe("formatCents", () => {
+  it("renders integer cents as USD", () => {
+    expect(formatCents(0)).toBe("$0.00");
+    expect(formatCents(250)).toBe("$2.50");
+    expect(formatCents(199900)).toBe("$1999.00");
+  });
+  it("treats undefined as zero", () => {
+    expect(formatCents(undefined)).toBe("$0.00");
   });
 });
 

@@ -114,6 +114,7 @@ type Item struct {
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 	ReorderPoint int32     `json:"reorder_point"`
+	PriceCents   int32     `json:"price_cents"`
 }
 
 type ItemLocation struct {

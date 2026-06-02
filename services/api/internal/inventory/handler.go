@@ -81,6 +81,8 @@ type Row struct {
 	Qty          int32     `json:"qty"`
 	ReorderPoint int32     `json:"reorder_point"`
 	StockStatus  string    `json:"stock_status"`
+	PriceCents   int32     `json:"price_cents"`
+	ValueCents   int64     `json:"value_cents"`
 	UpdatedAt    string    `json:"updated_at"`
 	Velocity     string    `json:"velocity"`
 }
@@ -94,6 +96,7 @@ type AddRequest struct {
 	Status       string `json:"status"`
 	Qty          int32  `json:"qty"`
 	ReorderPoint int32  `json:"reorder_point"`
+	PriceCents   int32  `json:"price_cents"`
 }
 
 // List godoc
@@ -136,6 +139,8 @@ func (h *Handler) List(c echo.Context) error {
 			Qty:          r.Qty,
 			ReorderPoint: r.ReorderPoint,
 			StockStatus:  string(domain.StockStatusFromQty(int(r.Qty), int(r.ReorderPoint))),
+			PriceCents:   r.PriceCents,
+			ValueCents:   int64(r.Qty) * int64(r.PriceCents),
 			UpdatedAt:    r.UpdatedAt.UTC().Format("2006-01-02T15:04:05Z07:00"),
 			Velocity:     string(domain.VelocityFromPicks(int(r.Picks7d), int(r.Picks30d))),
 		})
@@ -189,6 +194,9 @@ func (h *Handler) Add(c echo.Context) error {
 	if req.ReorderPoint < 0 {
 		return echo.NewHTTPError(http.StatusBadRequest, "reorder_point must be non-negative")
 	}
+	if req.PriceCents < 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "price_cents must be non-negative")
+	}
 
 	// Ensure item master exists.
 	_, err = h.q.UpsertItem(c.Request().Context(), store.UpsertItemParams{
@@ -198,6 +206,7 @@ func (h *Handler) Add(c echo.Context) error {
 		Category:     req.Category,
 		Status:       status,
 		ReorderPoint: req.ReorderPoint,
+		PriceCents:   req.PriceCents,
 	})
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "upsert item")
@@ -229,6 +238,8 @@ func (h *Handler) Add(c echo.Context) error {
 		Qty:          loc.Qty,
 		ReorderPoint: req.ReorderPoint,
 		StockStatus:  string(domain.StockStatusFromQty(int(loc.Qty), int(req.ReorderPoint))),
+		PriceCents:   req.PriceCents,
+		ValueCents:   int64(loc.Qty) * int64(req.PriceCents),
 		UpdatedAt:    loc.UpdatedAt.UTC().Format("2006-01-02T15:04:05Z07:00"),
 		Velocity:     "cold",
 	})
@@ -362,7 +373,9 @@ type DetailResponse struct {
 	Category     string        `json:"category"`
 	Status       string        `json:"status"`
 	ReorderPoint int32         `json:"reorder_point"`
+	PriceCents   int32         `json:"price_cents"`
 	TotalQty     int32         `json:"total_qty"`
+	TotalValue   int64         `json:"total_value_cents"`
 	StockStatus  string        `json:"stock_status"`
 	Locations    []LocationRow `json:"locations"`
 	RecentScans  []ScanRow     `json:"recent_scans"`
@@ -455,7 +468,9 @@ func (h *Handler) Detail(c echo.Context) error {
 		Category:     item.Category,
 		Status:       item.Status,
 		ReorderPoint: item.ReorderPoint,
+		PriceCents:   item.PriceCents,
 		TotalQty:     total,
+		TotalValue:   int64(total) * int64(item.PriceCents),
 		StockStatus:  string(domain.StockStatusFromQty(int(total), rp)),
 		Locations:    locations,
 		RecentScans:  recent,
@@ -468,6 +483,7 @@ type EditItemRequest struct {
 	Category     string `json:"category"`
 	Status       string `json:"status"`
 	ReorderPoint int32  `json:"reorder_point"`
+	PriceCents   int32  `json:"price_cents"`
 }
 
 // EditItem godoc
@@ -504,6 +520,9 @@ func (h *Handler) EditItem(c echo.Context) error {
 	if req.ReorderPoint < 0 {
 		return echo.NewHTTPError(http.StatusBadRequest, "reorder_point must be non-negative")
 	}
+	if req.PriceCents < 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "price_cents must be non-negative")
+	}
 
 	item, err := h.q.UpdateItem(c.Request().Context(), store.UpdateItemParams{
 		OrgID:        p.OrgID,
@@ -512,6 +531,7 @@ func (h *Handler) EditItem(c echo.Context) error {
 		Category:     req.Category,
 		Status:       req.Status,
 		ReorderPoint: req.ReorderPoint,
+		PriceCents:   req.PriceCents,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -523,6 +543,7 @@ func (h *Handler) EditItem(c echo.Context) error {
 	h.record(c.Request().Context(), p, "inventory.edit", sku, map[string]any{
 		"name": item.Name, "category": item.Category,
 		"status": item.Status, "reorder_point": item.ReorderPoint,
+		"price_cents": item.PriceCents,
 	})
 
 	return c.JSON(http.StatusOK, map[string]any{
@@ -531,6 +552,7 @@ func (h *Handler) EditItem(c echo.Context) error {
 		"category":      item.Category,
 		"status":        item.Status,
 		"reorder_point": item.ReorderPoint,
+		"price_cents":   item.PriceCents,
 	})
 }
 

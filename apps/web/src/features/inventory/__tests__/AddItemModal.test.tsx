@@ -73,10 +73,12 @@ describe("AddItemModal", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Add item" }));
 
-    await waitFor(() => expect(mockPost).toHaveBeenCalledWith(
-      "/api/v1/stores/store-1/inventory",
-      expect.objectContaining({ sku: "SKU-42", qty: 3, zone_id: "zone-1" }),
-    ));
+    await waitFor(() =>
+      expect(mockPost).toHaveBeenCalledWith(
+        "/api/v1/stores/store-1/inventory",
+        expect.objectContaining({ sku: "SKU-42", qty: 3, zone_id: "zone-1" }),
+      ),
+    );
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 

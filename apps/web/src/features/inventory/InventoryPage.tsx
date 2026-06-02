@@ -13,6 +13,7 @@ import {
   rowVelocity,
   useInventory,
 } from "./useInventory";
+import { AddItemModal } from "./AddItemModal";
 
 const VELOCITY_STYLES: Record<string, string> = {
   hot: "bg-destructive/15 text-destructive",
@@ -64,6 +65,7 @@ export function InventoryPage() {
   const [zone, setZone] = useState("all");
   const [status, setStatus] = useState("all");
   const [velocity, setVelocity] = useState("all");
+  const [showAdd, setShowAdd] = useState(false);
 
   const zones = useMemo(() => Array.from(new Set(rows.map((r) => r.zone_id))), [rows]);
   const visible = useMemo(
@@ -104,6 +106,13 @@ export function InventoryPage() {
               </option>
             ))}
           </FilterSelect>
+          <button
+            type="button"
+            onClick={() => setShowAdd(true)}
+            className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white transition hover:opacity-90"
+          >
+            + Add item
+          </button>
         </div>
       </header>
 
@@ -151,6 +160,8 @@ export function InventoryPage() {
           </tbody>
         </table>
       </div>
+
+      {showAdd && <AddItemModal onClose={() => setShowAdd(false)} />}
     </div>
   );
 }

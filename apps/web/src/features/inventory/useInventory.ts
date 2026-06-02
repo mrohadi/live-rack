@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../../lib/api";
 import type { InventoryRow, ItemStatus, VelocityBand } from "./types";
 import type { ScanRecorded } from "../../lib/ws";
@@ -50,6 +50,27 @@ export function useInventory(storeId: string) {
 /** Signed quantity delta a scan applies: pick removes stock, everything else adds. */
 export function scanQtyDelta(action: string): number {
   return action === "pick" ? -1 : 1;
+}
+
+/** Request body for POST /stores/:storeID/inventory */
+export interface AddItemBody {
+  zone_id: string;
+  sku: string;
+  name: string;
+  category: string;
+  status?: string;
+  qty: number;
+}
+
+/** Add or adjust an item's qty in a zone. */
+export function useAddItem(storeId: string) {
+  const { post } = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: AddItemBody) =>
+      post<InventoryRow>(inventoryPath(storeId), body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: inventoryKeys.list(storeId) }),
+  });
 }
 
 /** Apply a live scan event to the cached inventory rows. Pure — returns next state. */

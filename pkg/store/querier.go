@@ -13,11 +13,14 @@ import (
 type Querier interface {
 	AddPickLine(ctx context.Context, arg AddPickLineParams) (PickListLine, error)
 	AdjustItemLocationQty(ctx context.Context, arg AdjustItemLocationQtyParams) (ItemLocation, error)
+	// Attach the given open pick lists to a wave (skips lists already in a wave).
+	AssignListsToWave(ctx context.Context, arg AssignListsToWaveParams) error
 	AssignTask(ctx context.Context, arg AssignTaskParams) (Task, error)
 	BindUserRole(ctx context.Context, arg BindUserRoleParams) error
 	CancelPickList(ctx context.Context, arg CancelPickListParams) (PickList, error)
 	CompleteCycleCount(ctx context.Context, arg CompleteCycleCountParams) (CycleCount, error)
 	CompletePickList(ctx context.Context, arg CompletePickListParams) (PickList, error)
+	CompleteWave(ctx context.Context, arg CompleteWaveParams) (Wave, error)
 	CountOpenTasksByTitle(ctx context.Context, arg CountOpenTasksByTitleParams) (int64, error)
 	CountZonesByStore(ctx context.Context, arg CountZonesByStoreParams) (int64, error)
 	CreateCard(ctx context.Context, arg CreateCardParams) (PipelineCard, error)
@@ -30,6 +33,7 @@ type Querier interface {
 	CreateStage(ctx context.Context, arg CreateStageParams) (PipelineStage, error)
 	CreateStore(ctx context.Context, arg CreateStoreParams) (Store, error)
 	CreateTask(ctx context.Context, arg CreateTaskParams) (Task, error)
+	CreateWave(ctx context.Context, arg CreateWaveParams) (Wave, error)
 	CreateZone(ctx context.Context, arg CreateZoneParams) (Zone, error)
 	// Guarded source decrement for a transfer: only succeeds when the location
 	// holds at least @qty. Returns no rows (pgx.ErrNoRows) when stock is
@@ -50,6 +54,7 @@ type Querier interface {
 	GetUserByIdpID(ctx context.Context, idpUserID string) (User, error)
 	GetUserRole(ctx context.Context, arg GetUserRoleParams) (string, error)
 	GetUserStoreIDs(ctx context.Context, arg GetUserStoreIDsParams) ([]uuid.UUID, error)
+	GetWave(ctx context.Context, arg GetWaveParams) (Wave, error)
 	GetZone(ctx context.Context, arg GetZoneParams) (Zone, error)
 	InsertInboundWebhook(ctx context.Context, arg InsertInboundWebhookParams) (WebhooksInbound, error)
 	ListCardsByPipeline(ctx context.Context, arg ListCardsByPipelineParams) ([]PipelineCard, error)
@@ -70,6 +75,13 @@ type Querier interface {
 	ListStagesByPipeline(ctx context.Context, arg ListStagesByPipelineParams) ([]PipelineStage, error)
 	ListStoresByOrg(ctx context.Context, orgID uuid.UUID) ([]Store, error)
 	ListTasksByStore(ctx context.Context, arg ListTasksByStoreParams) ([]Task, error)
+	// Aggregate member order lines into one stop per SKU+zone, summing demand and
+	// picked qty across the wave's orders. Only mapped stops are returned.
+	ListWaveMergedLines(ctx context.Context, arg ListWaveMergedLinesParams) ([]ListWaveMergedLinesRow, error)
+	// Member order lines for one SKU+zone stop, in FIFO order (oldest order first),
+	// for allocating a merged picked quantity back to orders.
+	ListWaveStopMemberLines(ctx context.Context, arg ListWaveStopMemberLinesParams) ([]ListWaveStopMemberLinesRow, error)
+	ListWavesByStore(ctx context.Context, arg ListWavesByStoreParams) ([]ListWavesByStoreRow, error)
 	ListZonesByStore(ctx context.Context, arg ListZonesByStoreParams) ([]Zone, error)
 	MarkWebhookStatus(ctx context.Context, arg MarkWebhookStatusParams) error
 	MoveCard(ctx context.Context, arg MoveCardParams) (PipelineCard, error)
@@ -91,6 +103,7 @@ type Querier interface {
 	// Seed one line per SKU currently on-hand in the zone, capturing system_qty.
 	SnapshotCountLines(ctx context.Context, arg SnapshotCountLinesParams) error
 	StartPickList(ctx context.Context, arg StartPickListParams) (PickList, error)
+	StartWave(ctx context.Context, arg StartWaveParams) (Wave, error)
 	// Edit master-catalog fields for an existing SKU (LR-310).
 	UpdateItem(ctx context.Context, arg UpdateItemParams) (Item, error)
 	UpdateTaskStatus(ctx context.Context, arg UpdateTaskStatusParams) (Task, error)

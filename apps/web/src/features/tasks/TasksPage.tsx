@@ -2,7 +2,7 @@ import { useState } from "react";
 import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { useToast } from "../../components/feedback/toast-context";
 import { useCurrentStore } from "../map/useCurrentStore";
-import { useUsers } from "../users/useUsers";
+import { useMembers } from "../users/useUsers";
 import { KanbanColumn } from "./KanbanColumn";
 import { AssignMemberModal } from "./AssignMemberModal";
 import { TASK_COLUMNS, type Task, type TaskStatus } from "./types";
@@ -11,7 +11,7 @@ import { groupByStatus, useMoveTask, useTasks } from "./useTasks";
 export function TasksPage() {
   const storeId = useCurrentStore();
   const { data: tasks = [], isLoading } = useTasks(storeId);
-  const { data: members = [] } = useUsers();
+  const { data: members = [] } = useMembers();
   const move = useMoveTask(storeId);
   const toast = useToast();
 

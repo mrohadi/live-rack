@@ -1,7 +1,7 @@
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import type { Task, TaskPriority } from "./types";
-import type { OrgUser } from "../users/useUsers";
+import type { MemberPickerItem } from "../users/useUsers";
 
 const PRIORITY_STYLES: Record<TaskPriority, string> = {
   high: "bg-destructive/15 text-destructive",
@@ -11,7 +11,7 @@ const PRIORITY_STYLES: Record<TaskPriority, string> = {
 
 interface Props {
   task: Task;
-  members?: OrgUser[];
+  members?: MemberPickerItem[];
   onAssign?: (task: Task) => void;
 }
 

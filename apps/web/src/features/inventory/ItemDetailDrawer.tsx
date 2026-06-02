@@ -3,7 +3,13 @@ import { useToast } from "../../components/feedback/toast-context";
 import { Select } from "../../components/ui/Select";
 import { useCurrentStore } from "../map/useCurrentStore";
 import type { ItemDetail, StockStatus } from "./types";
-import { ITEM_STATUSES, useAdjustQty, useEditItem, useItemDetail } from "./useInventory";
+import {
+  ITEM_STATUSES,
+  formatCents,
+  useAdjustQty,
+  useEditItem,
+  useItemDetail,
+} from "./useInventory";
 
 const INPUT =
   "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20";
@@ -82,10 +88,7 @@ export function ItemDetailDrawer({ sku, onClose }: Props) {
             {/* Summary */}
             <div className="grid grid-cols-3 gap-3">
               <Stat label="Total qty" value={String(data.total_qty)} />
-              <Stat
-                label="Reorder pt"
-                value={data.reorder_point > 0 ? String(data.reorder_point) : "—"}
-              />
+              <Stat label="Unit price" value={formatCents(data.price_cents)} />
               <div>
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Stock</p>
                 <span
@@ -94,6 +97,11 @@ export function ItemDetailDrawer({ sku, onClose }: Props) {
                   {STOCK_LABELS[data.stock_status]}
                 </span>
               </div>
+              <Stat
+                label="Reorder pt"
+                value={data.reorder_point > 0 ? String(data.reorder_point) : "—"}
+              />
+              <Stat label="Stock value" value={formatCents(data.total_value_cents)} />
             </div>
 
             {/* Per-zone locations */}
@@ -186,11 +194,18 @@ function EditForm({
   const [category, setCategory] = useState(detail.category);
   const [status, setStatus] = useState(detail.status);
   const [reorderPoint, setReorderPoint] = useState(detail.reorder_point);
+  const [price, setPrice] = useState((detail.price_cents / 100).toFixed(2));
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     edit.mutate(
-      { name: name.trim(), category: category.trim(), status, reorder_point: reorderPoint },
+      {
+        name: name.trim(),
+        category: category.trim(),
+        status,
+        reorder_point: reorderPoint,
+        price_cents: Math.max(0, Math.round(Number(price) * 100)) || 0,
+      },
       {
         onSuccess: () => {
           toast.success("Item updated");
@@ -218,6 +233,16 @@ function EditForm({
           min={0}
           value={reorderPoint}
           onChange={(e) => setReorderPoint(Math.max(0, Number(e.target.value)))}
+          className={INPUT}
+        />
+      </Field>
+      <Field label="Unit price ($)">
+        <input
+          type="number"
+          min={0}
+          step="0.01"
+          value={price}
+          onChange={(e) => setPrice(e.target.value)}
           className={INPUT}
         />
       </Field>

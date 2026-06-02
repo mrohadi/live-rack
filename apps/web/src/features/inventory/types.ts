@@ -19,6 +19,10 @@ export interface InventoryRow {
   reorder_point?: number;
   /** Derived band from qty vs reorder_point (LR-305). */
   stock_status?: StockStatus;
+  /** Unit price in integer cents (LR-309). */
+  price_cents?: number;
+  /** qty * price_cents (LR-309). */
+  value_cents?: number;
   updated_at: string;
   /** Populated by LR-304; treated as "cold" while undefined. */
   velocity?: VelocityBand;
@@ -50,7 +54,9 @@ export interface ItemDetail {
   category: string;
   status: string;
   reorder_point: number;
+  price_cents: number;
   total_qty: number;
+  total_value_cents: number;
   stock_status: StockStatus;
   locations: ItemLocationRow[];
   recent_scans: ItemScanRow[];

@@ -12,7 +12,7 @@ import (
 )
 
 const getItemBySKU = `-- name: GetItemBySKU :one
-SELECT id, org_id, sku, name, category, status, created_at, updated_at, reorder_point FROM items
+SELECT id, org_id, sku, name, category, status, created_at, updated_at, reorder_point, price_cents FROM items
 WHERE org_id = $1 AND sku = $2
 `
 
@@ -34,12 +34,13 @@ func (q *Queries) GetItemBySKU(ctx context.Context, arg GetItemBySKUParams) (Ite
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ReorderPoint,
+		&i.PriceCents,
 	)
 	return i, err
 }
 
 const listItems = `-- name: ListItems :many
-SELECT id, org_id, sku, name, category, status, created_at, updated_at, reorder_point FROM items
+SELECT id, org_id, sku, name, category, status, created_at, updated_at, reorder_point, price_cents FROM items
 WHERE org_id = $1
 ORDER BY name
 `
@@ -63,6 +64,7 @@ func (q *Queries) ListItems(ctx context.Context, orgID uuid.UUID) ([]Item, error
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.ReorderPoint,
+			&i.PriceCents,
 		); err != nil {
 			return nil, err
 		}
@@ -76,9 +78,10 @@ func (q *Queries) ListItems(ctx context.Context, orgID uuid.UUID) ([]Item, error
 
 const updateItem = `-- name: UpdateItem :one
 UPDATE items
-SET name = $1, category = $2, status = $3, reorder_point = $4::int
-WHERE org_id = $5 AND sku = $6
-RETURNING id, org_id, sku, name, category, status, created_at, updated_at, reorder_point
+SET name = $1, category = $2, status = $3,
+    reorder_point = $4::int, price_cents = $5::int
+WHERE org_id = $6 AND sku = $7
+RETURNING id, org_id, sku, name, category, status, created_at, updated_at, reorder_point, price_cents
 `
 
 type UpdateItemParams struct {
@@ -86,6 +89,7 @@ type UpdateItemParams struct {
 	Category     string    `json:"category"`
 	Status       string    `json:"status"`
 	ReorderPoint int32     `json:"reorder_point"`
+	PriceCents   int32     `json:"price_cents"`
 	OrgID        uuid.UUID `json:"org_id"`
 	Sku          string    `json:"sku"`
 }
@@ -97,6 +101,7 @@ func (q *Queries) UpdateItem(ctx context.Context, arg UpdateItemParams) (Item, e
 		arg.Category,
 		arg.Status,
 		arg.ReorderPoint,
+		arg.PriceCents,
 		arg.OrgID,
 		arg.Sku,
 	)
@@ -111,17 +116,19 @@ func (q *Queries) UpdateItem(ctx context.Context, arg UpdateItemParams) (Item, e
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ReorderPoint,
+		&i.PriceCents,
 	)
 	return i, err
 }
 
 const upsertItem = `-- name: UpsertItem :one
-INSERT INTO items (org_id, sku, name, category, status, reorder_point)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO items (org_id, sku, name, category, status, reorder_point, price_cents)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 ON CONFLICT (org_id, sku) DO UPDATE
 SET name = EXCLUDED.name, category = EXCLUDED.category,
-    status = EXCLUDED.status, reorder_point = EXCLUDED.reorder_point
-RETURNING id, org_id, sku, name, category, status, created_at, updated_at, reorder_point
+    status = EXCLUDED.status, reorder_point = EXCLUDED.reorder_point,
+    price_cents = EXCLUDED.price_cents
+RETURNING id, org_id, sku, name, category, status, created_at, updated_at, reorder_point, price_cents
 `
 
 type UpsertItemParams struct {
@@ -131,6 +138,7 @@ type UpsertItemParams struct {
 	Category     string    `json:"category"`
 	Status       string    `json:"status"`
 	ReorderPoint int32     `json:"reorder_point"`
+	PriceCents   int32     `json:"price_cents"`
 }
 
 func (q *Queries) UpsertItem(ctx context.Context, arg UpsertItemParams) (Item, error) {
@@ -141,6 +149,7 @@ func (q *Queries) UpsertItem(ctx context.Context, arg UpsertItemParams) (Item, e
 		arg.Category,
 		arg.Status,
 		arg.ReorderPoint,
+		arg.PriceCents,
 	)
 	var i Item
 	err := row.Scan(
@@ -153,6 +162,7 @@ func (q *Queries) UpsertItem(ctx context.Context, arg UpsertItemParams) (Item, e
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ReorderPoint,
+		&i.PriceCents,
 	)
 	return i, err
 }

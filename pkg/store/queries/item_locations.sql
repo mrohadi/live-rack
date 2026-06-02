@@ -48,6 +48,7 @@ SELECT
     COALESCE(i.category, '')  AS category,
     COALESCE(i.status, '')    AS status,
     COALESCE(i.reorder_point, 0)::int AS reorder_point,
+    COALESCE(i.price_cents, 0)::int   AS price_cents,
     COALESCE((
         SELECT count(*) FROM scan_events se
         WHERE se.org_id = il.org_id AND se.zone_id = il.zone_id AND se.sku = il.sku

@@ -35,9 +35,11 @@ type Item struct {
 	Category string     `json:"category"`
 	Status   ItemStatus `json:"status"`
 	// ReorderPoint is the qty at/below which a restock is triggered. 0 disables.
-	ReorderPoint int       `json:"reorder_point"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ReorderPoint int `json:"reorder_point"`
+	// PriceCents is the unit price in integer cents. Stock value = qty * price.
+	PriceCents int       `json:"price_cents"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 // ItemLocation is the current on-hand quantity of a SKU in one zone.

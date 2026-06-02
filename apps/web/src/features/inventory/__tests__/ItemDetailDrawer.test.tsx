@@ -18,7 +18,9 @@ const DETAIL: ItemDetail = {
   category: "frozen",
   status: "active",
   reorder_point: 5,
+  price_cents: 250,
   total_qty: 12,
+  total_value_cents: 3000,
   stock_status: "in_stock",
   locations: [
     { zone_id: "z1", zone_name: "Frozen", qty: 3, stock_status: "low", updated_at: "t0" },

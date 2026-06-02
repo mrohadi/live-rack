@@ -44,6 +44,7 @@ func (f *fakeStore) CreateTask(_ context.Context, arg store.CreateTaskParams) (s
 	f.created.Title = arg.Title
 	f.created.Status = arg.Status
 	f.created.Priority = arg.Priority
+	f.created.AssigneeID = arg.AssigneeID
 	f.created.DueAt = arg.DueAt
 	f.created.UpdatedAt = time.Now().UTC()
 	return f.created, nil
@@ -301,6 +302,47 @@ func TestTasksHandler_Create(t *testing.T) {
 	assert.Equal(t, "Restock frozen", out.Title)
 	assert.Equal(t, "todo", out.Status)
 	assert.Equal(t, "high", out.Priority)
+}
+
+func TestTasksHandler_Create_NotifiesAssignee(t *testing.T) {
+	orgID, storeID, assignee := uuid.New(), uuid.New(), uuid.New()
+	fs := &fakeStore{}
+	pub := &fakePublisher{}
+	e := echo.New()
+	e.HideBanner = true
+	h := tasks.New(fs, pub)
+
+	body := `{"title":"Restock","priority":"high","assignee_id":"` + assignee.String() + `"}`
+	p := &domain.Principal{UserID: uuid.New(), OrgID: orgID, Role: domain.RoleStaff}
+	c, rec := newContext(t, e, http.MethodPost,
+		"/api/v1/stores/"+storeID.String()+"/tasks", body, p)
+	c.SetParamNames("storeID")
+	c.SetParamValues(storeID.String())
+
+	require.NoError(t, h.Create(c))
+	assert.Equal(t, http.StatusCreated, rec.Code)
+	assert.True(t, fs.createArg.AssigneeID.Valid)
+	require.Len(t, pub.subjects, 1)
+	assert.Equal(t, events.TaskSubject(orgID), pub.subjects[0])
+}
+
+func TestTasksHandler_Create_NoAssignee_NoNotify(t *testing.T) {
+	orgID, storeID := uuid.New(), uuid.New()
+	fs := &fakeStore{}
+	pub := &fakePublisher{}
+	e := echo.New()
+	h := tasks.New(fs, pub)
+
+	body := `{"title":"Restock","priority":"high"}`
+	p := &domain.Principal{UserID: uuid.New(), OrgID: orgID, Role: domain.RoleStaff}
+	c, rec := newContext(t, e, http.MethodPost,
+		"/api/v1/stores/"+storeID.String()+"/tasks", body, p)
+	c.SetParamNames("storeID")
+	c.SetParamValues(storeID.String())
+
+	require.NoError(t, h.Create(c))
+	assert.Equal(t, http.StatusCreated, rec.Code)
+	assert.Empty(t, pub.subjects)
 }
 
 func TestTasksHandler_Create_DefaultPriority(t *testing.T) {

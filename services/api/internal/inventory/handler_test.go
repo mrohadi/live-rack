@@ -17,11 +17,20 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/live-rack/pkg/audit"
 	pkgauth "github.com/live-rack/pkg/auth"
 	"github.com/live-rack/pkg/domain"
 	"github.com/live-rack/pkg/store"
 	"github.com/live-rack/services/api/internal/inventory"
 )
+
+// fakeAuditor captures audit entries for assertions.
+type fakeAuditor struct{ entries []audit.Entry }
+
+func (f *fakeAuditor) Write(_ context.Context, e audit.Entry) error {
+	f.entries = append(f.entries, e)
+	return nil
+}
 
 // fakeStore satisfies inventory.Store.
 type fakeStore struct {
@@ -141,7 +150,7 @@ func TestInventoryHandler_List(t *testing.T) {
 
 	e := echo.New()
 	e.HideBanner = true
-	h := inventory.New(fs)
+	h := inventory.New(fs, nil)
 	h.Register(e.Group("/api/v1/stores"))
 
 	req := httptest.NewRequestWithContext(newCtx(orgID), http.MethodGet,
@@ -171,7 +180,7 @@ func TestInventoryHandler_Add(t *testing.T) {
 
 	e := echo.New()
 	e.HideBanner = true
-	h := inventory.New(fs)
+	h := inventory.New(fs, nil)
 
 	body := inventory.AddRequest{
 		ZoneID:   zoneID.String(),
@@ -233,7 +242,7 @@ func TestInventoryHandler_Add_Validation(t *testing.T) {
 			fs := &fakeStore{}
 			e := echo.New()
 			e.HideBanner = true
-			h := inventory.New(fs)
+			h := inventory.New(fs, nil)
 
 			req := httptest.NewRequestWithContext(newCtx(orgID), http.MethodPost,
 				"/api/v1/stores/"+storeID.String()+"/inventory",
@@ -257,7 +266,7 @@ func doTransfer(t *testing.T, fs *fakeStore, orgID, storeID uuid.UUID, body stri
 	t.Helper()
 	e := echo.New()
 	e.HideBanner = true
-	h := inventory.New(fs)
+	h := inventory.New(fs, nil)
 	req := httptest.NewRequestWithContext(newCtx(orgID), http.MethodPost,
 		"/api/v1/stores/"+storeID.String()+"/inventory/transfer",
 		strings.NewReader(body))
@@ -352,7 +361,7 @@ func TestInventoryHandler_Detail(t *testing.T) {
 		}
 		e := echo.New()
 		e.HideBanner = true
-		h := inventory.New(fs)
+		h := inventory.New(fs, nil)
 		req := httptest.NewRequestWithContext(newCtx(orgID), http.MethodGet,
 			"/api/v1/stores/"+storeID.String()+"/inventory/SKU-7", nil)
 		rec := httptest.NewRecorder()
@@ -378,7 +387,7 @@ func TestInventoryHandler_Detail(t *testing.T) {
 		fs := &fakeStore{itemErr: pgx.ErrNoRows}
 		e := echo.New()
 		e.HideBanner = true
-		h := inventory.New(fs)
+		h := inventory.New(fs, nil)
 		req := httptest.NewRequestWithContext(newCtx(orgID), http.MethodGet,
 			"/api/v1/stores/"+storeID.String()+"/inventory/NOPE", nil)
 		rec := httptest.NewRecorder()
@@ -392,4 +401,112 @@ func TestInventoryHandler_Detail(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, http.StatusNotFound, he.Code)
 	})
+}
+
+func patchReq(t *testing.T, h *inventory.Handler, method, orgID, storeID, sku, path, body string, call func(echo.Context) error) *httptest.ResponseRecorder {
+	t.Helper()
+	e := echo.New()
+	e.HideBanner = true
+	org := uuid.MustParse(orgID)
+	req := httptest.NewRequestWithContext(newCtx(org), method,
+		"/api/v1/stores/"+storeID+"/inventory/"+sku+path, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("storeID", "sku")
+	c.SetParamValues(storeID, sku)
+	if err := call(c); err != nil {
+		if he, ok := err.(*echo.HTTPError); ok {
+			require.NoError(t, c.JSON(he.Code, map[string]string{"message": he.Message.(string)}))
+		}
+	}
+	return rec
+}
+
+func TestInventoryHandler_EditItem(t *testing.T) {
+	orgID := uuid.New().String()
+	storeID := uuid.New().String()
+
+	t.Run("updates catalog fields", func(t *testing.T) {
+		fs := &fakeStore{}
+		h := inventory.New(fs, nil)
+		body := `{"name":"New Name","category":"frozen","status":"active","reorder_point":8}`
+		rec := patchReq(t, h, http.MethodPatch, orgID, storeID, "SKU-7", "", body, h.EditItem)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.Equal(t, "SKU-7", fs.updateArg.Sku)
+		assert.Equal(t, "New Name", fs.updateArg.Name)
+		assert.EqualValues(t, 8, fs.updateArg.ReorderPoint)
+	})
+
+	t.Run("rejects invalid status", func(t *testing.T) {
+		fs := &fakeStore{}
+		h := inventory.New(fs, nil)
+		body := `{"name":"X","category":"c","status":"bogus","reorder_point":0}`
+		rec := patchReq(t, h, http.MethodPatch, orgID, storeID, "SKU-7", "", body, h.EditItem)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("404 when item missing", func(t *testing.T) {
+		fs := &fakeStore{updateErr: pgx.ErrNoRows}
+		h := inventory.New(fs, nil)
+		body := `{"name":"X","category":"c","status":"active","reorder_point":0}`
+		rec := patchReq(t, h, http.MethodPatch, orgID, storeID, "NOPE", "", body, h.EditItem)
+		assert.Equal(t, http.StatusNotFound, rec.Code)
+	})
+}
+
+func TestInventoryHandler_AdjustQty(t *testing.T) {
+	orgID := uuid.New().String()
+	storeID := uuid.New().String()
+	zone := uuid.New().String()
+
+	t.Run("sets absolute qty for a zone", func(t *testing.T) {
+		fs := &fakeStore{}
+		h := inventory.New(fs, nil)
+		body := `{"zone_id":"` + zone + `","qty":3}`
+		rec := patchReq(t, h, http.MethodPatch, orgID, storeID, "SKU-7", "/qty", body, h.AdjustQty)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.Equal(t, "SKU-7", fs.setArg.Sku)
+		assert.EqualValues(t, 3, fs.setArg.Qty)
+		assert.Equal(t, uuid.MustParse(zone), fs.setArg.ZoneID)
+	})
+
+	t.Run("rejects negative qty", func(t *testing.T) {
+		fs := &fakeStore{}
+		h := inventory.New(fs, nil)
+		body := `{"zone_id":"` + zone + `","qty":-1}`
+		rec := patchReq(t, h, http.MethodPatch, orgID, storeID, "SKU-7", "/qty", body, h.AdjustQty)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("404 when location missing", func(t *testing.T) {
+		fs := &fakeStore{setErr: pgx.ErrNoRows}
+		h := inventory.New(fs, nil)
+		body := `{"zone_id":"` + zone + `","qty":5}`
+		rec := patchReq(t, h, http.MethodPatch, orgID, storeID, "SKU-7", "/qty", body, h.AdjustQty)
+		assert.Equal(t, http.StatusNotFound, rec.Code)
+	})
+}
+
+func TestInventoryHandler_AuditsQtyCorrection(t *testing.T) {
+	orgID := uuid.New()
+	storeID := uuid.New().String()
+	zone := uuid.New().String()
+
+	fs := &fakeStore{}
+	aud := &fakeAuditor{}
+	h := inventory.New(fs, aud)
+
+	body := `{"zone_id":"` + zone + `","qty":2}`
+	rec := patchReq(t, h, http.MethodPatch, orgID.String(), storeID, "SKU-7", "/qty", body, h.AdjustQty)
+	assert.Equal(t, http.StatusOK, rec.Code)
+
+	require.Len(t, aud.entries, 1)
+	e := aud.entries[0]
+	assert.Equal(t, "inventory.qty_correct", e.Action)
+	assert.Equal(t, "inventory", e.ResourceType)
+	assert.Equal(t, "SKU-7", e.ResourceID)
+	assert.Equal(t, orgID, e.OrgID)
 }

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../../lib/api";
-import type { InventoryRow, ItemStatus, StockStatus, VelocityBand } from "./types";
+import type { InventoryRow, ItemDetail, ItemStatus, StockStatus, VelocityBand } from "./types";
 import type { ScanRecorded } from "../../lib/ws";
 
 export const ITEM_STATUSES: ItemStatus[] = ["active", "discontinued", "recalled"];
@@ -46,6 +46,7 @@ export function filterInventory(rows: InventoryRow[], f: InventoryFilters): Inve
 export const inventoryKeys = {
   all: ["inventory"] as const,
   list: (storeId: string) => [...inventoryKeys.all, "list", storeId] as const,
+  detail: (storeId: string, sku: string) => [...inventoryKeys.all, "detail", storeId, sku] as const,
 };
 
 function inventoryPath(storeId: string): string {
@@ -58,6 +59,16 @@ export function useInventory(storeId: string) {
   return useQuery({
     queryKey: inventoryKeys.list(storeId),
     queryFn: () => get<InventoryRow[]>(inventoryPath(storeId)),
+  });
+}
+
+/** Fetch full item detail (per-zone on-hand + scan timeline) for the drawer. */
+export function useItemDetail(storeId: string, sku: string | null) {
+  const { get } = useApi();
+  return useQuery({
+    queryKey: inventoryKeys.detail(storeId, sku ?? ""),
+    queryFn: () => get<ItemDetail>(`${inventoryPath(storeId)}/${encodeURIComponent(sku ?? "")}`),
+    enabled: !!sku,
   });
 }
 

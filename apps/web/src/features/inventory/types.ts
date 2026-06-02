@@ -23,3 +23,35 @@ export interface InventoryRow {
   /** Populated by LR-304; treated as "cold" while undefined. */
   velocity?: VelocityBand;
 }
+
+/** One zone's on-hand line in the item detail drawer (LR-308). */
+export interface ItemLocationRow {
+  zone_id: string;
+  zone_name: string;
+  qty: number;
+  stock_status: StockStatus;
+  updated_at: string;
+}
+
+/** One scan-timeline entry in the item detail drawer (LR-308). */
+export interface ItemScanRow {
+  ts: string;
+  zone_id: string;
+  scanner_id: string;
+  action: string;
+  valid: boolean;
+  reason?: string;
+}
+
+/** Full item detail payload from GET /inventory/:sku (LR-308). */
+export interface ItemDetail {
+  sku: string;
+  name: string;
+  category: string;
+  status: string;
+  reorder_point: number;
+  total_qty: number;
+  stock_status: StockStatus;
+  locations: ItemLocationRow[];
+  recent_scans: ItemScanRow[];
+}

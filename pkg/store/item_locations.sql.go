@@ -172,3 +172,54 @@ func (q *Queries) ListInventoryByStore(ctx context.Context, arg ListInventoryByS
 	}
 	return items, nil
 }
+
+const listItemLocationsBySKU = `-- name: ListItemLocationsBySKU :many
+SELECT
+    il.zone_id,
+    il.qty,
+    il.updated_at,
+    COALESCE(z.name, '') AS zone_name
+FROM item_locations il
+LEFT JOIN zones z ON z.id = il.zone_id AND z.org_id = il.org_id
+WHERE il.org_id = $1 AND il.store_id = $2 AND il.sku = $3
+ORDER BY il.qty DESC
+`
+
+type ListItemLocationsBySKUParams struct {
+	OrgID   uuid.UUID `json:"org_id"`
+	StoreID uuid.UUID `json:"store_id"`
+	Sku     string    `json:"sku"`
+}
+
+type ListItemLocationsBySKURow struct {
+	ZoneID    uuid.UUID `json:"zone_id"`
+	Qty       int32     `json:"qty"`
+	UpdatedAt time.Time `json:"updated_at"`
+	ZoneName  string    `json:"zone_name"`
+}
+
+// Per-zone on-hand for a single SKU across a store (item detail drawer).
+func (q *Queries) ListItemLocationsBySKU(ctx context.Context, arg ListItemLocationsBySKUParams) ([]ListItemLocationsBySKURow, error) {
+	rows, err := q.db.Query(ctx, listItemLocationsBySKU, arg.OrgID, arg.StoreID, arg.Sku)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListItemLocationsBySKURow
+	for rows.Next() {
+		var i ListItemLocationsBySKURow
+		if err := rows.Scan(
+			&i.ZoneID,
+			&i.Qty,
+			&i.UpdatedAt,
+			&i.ZoneName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

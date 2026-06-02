@@ -49,6 +49,44 @@ func (q *Queries) AdjustItemLocationQty(ctx context.Context, arg AdjustItemLocat
 	return i, err
 }
 
+const decrementItemLocationQty = `-- name: DecrementItemLocationQty :one
+UPDATE item_locations
+SET qty = qty - $1::int
+WHERE org_id = $2 AND zone_id = $3 AND sku = $4
+  AND qty >= $1::int
+RETURNING id, org_id, store_id, zone_id, sku, qty, updated_at
+`
+
+type DecrementItemLocationQtyParams struct {
+	Qty    int32     `json:"qty"`
+	OrgID  uuid.UUID `json:"org_id"`
+	ZoneID uuid.UUID `json:"zone_id"`
+	Sku    string    `json:"sku"`
+}
+
+// Guarded source decrement for a transfer: only succeeds when the location
+// holds at least @qty. Returns no rows (pgx.ErrNoRows) when stock is
+// insufficient or the location is missing, which the caller maps to 409.
+func (q *Queries) DecrementItemLocationQty(ctx context.Context, arg DecrementItemLocationQtyParams) (ItemLocation, error) {
+	row := q.db.QueryRow(ctx, decrementItemLocationQty,
+		arg.Qty,
+		arg.OrgID,
+		arg.ZoneID,
+		arg.Sku,
+	)
+	var i ItemLocation
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.StoreID,
+		&i.ZoneID,
+		&i.Sku,
+		&i.Qty,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const listInventoryByStore = `-- name: ListInventoryByStore :many
 SELECT
     il.id,

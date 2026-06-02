@@ -25,6 +25,10 @@ type Querier interface {
 	CreateStore(ctx context.Context, arg CreateStoreParams) (Store, error)
 	CreateTask(ctx context.Context, arg CreateTaskParams) (Task, error)
 	CreateZone(ctx context.Context, arg CreateZoneParams) (Zone, error)
+	// Guarded source decrement for a transfer: only succeeds when the location
+	// holds at least @qty. Returns no rows (pgx.ErrNoRows) when stock is
+	// insufficient or the location is missing, which the caller maps to 409.
+	DecrementItemLocationQty(ctx context.Context, arg DecrementItemLocationQtyParams) (ItemLocation, error)
 	DeleteTask(ctx context.Context, arg DeleteTaskParams) error
 	DeleteZone(ctx context.Context, arg DeleteZoneParams) error
 	GetCard(ctx context.Context, arg GetCardParams) (PipelineCard, error)

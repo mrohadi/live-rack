@@ -3,9 +3,11 @@ package inventory
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/labstack/echo/v4"
 
 	pkgauth "github.com/live-rack/pkg/auth"
@@ -18,6 +20,7 @@ type Store interface {
 	ListInventoryByStore(ctx context.Context, arg store.ListInventoryByStoreParams) ([]store.ListInventoryByStoreRow, error)
 	UpsertItem(ctx context.Context, arg store.UpsertItemParams) (store.Item, error)
 	AdjustItemLocationQty(ctx context.Context, arg store.AdjustItemLocationQtyParams) (store.ItemLocation, error)
+	DecrementItemLocationQty(ctx context.Context, arg store.DecrementItemLocationQtyParams) (store.ItemLocation, error)
 }
 
 // Handler serves inventory endpoints.
@@ -34,6 +37,7 @@ func New(q Store) *Handler {
 func (h *Handler) Register(g *echo.Group) {
 	g.GET("/:storeID/inventory", h.List)
 	g.POST("/:storeID/inventory", h.Add)
+	g.POST("/:storeID/inventory/transfer", h.Transfer)
 }
 
 // Row is one on-hand line returned to the client.
@@ -193,5 +197,101 @@ func (h *Handler) Add(c echo.Context) error {
 		StockStatus:  string(domain.StockStatusFromQty(int(loc.Qty), int(req.ReorderPoint))),
 		UpdatedAt:    loc.UpdatedAt.UTC().Format("2006-01-02T15:04:05Z07:00"),
 		Velocity:     "cold",
+	})
+}
+
+// TransferRequest is the POST /stores/:storeID/inventory/transfer body.
+type TransferRequest struct {
+	SKU        string `json:"sku"`
+	FromZoneID string `json:"from_zone_id"`
+	ToZoneID   string `json:"to_zone_id"`
+	Qty        int32  `json:"qty"`
+}
+
+// TransferResponse confirms a completed move.
+type TransferResponse struct {
+	SKU        string    `json:"sku"`
+	FromZoneID uuid.UUID `json:"from_zone_id"`
+	ToZoneID   uuid.UUID `json:"to_zone_id"`
+	Qty        int32     `json:"qty"`
+}
+
+// Transfer godoc
+//
+//	@Summary		Move stock of a SKU from one zone to another
+//	@Tags			inventory
+//	@Accept			json
+//	@Produce		json
+//	@Param			storeID	path		string			true	"Store UUID"
+//	@Param			body	body		TransferRequest	true	"Transfer"
+//	@Success		200		{object}	TransferResponse
+//	@Failure		400		{object}	map[string]string
+//	@Failure		409		{object}	map[string]string
+//	@Router			/stores/{storeID}/inventory/transfer [post]
+func (h *Handler) Transfer(c echo.Context) error {
+	p, err := pkgauth.PrincipalFrom(c.Request().Context())
+	if err != nil {
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
+	}
+
+	storeID, err := uuid.Parse(c.Param("storeID"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid store id")
+	}
+
+	var req TransferRequest
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid body")
+	}
+	if req.SKU == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "sku required")
+	}
+	if req.Qty <= 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "qty must be positive")
+	}
+
+	fromZone, err := uuid.Parse(req.FromZoneID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid from_zone_id")
+	}
+	toZone, err := uuid.Parse(req.ToZoneID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid to_zone_id")
+	}
+	if fromZone == toZone {
+		return echo.NewHTTPError(http.StatusBadRequest, "source and destination zones must differ")
+	}
+
+	ctx := c.Request().Context()
+
+	// Guarded source decrement: fails (no rows) when stock is insufficient.
+	if _, err := h.q.DecrementItemLocationQty(ctx, store.DecrementItemLocationQtyParams{
+		OrgID:  p.OrgID,
+		ZoneID: fromZone,
+		Sku:    req.SKU,
+		Qty:    req.Qty,
+	}); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusConflict, "insufficient stock in source zone")
+		}
+		return echo.NewHTTPError(http.StatusInternalServerError, "decrement source")
+	}
+
+	// Credit the destination zone.
+	if _, err := h.q.AdjustItemLocationQty(ctx, store.AdjustItemLocationQtyParams{
+		OrgID:   p.OrgID,
+		StoreID: storeID,
+		ZoneID:  toZone,
+		Sku:     req.SKU,
+		Qty:     req.Qty,
+	}); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "credit destination")
+	}
+
+	return c.JSON(http.StatusOK, TransferResponse{
+		SKU:        req.SKU,
+		FromZoneID: fromZone,
+		ToZoneID:   toZone,
+		Qty:        req.Qty,
 	})
 }

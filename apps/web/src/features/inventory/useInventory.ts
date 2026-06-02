@@ -1,16 +1,28 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../../lib/api";
-import type { InventoryRow, ItemStatus, VelocityBand } from "./types";
+import type { InventoryRow, ItemStatus, StockStatus, VelocityBand } from "./types";
 import type { ScanRecorded } from "../../lib/ws";
 
 export const ITEM_STATUSES: ItemStatus[] = ["active", "discontinued", "recalled"];
 export const VELOCITY_BANDS: VelocityBand[] = ["hot", "warm", "cold", "dead"];
+export const STOCK_STATUSES: StockStatus[] = ["in_stock", "low", "out"];
+
+/** Derive on-hand stock band from qty vs reorder point. Pure. Mirrors the API. */
+export function rowStockStatus(r: InventoryRow): StockStatus {
+  if (r.stock_status) return r.stock_status;
+  const rp = r.reorder_point ?? 0;
+  if (r.qty <= 0) return "out";
+  if (rp > 0 && r.qty <= rp) return "low";
+  return "in_stock";
+}
 
 /** Active filter selections. "all" means no constraint on that dimension. */
 export interface InventoryFilters {
   zone: string;
   status: string;
   velocity: string;
+  /** Stock band: "all" | in_stock | low | out (LR-305). */
+  stock?: string;
 }
 
 /** Velocity band for a row, defaulting to "cold" until LR-304 populates it. */
@@ -18,13 +30,15 @@ export function rowVelocity(r: InventoryRow): VelocityBand {
   return r.velocity ?? "cold";
 }
 
-/** Apply zone/status/velocity filters with AND semantics. Pure. */
+/** Apply zone/status/velocity/stock filters with AND semantics. Pure. */
 export function filterInventory(rows: InventoryRow[], f: InventoryFilters): InventoryRow[] {
+  const stock = f.stock ?? "all";
   return rows.filter(
     (r) =>
       (f.zone === "all" || r.zone_id === f.zone) &&
       (f.status === "all" || r.status === f.status) &&
-      (f.velocity === "all" || rowVelocity(r) === f.velocity),
+      (f.velocity === "all" || rowVelocity(r) === f.velocity) &&
+      (stock === "all" || rowStockStatus(r) === stock),
   );
 }
 
@@ -60,6 +74,8 @@ export interface AddItemBody {
   category: string;
   status?: string;
   qty: number;
+  /** Restock trigger threshold; 0 disables (LR-305). */
+  reorder_point?: number;
 }
 
 /** Add or adjust an item's qty in a zone. */

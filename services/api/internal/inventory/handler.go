@@ -38,25 +38,28 @@ func (h *Handler) Register(g *echo.Group) {
 
 // Row is one on-hand line returned to the client.
 type Row struct {
-	ID        uuid.UUID `json:"id"`
-	ZoneID    uuid.UUID `json:"zone_id"`
-	SKU       string    `json:"sku"`
-	Name      string    `json:"name"`
-	Category  string    `json:"category"`
-	Status    string    `json:"status"`
-	Qty       int32     `json:"qty"`
-	UpdatedAt string    `json:"updated_at"`
-	Velocity  string    `json:"velocity"`
+	ID           uuid.UUID `json:"id"`
+	ZoneID       uuid.UUID `json:"zone_id"`
+	SKU          string    `json:"sku"`
+	Name         string    `json:"name"`
+	Category     string    `json:"category"`
+	Status       string    `json:"status"`
+	Qty          int32     `json:"qty"`
+	ReorderPoint int32     `json:"reorder_point"`
+	StockStatus  string    `json:"stock_status"`
+	UpdatedAt    string    `json:"updated_at"`
+	Velocity     string    `json:"velocity"`
 }
 
 // AddRequest is the POST /stores/:storeID/inventory request body.
 type AddRequest struct {
-	ZoneID   string `json:"zone_id"`
-	SKU      string `json:"sku"`
-	Name     string `json:"name"`
-	Category string `json:"category"`
-	Status   string `json:"status"`
-	Qty      int32  `json:"qty"`
+	ZoneID       string `json:"zone_id"`
+	SKU          string `json:"sku"`
+	Name         string `json:"name"`
+	Category     string `json:"category"`
+	Status       string `json:"status"`
+	Qty          int32  `json:"qty"`
+	ReorderPoint int32  `json:"reorder_point"`
 }
 
 // List godoc
@@ -90,15 +93,17 @@ func (h *Handler) List(c echo.Context) error {
 	out := make([]Row, 0, len(rows))
 	for _, r := range rows {
 		out = append(out, Row{
-			ID:        r.ID,
-			ZoneID:    r.ZoneID,
-			SKU:       r.Sku,
-			Name:      r.Name,
-			Category:  r.Category,
-			Status:    r.Status,
-			Qty:       r.Qty,
-			UpdatedAt: r.UpdatedAt.UTC().Format("2006-01-02T15:04:05Z07:00"),
-			Velocity:  string(domain.VelocityFromPicks(int(r.Picks7d), int(r.Picks30d))),
+			ID:           r.ID,
+			ZoneID:       r.ZoneID,
+			SKU:          r.Sku,
+			Name:         r.Name,
+			Category:     r.Category,
+			Status:       r.Status,
+			Qty:          r.Qty,
+			ReorderPoint: r.ReorderPoint,
+			StockStatus:  string(domain.StockStatusFromQty(int(r.Qty), int(r.ReorderPoint))),
+			UpdatedAt:    r.UpdatedAt.UTC().Format("2006-01-02T15:04:05Z07:00"),
+			Velocity:     string(domain.VelocityFromPicks(int(r.Picks7d), int(r.Picks30d))),
 		})
 	}
 	return c.JSON(http.StatusOK, out)
@@ -147,13 +152,18 @@ func (h *Handler) Add(c echo.Context) error {
 		status = "active"
 	}
 
+	if req.ReorderPoint < 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "reorder_point must be non-negative")
+	}
+
 	// Ensure item master exists.
 	_, err = h.q.UpsertItem(c.Request().Context(), store.UpsertItemParams{
-		OrgID:    p.OrgID,
-		Sku:      req.SKU,
-		Name:     req.Name,
-		Category: req.Category,
-		Status:   status,
+		OrgID:        p.OrgID,
+		Sku:          req.SKU,
+		Name:         req.Name,
+		Category:     req.Category,
+		Status:       status,
+		ReorderPoint: req.ReorderPoint,
 	})
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "upsert item")
@@ -172,14 +182,16 @@ func (h *Handler) Add(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusCreated, Row{
-		ID:        loc.ID,
-		ZoneID:    loc.ZoneID,
-		SKU:       loc.Sku,
-		Name:      req.Name,
-		Category:  req.Category,
-		Status:    status,
-		Qty:       loc.Qty,
-		UpdatedAt: loc.UpdatedAt.UTC().Format("2006-01-02T15:04:05Z07:00"),
-		Velocity:  "cold",
+		ID:           loc.ID,
+		ZoneID:       loc.ZoneID,
+		SKU:          loc.Sku,
+		Name:         req.Name,
+		Category:     req.Category,
+		Status:       status,
+		Qty:          loc.Qty,
+		ReorderPoint: req.ReorderPoint,
+		StockStatus:  string(domain.StockStatusFromQty(int(loc.Qty), int(req.ReorderPoint))),
+		UpdatedAt:    loc.UpdatedAt.UTC().Format("2006-01-02T15:04:05Z07:00"),
+		Velocity:     "cold",
 	})
 }

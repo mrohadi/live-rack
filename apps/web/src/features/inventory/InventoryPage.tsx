@@ -13,6 +13,7 @@ import {
   filterInventory,
   inventoryKeys,
   patchInventory,
+  rowStockStatus,
   rowVelocity,
   useInventory,
 } from "./useInventory";
@@ -24,6 +25,25 @@ const VELOCITY_STYLES: Record<string, string> = {
   cold: "bg-primary/15 text-primary",
   dead: "bg-muted/40 text-muted-foreground",
 };
+
+const STOCK_STYLES: Record<string, string> = {
+  in_stock: "bg-primary/15 text-primary",
+  low: "bg-warning/15 text-warning",
+  out: "bg-destructive/15 text-destructive",
+};
+
+const STOCK_LABELS: Record<string, string> = {
+  in_stock: "In stock",
+  low: "Low",
+  out: "Out",
+};
+
+const STOCK_TABS: { value: string; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "in_stock", label: "In stock" },
+  { value: "low", label: "Low" },
+  { value: "out", label: "Out" },
+];
 
 const STATUS_OPTIONS = [
   { value: "all", label: "All statuses" },
@@ -63,6 +83,7 @@ export function InventoryPage() {
   const [zone, setZone] = useState(searchParams.get("zone") ?? "all");
   const [status, setStatus] = useState("all");
   const [velocity, setVelocity] = useState("all");
+  const [stock, setStock] = useState("all");
   const [showAdd, setShowAdd] = useState(false);
 
   const zoneOptions = useMemo(
@@ -74,8 +95,13 @@ export function InventoryPage() {
   );
 
   const visible = useMemo(
-    () => filterInventory(rows, { zone, status, velocity }),
-    [rows, zone, status, velocity],
+    () => filterInventory(rows, { zone, status, velocity, stock }),
+    [rows, zone, status, velocity, stock],
+  );
+
+  const lowCount = useMemo(
+    () => rows.filter((r) => rowStockStatus(r) !== "in_stock").length,
+    [rows],
   );
 
   const zoneNameById = useMemo(() => Object.fromEntries(zones.map((z) => [z.id, z.name])), [zones]);
@@ -116,6 +142,26 @@ export function InventoryPage() {
         </div>
       </header>
 
+      <div className="flex items-center gap-2 border-b border-border px-4 py-2">
+        {STOCK_TABS.map((t) => (
+          <button
+            key={t.value}
+            type="button"
+            onClick={() => setStock(t.value)}
+            className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+              stock === t.value
+                ? "bg-primary text-white"
+                : "bg-muted/40 text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+        {lowCount > 0 && (
+          <span className="ml-auto text-xs text-warning">{lowCount} need attention</span>
+        )}
+      </div>
+
       <div className="flex-1 overflow-auto p-4">
         <table className="w-full border-collapse text-sm">
           <thead>
@@ -125,6 +171,7 @@ export function InventoryPage() {
               <th className="px-2 py-1.5 font-medium">Category</th>
               <th className="px-2 py-1.5 font-medium">Zone</th>
               <th className="px-2 py-1.5 font-medium">Status</th>
+              <th className="px-2 py-1.5 font-medium">Stock</th>
               <th className="px-2 py-1.5 font-medium">Velocity</th>
               <th className="px-2 py-1.5 text-right font-medium">Qty</th>
             </tr>
@@ -139,6 +186,13 @@ export function InventoryPage() {
                   {zoneNameById[r.zone_id] ?? r.zone_id.slice(0, 8)}
                 </td>
                 <td className="px-2 py-1.5 text-muted-foreground">{r.status}</td>
+                <td className="px-2 py-1.5">
+                  <span
+                    className={`rounded px-1.5 py-0.5 text-xs ${STOCK_STYLES[rowStockStatus(r)]}`}
+                  >
+                    {STOCK_LABELS[rowStockStatus(r)]}
+                  </span>
+                </td>
                 <td className="px-2 py-1.5">
                   <span
                     className={`rounded px-1.5 py-0.5 text-xs ${VELOCITY_STYLES[rowVelocity(r)]}`}
@@ -156,7 +210,7 @@ export function InventoryPage() {
             ))}
             {visible.length === 0 && (
               <tr>
-                <td colSpan={7} className="p-4 text-center text-muted-foreground">
+                <td colSpan={8} className="p-4 text-center text-muted-foreground">
                   No stock matches the current filters.
                 </td>
               </tr>

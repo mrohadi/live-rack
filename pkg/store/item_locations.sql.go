@@ -58,9 +58,10 @@ SELECT
     il.sku,
     il.qty,
     il.updated_at,
-    COALESCE(i.name, '')     AS name,
-    COALESCE(i.category, '') AS category,
-    COALESCE(i.status, '')   AS status,
+    COALESCE(i.name, '')      AS name,
+    COALESCE(i.category, '')  AS category,
+    COALESCE(i.status, '')    AS status,
+    COALESCE(i.reorder_point, 0)::int AS reorder_point,
     COALESCE((
         SELECT count(*) FROM scan_events se
         WHERE se.org_id = il.org_id AND se.zone_id = il.zone_id AND se.sku = il.sku
@@ -85,18 +86,19 @@ type ListInventoryByStoreParams struct {
 }
 
 type ListInventoryByStoreRow struct {
-	ID        uuid.UUID `json:"id"`
-	OrgID     uuid.UUID `json:"org_id"`
-	StoreID   uuid.UUID `json:"store_id"`
-	ZoneID    uuid.UUID `json:"zone_id"`
-	Sku       string    `json:"sku"`
-	Qty       int32     `json:"qty"`
-	UpdatedAt time.Time `json:"updated_at"`
-	Name      string    `json:"name"`
-	Category  string    `json:"category"`
-	Status    string    `json:"status"`
-	Picks7d   int32     `json:"picks_7d"`
-	Picks30d  int32     `json:"picks_30d"`
+	ID           uuid.UUID `json:"id"`
+	OrgID        uuid.UUID `json:"org_id"`
+	StoreID      uuid.UUID `json:"store_id"`
+	ZoneID       uuid.UUID `json:"zone_id"`
+	Sku          string    `json:"sku"`
+	Qty          int32     `json:"qty"`
+	UpdatedAt    time.Time `json:"updated_at"`
+	Name         string    `json:"name"`
+	Category     string    `json:"category"`
+	Status       string    `json:"status"`
+	ReorderPoint int32     `json:"reorder_point"`
+	Picks7d      int32     `json:"picks_7d"`
+	Picks30d     int32     `json:"picks_30d"`
 }
 
 func (q *Queries) ListInventoryByStore(ctx context.Context, arg ListInventoryByStoreParams) ([]ListInventoryByStoreRow, error) {
@@ -119,6 +121,7 @@ func (q *Queries) ListInventoryByStore(ctx context.Context, arg ListInventoryByS
 			&i.Name,
 			&i.Category,
 			&i.Status,
+			&i.ReorderPoint,
 			&i.Picks7d,
 			&i.Picks30d,
 		); err != nil {

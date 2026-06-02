@@ -102,6 +102,13 @@ export const routes: RouteObject[] = [
               })),
           },
           {
+            path: "shipments",
+            lazy: () =>
+              import("./features/shipments/ShipmentsPage").then((m) => ({
+                Component: m.ShipmentsPage,
+              })),
+          },
+          {
             path: "analytics",
             lazy: () =>
               import("./features/analytics/AnalyticsPage").then((m) => ({

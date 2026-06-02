@@ -44,9 +44,18 @@ export interface Capabilities {
 
 export const userKeys = {
   list: ["users", "list"] as const,
+  members: ["users", "members"] as const,
   me: ["users", "me"] as const,
   stats: ["users", "stats"] as const,
 };
+
+/** Minimal member record for assignee pickers — returned by /api/v1/users/members. */
+export interface MemberPickerItem {
+  id: string;
+  display_name: string;
+  email: string;
+  avatar_url: string;
+}
 
 /** Zone-access label: explicit zones joined, else org-wide "All". Pure. */
 export function zonesLabel(zones: string[] | undefined): string {
@@ -106,6 +115,15 @@ export function displayLabel(u: { display_name: string; email: string }): string
 export function useUsers() {
   const { get } = useApi();
   return useQuery({ queryKey: userKeys.list, queryFn: () => get<OrgUser[]>("/api/v1/users") });
+}
+
+/** Minimal member list for assignee pickers — accessible to all roles. */
+export function useMembers() {
+  const { get } = useApi();
+  return useQuery({
+    queryKey: userKeys.members,
+    queryFn: () => get<MemberPickerItem[]>("/api/v1/users/members"),
+  });
 }
 
 /** Fetch the caller's capabilities. */

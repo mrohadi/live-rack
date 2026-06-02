@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useToast } from "../../components/feedback/toast-context";
-import { useUsers } from "../users/useUsers";
+import { useMembers } from "../users/useUsers";
 import { useCreateTask } from "./useTasks";
 import { useCurrentStore } from "../map/useCurrentStore";
 import type { TaskPriority } from "./types";
@@ -20,7 +20,7 @@ const PRIORITIES: { value: TaskPriority; label: string }[] = [
 export function AssignTaskModal({ zoneId, zoneName, onClose }: Props) {
   const storeId = useCurrentStore();
   const createTask = useCreateTask(storeId);
-  const { data: members = [] } = useUsers();
+  const { data: members = [] } = useMembers();
   const toast = useToast();
 
   const [title, setTitle] = useState("");

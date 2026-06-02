@@ -14,3 +14,10 @@ SELECT * FROM scan_events
 WHERE org_id = $1 AND zone_id = $2
 ORDER BY ts DESC
 LIMIT $3;
+
+-- name: ListScanEventsBySKU :many
+-- Recent scan timeline for one SKU across a store (item detail drawer).
+SELECT * FROM scan_events
+WHERE org_id = $1 AND store_id = $2 AND sku = $3
+ORDER BY ts DESC
+LIMIT $4;

@@ -39,6 +39,12 @@ type fakeStore struct {
 	decrementArg   store.DecrementItemLocationQtyParams
 	decrementErr   error
 	decrementCalls int
+
+	// detail
+	item     store.Item
+	itemErr  error
+	skuLocs  []store.ListItemLocationsBySKURow
+	skuScans []store.ScanEvent
 }
 
 func (f *fakeStore) ListInventoryByStore(_ context.Context, arg store.ListInventoryByStoreParams) ([]store.ListInventoryByStoreRow, error) {
@@ -71,6 +77,24 @@ func (f *fakeStore) DecrementItemLocationQty(_ context.Context, arg store.Decrem
 		return store.ItemLocation{}, f.decrementErr
 	}
 	return store.ItemLocation{ID: uuid.New(), OrgID: arg.OrgID, ZoneID: arg.ZoneID, Sku: arg.Sku}, nil
+}
+
+func (f *fakeStore) GetItemBySKU(_ context.Context, arg store.GetItemBySKUParams) (store.Item, error) {
+	if f.itemErr != nil {
+		return store.Item{}, f.itemErr
+	}
+	if f.item.Sku == "" {
+		f.item.Sku = arg.Sku
+	}
+	return f.item, nil
+}
+
+func (f *fakeStore) ListItemLocationsBySKU(_ context.Context, _ store.ListItemLocationsBySKUParams) ([]store.ListItemLocationsBySKURow, error) {
+	return f.skuLocs, nil
+}
+
+func (f *fakeStore) ListScanEventsBySKU(_ context.Context, _ store.ListScanEventsBySKUParams) ([]store.ScanEvent, error) {
+	return f.skuScans, nil
 }
 
 func newCtx(orgID uuid.UUID) context.Context {
@@ -282,4 +306,65 @@ func TestInventoryHandler_Transfer_Validation(t *testing.T) {
 			assert.Equal(t, 0, fs.decrementCalls)
 		})
 	}
+}
+
+func TestInventoryHandler_Detail(t *testing.T) {
+	orgID := uuid.New()
+	storeID := uuid.New()
+	z1 := uuid.New()
+	z2 := uuid.New()
+
+	t.Run("aggregates locations + scans for a sku", func(t *testing.T) {
+		fs := &fakeStore{
+			item: store.Item{Sku: "SKU-7", Name: "Widget", Category: "frozen", Status: "active", ReorderPoint: 5},
+			skuLocs: []store.ListItemLocationsBySKURow{
+				{ZoneID: z1, ZoneName: "Frozen", Qty: 3, UpdatedAt: time.Now().UTC()},
+				{ZoneID: z2, ZoneName: "Backroom", Qty: 9, UpdatedAt: time.Now().UTC()},
+			},
+			skuScans: []store.ScanEvent{
+				{ID: uuid.New(), Ts: time.Now().UTC(), ZoneID: z1, ScannerID: "scn-1", Action: "pick", Valid: true},
+			},
+		}
+		e := echo.New()
+		e.HideBanner = true
+		h := inventory.New(fs)
+		req := httptest.NewRequestWithContext(newCtx(orgID), http.MethodGet,
+			"/api/v1/stores/"+storeID.String()+"/inventory/SKU-7", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetParamNames("storeID", "sku")
+		c.SetParamValues(storeID.String(), "SKU-7")
+
+		require.NoError(t, h.Detail(c))
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		var out inventory.DetailResponse
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &out))
+		assert.Equal(t, "SKU-7", out.SKU)
+		assert.EqualValues(t, 12, out.TotalQty)
+		assert.Equal(t, "in_stock", out.StockStatus) // 12 > reorder 5
+		require.Len(t, out.Locations, 2)
+		assert.Equal(t, "low", out.Locations[0].StockStatus) // zone1 qty 3 <= 5
+		require.Len(t, out.RecentScans, 1)
+		assert.Equal(t, "pick", out.RecentScans[0].Action)
+	})
+
+	t.Run("404 when item unknown", func(t *testing.T) {
+		fs := &fakeStore{itemErr: pgx.ErrNoRows}
+		e := echo.New()
+		e.HideBanner = true
+		h := inventory.New(fs)
+		req := httptest.NewRequestWithContext(newCtx(orgID), http.MethodGet,
+			"/api/v1/stores/"+storeID.String()+"/inventory/NOPE", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetParamNames("storeID", "sku")
+		c.SetParamValues(storeID.String(), "NOPE")
+
+		err := h.Detail(c)
+		require.Error(t, err)
+		he, ok := err.(*echo.HTTPError)
+		require.True(t, ok)
+		assert.Equal(t, http.StatusNotFound, he.Code)
+	})
 }

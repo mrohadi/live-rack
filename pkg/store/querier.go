@@ -48,8 +48,12 @@ type Querier interface {
 	ListInboundWebhooks(ctx context.Context, arg ListInboundWebhooksParams) ([]WebhooksInbound, error)
 	ListIntegrations(ctx context.Context, orgID uuid.UUID) ([]ListIntegrationsRow, error)
 	ListInventoryByStore(ctx context.Context, arg ListInventoryByStoreParams) ([]ListInventoryByStoreRow, error)
+	// Per-zone on-hand for a single SKU across a store (item detail drawer).
+	ListItemLocationsBySKU(ctx context.Context, arg ListItemLocationsBySKUParams) ([]ListItemLocationsBySKURow, error)
 	ListItems(ctx context.Context, orgID uuid.UUID) ([]Item, error)
 	ListPipelinesByStore(ctx context.Context, arg ListPipelinesByStoreParams) ([]Pipeline, error)
+	// Recent scan timeline for one SKU across a store (item detail drawer).
+	ListScanEventsBySKU(ctx context.Context, arg ListScanEventsBySKUParams) ([]ScanEvent, error)
 	ListScanEventsByZone(ctx context.Context, arg ListScanEventsByZoneParams) ([]ScanEvent, error)
 	ListStagesByPipeline(ctx context.Context, arg ListStagesByPipelineParams) ([]PipelineStage, error)
 	ListStoresByOrg(ctx context.Context, orgID uuid.UUID) ([]Store, error)

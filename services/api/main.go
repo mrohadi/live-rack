@@ -51,6 +51,7 @@ import (
 	apimw "github.com/live-rack/services/api/internal/middleware"
 	"github.com/live-rack/services/api/internal/onboarding"
 	"github.com/live-rack/services/api/internal/passwordreset"
+	"github.com/live-rack/services/api/internal/picking"
 	"github.com/live-rack/services/api/internal/pipelines"
 	"github.com/live-rack/services/api/internal/recommendations"
 	"github.com/live-rack/services/api/internal/sales"
@@ -229,6 +230,7 @@ func main() {
 	counts.New(q, auditWriter).Register(api.Group("/stores"))
 	tasks.New(q, publisher).Register(api.Group("/stores"))
 	pipelines.New(q, publisher).Register(api.Group("/stores"))
+	picking.New(q, publisher, auditWriter).Register(api.Group("/stores"))
 	sales.New(q).Register(api)
 	integrationsapi.New(q).Register(api)
 	search.New(q).Register(api)

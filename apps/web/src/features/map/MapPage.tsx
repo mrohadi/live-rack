@@ -12,6 +12,7 @@ import { useConfirm } from "../../components/feedback/confirm-context";
 import { useInventory } from "../inventory/useInventory";
 import { useScanStream } from "../../lib/useScanStream";
 import type { ScanRecorded } from "../../lib/ws";
+import { AddItemModal } from "../inventory/AddItemModal";
 
 const TABS: { label: string; value: ViewMode }[] = [
   { label: "Zones", value: "zones" },
@@ -63,6 +64,7 @@ export function MapPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newZoneName, setNewZoneName] = useState("");
+  const [addItemZoneId, setAddItemZoneId] = useState<string | null>(null);
 
   const [filterOpen, setFilterOpen] = useState(false);
   const [typeFilter, setTypeFilter] = useState<Zone["type"] | "all">("all");
@@ -310,8 +312,16 @@ export function MapPage() {
           onRename={handleRename}
           onDelete={handleDelete}
           onOpen={handleOpen}
+          onAddItem={(id) => setAddItemZoneId(id)}
         />
       </div>
+
+      {addItemZoneId && (
+        <AddItemModal
+          defaultZoneId={addItemZoneId}
+          onClose={() => setAddItemZoneId(null)}
+        />
+      )}
     </div>
   );
 }

@@ -6,11 +6,12 @@ interface Props {
   onRename?: (id: string, name: string) => void;
   onDelete?: (id: string) => void;
   onOpen?: (id: string) => void;
+  onAddItem?: (zoneId: string) => void;
 }
 
 /** Right-hand zone inspector: capacity, fill, sales, dwell, misplaced, last
- *  scan, and constraint chips, with Open / Assign actions. */
-export function ZoneDetailSidebar({ zone, onRename, onDelete, onOpen }: Props) {
+ *  scan, and constraint chips, with Open / Add item / Assign task actions. */
+export function ZoneDetailSidebar({ zone, onRename, onDelete, onOpen, onAddItem }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [draftName, setDraftName] = useState("");
@@ -126,19 +127,28 @@ export function ZoneDetailSidebar({ zone, onRename, onDelete, onOpen }: Props) {
         )}
       </div>
 
-      <div className="flex items-center justify-between gap-2 border-t border-border p-4">
+      <div className="flex flex-col gap-2 border-t border-border p-4">
+        <div className="flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={() => onOpen?.(zone.id)}
+            className="text-sm font-medium text-foreground hover:underline"
+          >
+            Open zone
+          </button>
+          <button
+            type="button"
+            className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white transition hover:opacity-90"
+          >
+            Assign task
+          </button>
+        </div>
         <button
           type="button"
-          onClick={() => onOpen?.(zone.id)}
-          className="text-sm font-medium text-foreground hover:underline"
+          onClick={() => onAddItem?.(zone.id)}
+          className="w-full rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-muted"
         >
-          Open zone
-        </button>
-        <button
-          type="button"
-          className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white transition hover:opacity-90"
-        >
-          Assign task
+          + Add item to zone
         </button>
       </div>
     </aside>

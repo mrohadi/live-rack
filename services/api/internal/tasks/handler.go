@@ -198,6 +198,14 @@ func (h *Handler) Create(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "create task")
 	}
+
+	// Notify the assignee when a task is created already assigned.
+	if task.AssigneeID.Valid {
+		if err := h.notify(c.Request().Context(), task); err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "publish notification")
+		}
+	}
+
 	return c.JSON(http.StatusCreated, toRow(task))
 }
 

@@ -88,6 +88,13 @@ export const routes: RouteObject[] = [
               })),
           },
           {
+            path: "picking",
+            lazy: () =>
+              import("./features/picking/PickingPage").then((m) => ({
+                Component: m.PickingPage,
+              })),
+          },
+          {
             path: "analytics",
             lazy: () =>
               import("./features/analytics/AnalyticsPage").then((m) => ({

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../../lib/api";
-import { TASK_COLUMNS, type Task, type TaskStatus } from "./types";
+import { TASK_COLUMNS, type Task, type TaskPriority, type TaskStatus } from "./types";
 
 /** Query-key factory — keeps cache keys consistent across hooks. */
 export const taskKeys = {
@@ -23,6 +23,23 @@ export function groupByStatus(tasks: Task[]): Record<TaskStatus, Task[]> {
 /** Return next state with the given task moved to a new column. Pure — no-op if unchanged or missing. */
 export function moveTask(tasks: Task[], id: string, status: TaskStatus): Task[] {
   return tasks.map((t) => (t.id === id && t.status !== status ? { ...t, status } : t));
+}
+
+export interface CreateTaskInput {
+  zone_id?: string;
+  title: string;
+  priority: TaskPriority;
+  due_at?: string;
+}
+
+/** Create a new task, optionally scoped to a zone. */
+export function useCreateTask(storeId: string) {
+  const { post } = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateTaskInput) => post<Task>(tasksPath(storeId), input),
+    onSettled: () => void qc.invalidateQueries({ queryKey: taskKeys.list(storeId) }),
+  });
 }
 
 /** Fetch the task board for a store. */

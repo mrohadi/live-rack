@@ -14,6 +14,7 @@ import type { ScanRecorded } from "../../lib/ws";
 import { AddItemModal } from "../inventory/AddItemModal";
 import { ZoneEditModal } from "./ZoneEditModal";
 import { ZoneCreateModal } from "./ZoneCreateModal";
+import { AssignTaskModal } from "../tasks/AssignTaskModal";
 
 const TABS: { label: string; value: ViewMode }[] = [
   { label: "Zones", value: "zones" },
@@ -79,6 +80,7 @@ export function MapPage() {
   const [showCreateZone, setShowCreateZone] = useState(false);
   const [addItemZoneId, setAddItemZoneId] = useState<string | null>(null);
   const [editZone, setEditZone] = useState<Zone | null>(null);
+  const [assignTaskZone, setAssignTaskZone] = useState<Zone | null>(null);
 
   const [filterOpen, setFilterOpen] = useState(false);
   const [typeFilter, setTypeFilter] = useState<Zone["type"] | "all">("all");
@@ -267,6 +269,7 @@ export function MapPage() {
           onOpen={handleOpen}
           onAddItem={(id) => setAddItemZoneId(id)}
           onEdit={(z) => setEditZone(z)}
+          onAssignTask={(z) => setAssignTaskZone(z)}
         />
       </div>
 
@@ -277,6 +280,14 @@ export function MapPage() {
       {editZone && <ZoneEditModal zone={editZone} onClose={() => setEditZone(null)} />}
 
       {showCreateZone && <ZoneCreateModal zones={zones} onClose={() => setShowCreateZone(false)} />}
+
+      {assignTaskZone && (
+        <AssignTaskModal
+          zoneId={assignTaskZone.id}
+          zoneName={assignTaskZone.name}
+          onClose={() => setAssignTaskZone(null)}
+        />
+      )}
     </div>
   );
 }

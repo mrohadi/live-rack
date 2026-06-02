@@ -65,6 +65,12 @@ export const Icons = {
       <path d="M9 11l1.5 1.5L13 10M9 16l1.5 1.5L13 15" />
     </>
   ),
+  wave: (
+    <>
+      <path d="M2 7h7M2 12h12M2 17h9" />
+      <path d="M16 6l4 4-4 4" />
+    </>
+  ),
   chart: (
     <>
       <path d="M3 3v18h18" />

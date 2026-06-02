@@ -88,6 +88,25 @@ export function useAddItem(storeId: string) {
   });
 }
 
+/** Request body for POST /stores/:storeID/inventory/transfer (LR-306). */
+export interface TransferStockBody {
+  sku: string;
+  from_zone_id: string;
+  to_zone_id: string;
+  qty: number;
+}
+
+/** Move stock of a SKU from one zone to another. */
+export function useTransferStock(storeId: string) {
+  const { post } = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: TransferStockBody) =>
+      post<TransferStockBody>(`${inventoryPath(storeId)}/transfer`, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: inventoryKeys.list(storeId) }),
+  });
+}
+
 /** Apply a live scan event to the cached inventory rows. Pure — returns next state. */
 export function patchInventory(
   rows: InventoryRow[] | undefined,

@@ -5,6 +5,16 @@ ON CONFLICT (org_id, zone_id, sku) DO UPDATE
 SET qty = GREATEST(item_locations.qty + @qty::int, 0)
 RETURNING *;
 
+-- name: DecrementItemLocationQty :one
+-- Guarded source decrement for a transfer: only succeeds when the location
+-- holds at least @qty. Returns no rows (pgx.ErrNoRows) when stock is
+-- insufficient or the location is missing, which the caller maps to 409.
+UPDATE item_locations
+SET qty = qty - @qty::int
+WHERE org_id = @org_id AND zone_id = @zone_id AND sku = @sku
+  AND qty >= @qty::int
+RETURNING *;
+
 -- name: ListInventoryByStore :many
 SELECT
     il.id,

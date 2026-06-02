@@ -15,6 +15,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/jackc/pgx/v5"
+
 	pkgauth "github.com/live-rack/pkg/auth"
 	"github.com/live-rack/pkg/domain"
 	"github.com/live-rack/pkg/store"
@@ -32,6 +34,11 @@ type fakeStore struct {
 	upsertArg    store.UpsertItemParams
 	adjustArg    store.AdjustItemLocationQtyParams
 	adjustResult store.ItemLocation
+
+	// transfer
+	decrementArg   store.DecrementItemLocationQtyParams
+	decrementErr   error
+	decrementCalls int
 }
 
 func (f *fakeStore) ListInventoryByStore(_ context.Context, arg store.ListInventoryByStoreParams) ([]store.ListInventoryByStoreRow, error) {
@@ -55,6 +62,15 @@ func (f *fakeStore) AdjustItemLocationQty(_ context.Context, arg store.AdjustIte
 	f.adjustResult.Qty = arg.Qty
 	f.adjustResult.UpdatedAt = time.Now().UTC()
 	return f.adjustResult, nil
+}
+
+func (f *fakeStore) DecrementItemLocationQty(_ context.Context, arg store.DecrementItemLocationQtyParams) (store.ItemLocation, error) {
+	f.decrementArg = arg
+	f.decrementCalls++
+	if f.decrementErr != nil {
+		return store.ItemLocation{}, f.decrementErr
+	}
+	return store.ItemLocation{ID: uuid.New(), OrgID: arg.OrgID, ZoneID: arg.ZoneID, Sku: arg.Sku}, nil
 }
 
 func newCtx(orgID uuid.UUID) context.Context {
@@ -184,6 +200,86 @@ func TestInventoryHandler_Add_Validation(t *testing.T) {
 			he, ok := err.(*echo.HTTPError)
 			require.True(t, ok)
 			assert.Equal(t, tc.status, he.Code)
+		})
+	}
+}
+
+func doTransfer(t *testing.T, fs *fakeStore, orgID, storeID uuid.UUID, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	e := echo.New()
+	e.HideBanner = true
+	h := inventory.New(fs)
+	req := httptest.NewRequestWithContext(newCtx(orgID), http.MethodPost,
+		"/api/v1/stores/"+storeID.String()+"/inventory/transfer",
+		strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("storeID")
+	c.SetParamValues(storeID.String())
+	if err := h.Transfer(c); err != nil {
+		if he, ok := err.(*echo.HTTPError); ok {
+			require.NoError(t, c.JSON(he.Code, map[string]string{"message": he.Message.(string)}))
+		}
+	}
+	return rec
+}
+
+func TestInventoryHandler_Transfer(t *testing.T) {
+	orgID := uuid.New()
+	storeID := uuid.New()
+	from := uuid.New()
+	to := uuid.New()
+
+	t.Run("moves stock from source to destination", func(t *testing.T) {
+		fs := &fakeStore{}
+		body := `{"sku":"SKU-7","from_zone_id":"` + from.String() +
+			`","to_zone_id":"` + to.String() + `","qty":4}`
+		rec := doTransfer(t, fs, orgID, storeID, body)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.Equal(t, 1, fs.decrementCalls)
+		assert.Equal(t, from, fs.decrementArg.ZoneID)
+		assert.EqualValues(t, 4, fs.decrementArg.Qty)
+		assert.Equal(t, to, fs.adjustArg.ZoneID)
+		assert.EqualValues(t, 4, fs.adjustArg.Qty)
+	})
+
+	t.Run("409 when source stock insufficient", func(t *testing.T) {
+		fs := &fakeStore{decrementErr: pgx.ErrNoRows}
+		body := `{"sku":"SKU-7","from_zone_id":"` + from.String() +
+			`","to_zone_id":"` + to.String() + `","qty":99}`
+		rec := doTransfer(t, fs, orgID, storeID, body)
+
+		assert.Equal(t, http.StatusConflict, rec.Code)
+		assert.Equal(t, 1, fs.decrementCalls)
+		// destination must not be credited on a failed decrement
+		assert.Equal(t, uuid.Nil, fs.adjustArg.ZoneID)
+	})
+}
+
+func TestInventoryHandler_Transfer_Validation(t *testing.T) {
+	orgID := uuid.New()
+	storeID := uuid.New()
+	z := uuid.New()
+
+	cases := []struct {
+		name   string
+		body   string
+		status int
+	}{
+		{"missing sku", `{"from_zone_id":"` + z.String() + `","to_zone_id":"` + uuid.New().String() + `","qty":1}`, http.StatusBadRequest},
+		{"qty zero", `{"sku":"X","from_zone_id":"` + z.String() + `","to_zone_id":"` + uuid.New().String() + `","qty":0}`, http.StatusBadRequest},
+		{"same zone", `{"sku":"X","from_zone_id":"` + z.String() + `","to_zone_id":"` + z.String() + `","qty":1}`, http.StatusBadRequest},
+		{"bad from zone", `{"sku":"X","from_zone_id":"nope","to_zone_id":"` + uuid.New().String() + `","qty":1}`, http.StatusBadRequest},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			fs := &fakeStore{}
+			rec := doTransfer(t, fs, orgID, storeID, tc.body)
+			assert.Equal(t, tc.status, rec.Code)
+			assert.Equal(t, 0, fs.decrementCalls)
 		})
 	}
 }

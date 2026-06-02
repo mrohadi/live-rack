@@ -95,6 +95,13 @@ export const routes: RouteObject[] = [
               })),
           },
           {
+            path: "waves",
+            lazy: () =>
+              import("./features/waves/WavesPage").then((m) => ({
+                Component: m.WavesPage,
+              })),
+          },
+          {
             path: "analytics",
             lazy: () =>
               import("./features/analytics/AnalyticsPage").then((m) => ({

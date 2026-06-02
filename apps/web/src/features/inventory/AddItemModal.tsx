@@ -28,7 +28,14 @@ export function AddItemModal({ defaultZoneId, onClose }: Props) {
     e.preventDefault();
     if (!sku.trim() || !zoneId || qty <= 0) return;
     addItem.mutate(
-      { zone_id: zoneId, sku: sku.trim(), name: name.trim(), category: category.trim(), status, qty },
+      {
+        zone_id: zoneId,
+        sku: sku.trim(),
+        name: name.trim(),
+        category: category.trim(),
+        status,
+        qty,
+      },
       {
         onSuccess: () => {
           toast.success(`${sku.trim()} added to zone`);

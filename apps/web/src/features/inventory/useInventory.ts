@@ -67,8 +67,7 @@ export function useAddItem(storeId: string) {
   const { post } = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: AddItemBody) =>
-      post<InventoryRow>(inventoryPath(storeId), body),
+    mutationFn: (body: AddItemBody) => post<InventoryRow>(inventoryPath(storeId), body),
     onSuccess: () => qc.invalidateQueries({ queryKey: inventoryKeys.list(storeId) }),
   });
 }

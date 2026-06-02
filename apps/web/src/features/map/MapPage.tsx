@@ -3,16 +3,17 @@ import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import type { ViewMode, Zone } from "./types";
 import { useCurrentStore } from "./useCurrentStore";
-import { useCreateZone, useDeleteZone, useUpdateZone, useZones, zoneKeys } from "./useZones";
+import { useDeleteZone, useUpdateZone, useZones, zoneKeys } from "./useZones";
 import { ZoneDetailSidebar } from "./ZoneDetailSidebar";
 import { ZoneMapView, type ZoneRect } from "./ZoneMapView";
-import { findOpenSlot, randomZoneColor } from "./zoneMath";
 import { useToast } from "../../components/feedback/toast-context";
 import { useConfirm } from "../../components/feedback/confirm-context";
 import { useInventory } from "../inventory/useInventory";
 import { useScanStream } from "../../lib/useScanStream";
 import type { ScanRecorded } from "../../lib/ws";
 import { AddItemModal } from "../inventory/AddItemModal";
+import { ZoneEditModal } from "./ZoneEditModal";
+import { ZoneCreateModal } from "./ZoneCreateModal";
 
 const TABS: { label: string; value: ViewMode }[] = [
   { label: "Zones", value: "zones" },
@@ -34,7 +35,6 @@ export function MapPage() {
   const navigate = useNavigate();
   const { data: zones = [], isLoading } = useZones(storeId);
   const { data: items = [] } = useInventory(storeId);
-  const createZone = useCreateZone(storeId);
   const updateZone = useUpdateZone(storeId);
   const deleteZone = useDeleteZone(storeId);
   const toast = useToast();
@@ -60,11 +60,25 @@ export function MapPage() {
   );
   useScanStream(onScan);
 
+  // Merge item_locations qty totals into each zone so fill/capacity display correctly.
+  // The zones API doesn't JOIN item_locations, so we compute counts client-side.
+  const zonesWithCounts = useMemo(() => {
+    if (!items.length) return zones;
+    const qtyByZone = new Map<string, number>();
+    for (const row of items) {
+      qtyByZone.set(row.zone_id, (qtyByZone.get(row.zone_id) ?? 0) + row.qty);
+    }
+    return zones.map((z) => {
+      const count = qtyByZone.get(z.id);
+      return count !== undefined ? { ...z, items: count } : z;
+    });
+  }, [zones, items]);
+
   const [view, setView] = useState<ViewMode>("zones");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [newZoneName, setNewZoneName] = useState("");
+  const [showCreateZone, setShowCreateZone] = useState(false);
   const [addItemZoneId, setAddItemZoneId] = useState<string | null>(null);
+  const [editZone, setEditZone] = useState<Zone | null>(null);
 
   const [filterOpen, setFilterOpen] = useState(false);
   const [typeFilter, setTypeFilter] = useState<Zone["type"] | "all">("all");
@@ -80,10 +94,13 @@ export function MapPage() {
     return () => document.removeEventListener("mousedown", close);
   }, [filterOpen]);
 
-  const zoneTypes = useMemo(() => Array.from(new Set(zones.map((z) => z.type))), [zones]);
+  const zoneTypes = useMemo(
+    () => Array.from(new Set(zonesWithCounts.map((z) => z.type))),
+    [zonesWithCounts],
+  );
 
   const visibleZones = useMemo(() => {
-    return zones.filter((z) => {
+    return zonesWithCounts.filter((z) => {
       if (typeFilter !== "all" && z.type !== typeFilter) return false;
       if (fillFilter !== "all") {
         const fill = z.capacity && z.items != null ? z.items / z.capacity : 0;
@@ -93,56 +110,24 @@ export function MapPage() {
       }
       return true;
     });
-  }, [zones, typeFilter, fillFilter]);
+  }, [zonesWithCounts, typeFilter, fillFilter]);
 
   const filterActive = typeFilter !== "all" || fillFilter !== "all";
 
   // Default to the first zone once loaded so the detail panel is never empty.
   useEffect(() => {
-    if (!selectedId && zones.length > 0) setSelectedId(zones[0].id);
-  }, [zones, selectedId]);
-
-  const handleAddZone = () => {
-    if (!newZoneName.trim()) return;
-    const width = 20;
-    const height = 14;
-    const { x, y } = findOpenSlot(zones, width, height);
-    createZone.mutate(
-      {
-        name: newZoneName.trim(),
-        type: "general",
-        x,
-        y,
-        width,
-        height,
-        color: randomZoneColor(),
-        capacity: 100,
-      },
-      {
-        onSuccess: () => {
-          setNewZoneName("");
-          setShowAddForm(false);
-          toast.success("Zone created");
-        },
-      },
-    );
-  };
+    if (!selectedId && zonesWithCounts.length > 0) setSelectedId(zonesWithCounts[0].id);
+  }, [zonesWithCounts, selectedId]);
 
   // The backend PUT requires a full zone body; merge the new rect into it.
   const handleMove = (id: string, rect: ZoneRect) => {
-    const existing = zones.find((z) => z.id === id);
+    const existing = zonesWithCounts.find((z) => z.id === id);
     if (!existing) return;
     updateZone.mutate({ ...existing, ...rect });
   };
 
-  const handleRename = (id: string, name: string) => {
-    const existing = zones.find((z) => z.id === id);
-    if (!existing) return;
-    updateZone.mutate({ ...existing, name }, { onSuccess: () => toast.success("Zone renamed") });
-  };
-
   const handleDelete = async (id: string) => {
-    const zone = zones.find((z) => z.id === id);
+    const zone = zonesWithCounts.find((z) => z.id === id);
     const ok = await confirm({
       title: "Delete zone",
       message: `Delete ${zone?.name ?? "this zone"}? This cannot be undone.`,
@@ -161,8 +146,8 @@ export function MapPage() {
 
   const handleOpen = (id: string) => navigate(`/inventory?zone=${encodeURIComponent(id)}`);
 
-  const selectedZone = zones.find((z) => z.id === selectedId) ?? null;
-  const itemsTracked = zones.reduce((sum, z) => sum + (z.items ?? 0), 0);
+  const selectedZone = zonesWithCounts.find((z) => z.id === selectedId) ?? null;
+  const itemsTracked = zonesWithCounts.reduce((sum, z) => sum + (z.items ?? 0), 0);
 
   return (
     <div className="flex h-full flex-col">
@@ -248,45 +233,14 @@ export function MapPage() {
             )}
           </div>
 
-          {showAddForm ? (
-            <div className="flex items-center gap-2">
-              <input
-                autoFocus
-                value={newZoneName}
-                onChange={(e) => setNewZoneName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleAddZone();
-                  if (e.key === "Escape") setShowAddForm(false);
-                }}
-                placeholder="Zone name"
-                className="w-32 rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground"
-              />
-              <button
-                type="button"
-                onClick={handleAddZone}
-                disabled={createZone.isPending}
-                className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
-              >
-                {createZone.isPending ? "Saving…" : "Add"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowAddForm(false)}
-                className="px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground"
-              >
-                Cancel
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              data-testid="add-zone-btn"
-              onClick={() => setShowAddForm(true)}
-              className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white transition hover:opacity-90"
-            >
-              + New zone
-            </button>
-          )}
+          <button
+            type="button"
+            data-testid="add-zone-btn"
+            onClick={() => setShowCreateZone(true)}
+            className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white transition hover:opacity-90"
+          >
+            + New zone
+          </button>
         </div>
       </header>
 
@@ -309,19 +263,20 @@ export function MapPage() {
         </div>
         <ZoneDetailSidebar
           zone={selectedZone}
-          onRename={handleRename}
           onDelete={handleDelete}
           onOpen={handleOpen}
           onAddItem={(id) => setAddItemZoneId(id)}
+          onEdit={(z) => setEditZone(z)}
         />
       </div>
 
       {addItemZoneId && (
-        <AddItemModal
-          defaultZoneId={addItemZoneId}
-          onClose={() => setAddItemZoneId(null)}
-        />
+        <AddItemModal defaultZoneId={addItemZoneId} onClose={() => setAddItemZoneId(null)} />
       )}
+
+      {editZone && <ZoneEditModal zone={editZone} onClose={() => setEditZone(null)} />}
+
+      {showCreateZone && <ZoneCreateModal zones={zones} onClose={() => setShowCreateZone(false)} />}
     </div>
   );
 }

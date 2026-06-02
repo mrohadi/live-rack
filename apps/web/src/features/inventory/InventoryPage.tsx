@@ -22,6 +22,7 @@ import {
 import { AddItemModal } from "./AddItemModal";
 import { TransferStockModal } from "./TransferStockModal";
 import { ItemDetailDrawer } from "./ItemDetailDrawer";
+import { CycleCountModal } from "./CycleCountModal";
 
 const VELOCITY_STYLES: Record<string, string> = {
   hot: "bg-destructive/15 text-destructive",
@@ -91,6 +92,7 @@ export function InventoryPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [transferRow, setTransferRow] = useState<InventoryRow | null>(null);
   const [detailSku, setDetailSku] = useState<string | null>(null);
+  const [showCount, setShowCount] = useState(false);
 
   const zoneOptions = useMemo(
     () => [
@@ -156,6 +158,13 @@ export function InventoryPage() {
               className="w-40"
             />
           </div>
+          <button
+            type="button"
+            onClick={() => setShowCount(true)}
+            className="rounded-lg border border-border px-3 py-1.5 text-sm text-foreground transition hover:bg-muted"
+          >
+            Cycle count
+          </button>
           <button
             type="button"
             onClick={exportCsv}
@@ -277,6 +286,7 @@ export function InventoryPage() {
       {showAdd && <AddItemModal onClose={() => setShowAdd(false)} />}
       {transferRow && <TransferStockModal row={transferRow} onClose={() => setTransferRow(null)} />}
       {detailSku && <ItemDetailDrawer sku={detailSku} onClose={() => setDetailSku(null)} />}
+      {showCount && <CycleCountModal onClose={() => setShowCount(false)} />}
     </div>
   );
 }

@@ -92,6 +92,26 @@ type AuditLog202607 struct {
 	Metadata     []byte      `json:"metadata"`
 }
 
+type CycleCount struct {
+	ID          uuid.UUID          `json:"id"`
+	OrgID       uuid.UUID          `json:"org_id"`
+	StoreID     uuid.UUID          `json:"store_id"`
+	ZoneID      uuid.UUID          `json:"zone_id"`
+	Status      string             `json:"status"`
+	CreatedBy   pgtype.UUID        `json:"created_by"`
+	CreatedAt   time.Time          `json:"created_at"`
+	CompletedAt pgtype.Timestamptz `json:"completed_at"`
+}
+
+type CycleCountLine struct {
+	ID         uuid.UUID   `json:"id"`
+	CountID    uuid.UUID   `json:"count_id"`
+	OrgID      uuid.UUID   `json:"org_id"`
+	Sku        string      `json:"sku"`
+	SystemQty  int32       `json:"system_qty"`
+	CountedQty pgtype.Int4 `json:"counted_qty"`
+}
+
 type Integration struct {
 	ID         uuid.UUID `json:"id"`
 	OrgID      uuid.UUID `json:"org_id"`

@@ -58,6 +58,7 @@ import (
 	"github.com/live-rack/services/api/internal/scans"
 	"github.com/live-rack/services/api/internal/search"
 	"github.com/live-rack/services/api/internal/servicetokens"
+	"github.com/live-rack/services/api/internal/shipments"
 	"github.com/live-rack/services/api/internal/signup"
 	"github.com/live-rack/services/api/internal/tasks"
 	"github.com/live-rack/services/api/internal/users"
@@ -233,6 +234,7 @@ func main() {
 	pipelines.New(q, publisher).Register(api.Group("/stores"))
 	picking.New(q, publisher, auditWriter).Register(api.Group("/stores"))
 	waves.New(q, publisher, auditWriter).Register(api.Group("/stores"))
+	shipments.New(q, auditWriter).Register(api.Group("/stores"))
 	sales.New(q).Register(api)
 	integrationsapi.New(q).Register(api)
 	search.New(q).Register(api)

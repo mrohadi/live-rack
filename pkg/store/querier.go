@@ -12,12 +12,14 @@ import (
 
 type Querier interface {
 	AddPickLine(ctx context.Context, arg AddPickLineParams) (PickListLine, error)
+	AddShipmentItem(ctx context.Context, arg AddShipmentItemParams) (ShipmentItem, error)
 	AdjustItemLocationQty(ctx context.Context, arg AdjustItemLocationQtyParams) (ItemLocation, error)
 	// Attach the given open pick lists to a wave (skips lists already in a wave).
 	AssignListsToWave(ctx context.Context, arg AssignListsToWaveParams) error
 	AssignTask(ctx context.Context, arg AssignTaskParams) (Task, error)
 	BindUserRole(ctx context.Context, arg BindUserRoleParams) error
 	CancelPickList(ctx context.Context, arg CancelPickListParams) (PickList, error)
+	CancelShipment(ctx context.Context, arg CancelShipmentParams) (Shipment, error)
 	CompleteCycleCount(ctx context.Context, arg CompleteCycleCountParams) (CycleCount, error)
 	CompletePickList(ctx context.Context, arg CompletePickListParams) (PickList, error)
 	CompleteWave(ctx context.Context, arg CompleteWaveParams) (Wave, error)
@@ -30,6 +32,7 @@ type Querier interface {
 	CreatePipeline(ctx context.Context, arg CreatePipelineParams) (Pipeline, error)
 	CreateSaleEvent(ctx context.Context, arg CreateSaleEventParams) (SalesEvent, error)
 	CreateScanEvent(ctx context.Context, arg CreateScanEventParams) (ScanEvent, error)
+	CreateShipment(ctx context.Context, arg CreateShipmentParams) (Shipment, error)
 	CreateStage(ctx context.Context, arg CreateStageParams) (PipelineStage, error)
 	CreateStore(ctx context.Context, arg CreateStoreParams) (Store, error)
 	CreateTask(ctx context.Context, arg CreateTaskParams) (Task, error)
@@ -49,6 +52,7 @@ type Querier interface {
 	GetOrgByIdpID(ctx context.Context, idpOrgID string) (Org, error)
 	GetPickList(ctx context.Context, arg GetPickListParams) (PickList, error)
 	GetPipeline(ctx context.Context, arg GetPipelineParams) (Pipeline, error)
+	GetShipment(ctx context.Context, arg GetShipmentParams) (Shipment, error)
 	GetStore(ctx context.Context, arg GetStoreParams) (Store, error)
 	GetTask(ctx context.Context, arg GetTaskParams) (Task, error)
 	GetUserByIdpID(ctx context.Context, idpUserID string) (User, error)
@@ -72,6 +76,8 @@ type Querier interface {
 	// Recent scan timeline for one SKU across a store (item detail drawer).
 	ListScanEventsBySKU(ctx context.Context, arg ListScanEventsBySKUParams) ([]ScanEvent, error)
 	ListScanEventsByZone(ctx context.Context, arg ListScanEventsByZoneParams) ([]ScanEvent, error)
+	ListShipmentItems(ctx context.Context, shipmentID uuid.UUID) ([]ListShipmentItemsRow, error)
+	ListShipmentsByStore(ctx context.Context, arg ListShipmentsByStoreParams) ([]ListShipmentsByStoreRow, error)
 	ListStagesByPipeline(ctx context.Context, arg ListStagesByPipelineParams) ([]PipelineStage, error)
 	ListStoresByOrg(ctx context.Context, orgID uuid.UUID) ([]Store, error)
 	ListTasksByStore(ctx context.Context, arg ListTasksByStoreParams) ([]Task, error)
@@ -83,6 +89,8 @@ type Querier interface {
 	ListWaveStopMemberLines(ctx context.Context, arg ListWaveStopMemberLinesParams) ([]ListWaveStopMemberLinesRow, error)
 	ListWavesByStore(ctx context.Context, arg ListWavesByStoreParams) ([]ListWavesByStoreRow, error)
 	ListZonesByStore(ctx context.Context, arg ListZonesByStoreParams) ([]Zone, error)
+	MarkShipmentDispatched(ctx context.Context, arg MarkShipmentDispatchedParams) (Shipment, error)
+	MarkShipmentPacked(ctx context.Context, arg MarkShipmentPackedParams) (Shipment, error)
 	MarkWebhookStatus(ctx context.Context, arg MarkWebhookStatusParams) error
 	MoveCard(ctx context.Context, arg MoveCardParams) (PipelineCard, error)
 	// Best source location for a SKU: the zone holding the most on-hand units, with

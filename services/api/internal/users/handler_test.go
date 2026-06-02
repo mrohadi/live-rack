@@ -86,3 +86,32 @@ func TestList_ServiceForbidden(t *testing.T) {
 	rec, _ := serve(t, p, "/api/v1/users")
 	assert.Equal(t, http.StatusForbidden, rec.Code)
 }
+
+func TestMembers_AllRolesCanAccess(t *testing.T) {
+	roles := []domain.RoleName{domain.RoleAdmin, domain.RoleManager, domain.RoleStaff, domain.RoleReadonly}
+	for _, role := range roles {
+		t.Run(string(role), func(t *testing.T) {
+			org := uuid.New()
+			p := &domain.Principal{UserID: uuid.New(), OrgID: org, Role: role}
+			rec, fs := serve(t, p, "/api/v1/users/members")
+			require.Equal(t, http.StatusOK, rec.Code)
+			assert.Equal(t, org, fs.gotOrg)
+
+			var out []users.MemberRow
+			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &out))
+			require.Len(t, out, 1)
+			assert.Equal(t, "Ann", out[0].DisplayName)
+			assert.Equal(t, "a@b.io", out[0].Email)
+		})
+	}
+}
+
+func TestMembers_DoesNotExposeRole(t *testing.T) {
+	org := uuid.New()
+	p := &domain.Principal{UserID: uuid.New(), OrgID: org, Role: domain.RoleStaff}
+	rec, _ := serve(t, p, "/api/v1/users/members")
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	// Response must not contain "role" field.
+	assert.NotContains(t, rec.Body.String(), `"admin"`)
+}

@@ -34,6 +34,7 @@ func New(q Store) *Handler {
 // Register mounts routes on the authenticated API group.
 func (h *Handler) Register(g *echo.Group) {
 	g.GET("/users", h.List)
+	g.GET("/users/members", h.Members)
 	g.GET("/me", h.Me)
 	g.POST("/me/2fa", h.SyncMFA)
 }
@@ -131,4 +132,40 @@ func (h *Handler) List(c echo.Context) error {
 		rows = []store.UserListRow{}
 	}
 	return c.JSON(http.StatusOK, rows)
+}
+
+// MemberRow is a minimal user record for assignee pickers — safe for all roles.
+type MemberRow struct {
+	ID          string `json:"id"`
+	DisplayName string `json:"display_name"`
+	Email       string `json:"email"`
+	AvatarURL   string `json:"avatar_url"`
+}
+
+// Members godoc
+//
+//	@Summary	Minimal member list for assignee pickers — accessible to all roles
+//	@Tags		users
+//	@Produce	json
+//	@Success	200	{array}	MemberRow
+//	@Router		/users/members [get]
+func (h *Handler) Members(c echo.Context) error {
+	p, err := pkgauth.PrincipalFrom(c.Request().Context())
+	if err != nil {
+		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
+	}
+	rows, err := h.q.ListUsersByOrg(c.Request().Context(), p.OrgID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "list members")
+	}
+	out := make([]MemberRow, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, MemberRow{
+			ID:          r.ID.String(),
+			DisplayName: r.DisplayName,
+			Email:       r.Email,
+			AvatarURL:   r.AvatarURL,
+		})
+	}
+	return c.JSON(http.StatusOK, out)
 }

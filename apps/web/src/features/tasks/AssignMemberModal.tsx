@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useToast } from "../../components/feedback/toast-context";
-import { useUsers } from "../users/useUsers";
+import { useMembers } from "../users/useUsers";
 import { useAssignTask } from "./useTasks";
 import { useCurrentStore } from "../map/useCurrentStore";
 import type { Task } from "./types";
@@ -13,7 +13,7 @@ interface Props {
 export function AssignMemberModal({ task, onClose }: Props) {
   const storeId = useCurrentStore();
   const assignTask = useAssignTask(storeId);
-  const { data: members = [], isLoading } = useUsers();
+  const { data: members = [], isLoading } = useMembers();
   const toast = useToast();
 
   const [assigneeId, setAssigneeId] = useState(task.assignee_id ?? "");
@@ -86,7 +86,6 @@ export function AssignMemberModal({ task, onClose }: Props) {
             {members.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.display_name || m.email}
-                {m.role ? ` · ${m.role}` : ""}
               </option>
             ))}
           </select>

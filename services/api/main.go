@@ -224,7 +224,7 @@ func main() {
 
 	zones.New(q).Register(api.Group("/stores"))
 	scans.New(q, q, q, q, publisher).Register(api.Group("/stores"))
-	inventory.New(q).Register(api.Group("/stores"))
+	inventory.New(q, auditWriter).Register(api.Group("/stores"))
 	tasks.New(q, publisher).Register(api.Group("/stores"))
 	pipelines.New(q, publisher).Register(api.Group("/stores"))
 	sales.New(q).Register(api)

@@ -10,10 +10,16 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/labstack/echo/v4"
 
+	"github.com/live-rack/pkg/audit"
 	pkgauth "github.com/live-rack/pkg/auth"
 	"github.com/live-rack/pkg/domain"
 	"github.com/live-rack/pkg/store"
 )
+
+// Auditor records an append-only audit entry. *audit.Writer satisfies it.
+type Auditor interface {
+	Write(ctx context.Context, e audit.Entry) error
+}
 
 // Store is the narrow store dependency the handler needs.
 type Store interface {
@@ -30,12 +36,28 @@ type Store interface {
 
 // Handler serves inventory endpoints.
 type Handler struct {
-	q Store
+	q     Store
+	audit Auditor
 }
 
-// New creates a Handler.
-func New(q Store) *Handler {
-	return &Handler{q: q}
+// New creates a Handler. audit may be nil to disable audit logging.
+func New(q Store, a Auditor) *Handler {
+	return &Handler{q: q, audit: a}
+}
+
+// record writes an audit entry best-effort; nil auditor or errors are ignored.
+func (h *Handler) record(ctx context.Context, p *domain.Principal, action, sku string, meta map[string]any) {
+	if h.audit == nil {
+		return
+	}
+	_ = h.audit.Write(ctx, audit.Entry{
+		OrgID:        p.OrgID,
+		ActorUserID:  p.UserID,
+		Action:       action,
+		ResourceType: "inventory",
+		ResourceID:   sku,
+		Metadata:     meta,
+	})
 }
 
 // Register mounts inventory routes onto g (expected: /api/v1/stores).
@@ -193,6 +215,10 @@ func (h *Handler) Add(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "adjust qty")
 	}
 
+	h.record(c.Request().Context(), p, "inventory.add", req.SKU, map[string]any{
+		"zone_id": zoneID.String(), "qty": req.Qty, "reorder_point": req.ReorderPoint,
+	})
+
 	return c.JSON(http.StatusCreated, Row{
 		ID:           loc.ID,
 		ZoneID:       loc.ZoneID,
@@ -295,6 +321,10 @@ func (h *Handler) Transfer(c echo.Context) error {
 	}); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "credit destination")
 	}
+
+	h.record(c.Request().Context(), p, "inventory.transfer", req.SKU, map[string]any{
+		"from_zone_id": fromZone.String(), "to_zone_id": toZone.String(), "qty": req.Qty,
+	})
 
 	return c.JSON(http.StatusOK, TransferResponse{
 		SKU:        req.SKU,
@@ -490,6 +520,11 @@ func (h *Handler) EditItem(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "update item")
 	}
 
+	h.record(c.Request().Context(), p, "inventory.edit", sku, map[string]any{
+		"name": item.Name, "category": item.Category,
+		"status": item.Status, "reorder_point": item.ReorderPoint,
+	})
+
 	return c.JSON(http.StatusOK, map[string]any{
 		"sku":           item.Sku,
 		"name":          item.Name,
@@ -558,6 +593,10 @@ func (h *Handler) AdjustQty(c echo.Context) error {
 		}
 		return echo.NewHTTPError(http.StatusInternalServerError, "set qty")
 	}
+
+	h.record(c.Request().Context(), p, "inventory.qty_correct", sku, map[string]any{
+		"zone_id": zoneID.String(), "qty": loc.Qty,
+	})
 
 	return c.JSON(http.StatusOK, map[string]any{
 		"sku":     loc.Sku,

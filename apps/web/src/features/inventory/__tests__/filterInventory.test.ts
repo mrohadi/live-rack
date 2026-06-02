@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { InventoryRow } from "../types";
-import { filterInventory, rowVelocity } from "../useInventory";
+import { filterInventory, rowStockStatus, rowVelocity } from "../useInventory";
 
 function row(over: Partial<InventoryRow>): InventoryRow {
   return {
@@ -22,12 +22,30 @@ const rows: InventoryRow[] = [
   row({ id: "c", zone_id: "z1", status: "recalled" }), // velocity undefined → cold
 ];
 
-const ALL = { zone: "all", status: "all", velocity: "all" };
+const ALL = { zone: "all", status: "all", velocity: "all", stock: "all" };
 
 describe("rowVelocity", () => {
   it("defaults missing velocity to cold", () => {
     expect(rowVelocity(row({ velocity: undefined }))).toBe("cold");
     expect(rowVelocity(row({ velocity: "hot" }))).toBe("hot");
+  });
+});
+
+describe("rowStockStatus", () => {
+  it("out when qty is zero", () => {
+    expect(rowStockStatus(row({ qty: 0 }))).toBe("out");
+  });
+  it("low when qty at/below reorder point", () => {
+    expect(rowStockStatus(row({ qty: 3, reorder_point: 5 }))).toBe("low");
+  });
+  it("in_stock above reorder point", () => {
+    expect(rowStockStatus(row({ qty: 9, reorder_point: 5 }))).toBe("in_stock");
+  });
+  it("in_stock when reorder point disabled and positive", () => {
+    expect(rowStockStatus(row({ qty: 1, reorder_point: 0 }))).toBe("in_stock");
+  });
+  it("prefers server-provided stock_status", () => {
+    expect(rowStockStatus(row({ qty: 100, stock_status: "low" }))).toBe("low");
   });
 });
 

@@ -59,6 +59,37 @@ func (f *fakeAdjuster) AdjustItemLocationQty(_ context.Context, arg store.Adjust
 	return store.ItemLocation{ID: uuid.New(), Sku: arg.Sku, Qty: arg.Qty}, nil
 }
 
+// fakeRestocker implements scans.Restocker. items maps SKU→reorder_point.
+type fakeRestocker struct {
+	mu          sync.Mutex
+	items       map[string]int32
+	openByTitle map[string]int64
+	created     []store.CreateTaskParams
+}
+
+func (f *fakeRestocker) GetItemBySKU(_ context.Context, arg store.GetItemBySKUParams) (store.Item, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	rp, ok := f.items[arg.Sku]
+	if !ok {
+		return store.Item{}, errNotFound
+	}
+	return store.Item{Sku: arg.Sku, ReorderPoint: rp}, nil
+}
+
+func (f *fakeRestocker) CountOpenTasksByTitle(_ context.Context, arg store.CountOpenTasksByTitleParams) (int64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.openByTitle[arg.Title], nil
+}
+
+func (f *fakeRestocker) CreateTask(_ context.Context, arg store.CreateTaskParams) (store.Task, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.created = append(f.created, arg)
+	return store.Task{ID: uuid.New()}, nil
+}
+
 type fakePublisher struct {
 	mu       sync.Mutex
 	subjects []string
@@ -106,7 +137,9 @@ func run(t *testing.T, getter *fakeZoneGetter, orgID, storeID uuid.UUID, body ma
 	rec0 := &fakeRecorder{}
 	adj := &fakeAdjuster{}
 	pub := &fakePublisher{}
-	h := scans.New(getter, rec0, adj, pub)
+	// Empty items map → no reorder policy → auto-restock is a no-op here.
+	restock := &fakeRestocker{items: map[string]int32{}, openByTitle: map[string]int64{}}
+	h := scans.New(getter, rec0, adj, restock, pub)
 	h.Register(e.Group("/api/v1/stores"))
 
 	raw, _ := json.Marshal(body)
@@ -238,4 +271,90 @@ func TestScanHandler_Validate_BadScanQty(t *testing.T) {
 	var he *echo.HTTPError
 	require.ErrorAs(t, err, &he)
 	assert.Equal(t, http.StatusBadRequest, he.Code)
+}
+
+// fixedAdjuster reports a constant resulting on-hand qty after each adjust.
+type fixedAdjuster struct{ qty int32 }
+
+func (f *fixedAdjuster) AdjustItemLocationQty(_ context.Context, arg store.AdjustItemLocationQtyParams) (store.ItemLocation, error) {
+	return store.ItemLocation{ID: uuid.New(), Sku: arg.Sku, Qty: f.qty}, nil
+}
+
+// runRestock wires a validate request with custom adjuster + restocker.
+func runRestock(
+	t *testing.T,
+	getter *fakeZoneGetter,
+	adj scans.LocationAdjuster,
+	restock *fakeRestocker,
+	orgID, storeID uuid.UUID,
+	body map[string]any,
+) error {
+	t.Helper()
+	e := echo.New()
+	e.HideBanner = true
+	h := scans.New(getter, &fakeRecorder{}, adj, restock, &fakePublisher{})
+	h.Register(e.Group("/api/v1/stores"))
+
+	raw, _ := json.Marshal(body)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost,
+		"/api/v1/stores/"+storeID.String()+"/scan/validate", bytes.NewReader(raw))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("storeID")
+	c.SetParamValues(storeID.String())
+	withPrincipal(c, orgID, storeID)
+	return h.Validate(c)
+}
+
+func TestScanHandler_AutoRestock(t *testing.T) {
+	orgID := uuid.New()
+	storeID := uuid.New()
+	zoneID := uuid.New()
+	getter := &fakeZoneGetter{rows: map[uuid.UUID]store.Zone{
+		zoneID: {ID: zoneID, OrgID: orgID, StoreID: storeID, Capacity: 100},
+	}}
+	body := map[string]any{
+		"zone_id": zoneID, "category": "frozen", "scan_qty": 1,
+		"scanner_id": "scn-1", "sku": "SKU-9", "action": "pick",
+	}
+
+	t.Run("creates restock task when qty drops to reorder point", func(t *testing.T) {
+		restock := &fakeRestocker{
+			items:       map[string]int32{"SKU-9": 5},
+			openByTitle: map[string]int64{},
+		}
+		require.NoError(t, runRestock(t, getter, &fixedAdjuster{qty: 4}, restock, orgID, storeID, body))
+		require.Len(t, restock.created, 1)
+		assert.Equal(t, domain.RestockTaskTitle("SKU-9"), restock.created[0].Title)
+		assert.Equal(t, string(domain.TaskPriorityHigh), restock.created[0].Priority)
+		assert.Equal(t, string(domain.TaskStatusTodo), restock.created[0].Status)
+	})
+
+	t.Run("no task when above reorder point", func(t *testing.T) {
+		restock := &fakeRestocker{
+			items:       map[string]int32{"SKU-9": 5},
+			openByTitle: map[string]int64{},
+		}
+		require.NoError(t, runRestock(t, getter, &fixedAdjuster{qty: 20}, restock, orgID, storeID, body))
+		assert.Empty(t, restock.created)
+	})
+
+	t.Run("dedupes against an existing open restock task", func(t *testing.T) {
+		restock := &fakeRestocker{
+			items:       map[string]int32{"SKU-9": 5},
+			openByTitle: map[string]int64{domain.RestockTaskTitle("SKU-9"): 1},
+		}
+		require.NoError(t, runRestock(t, getter, &fixedAdjuster{qty: 1}, restock, orgID, storeID, body))
+		assert.Empty(t, restock.created)
+	})
+
+	t.Run("no task when reorder point disabled", func(t *testing.T) {
+		restock := &fakeRestocker{
+			items:       map[string]int32{"SKU-9": 0},
+			openByTitle: map[string]int64{},
+		}
+		require.NoError(t, runRestock(t, getter, &fixedAdjuster{qty: 0}, restock, orgID, storeID, body))
+		assert.Empty(t, restock.created)
+	})
 }

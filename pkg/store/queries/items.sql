@@ -1,8 +1,9 @@
 -- name: UpsertItem :one
-INSERT INTO items (org_id, sku, name, category, status)
-VALUES ($1, $2, $3, $4, $5)
+INSERT INTO items (org_id, sku, name, category, status, reorder_point)
+VALUES ($1, $2, $3, $4, $5, $6)
 ON CONFLICT (org_id, sku) DO UPDATE
-SET name = EXCLUDED.name, category = EXCLUDED.category, status = EXCLUDED.status
+SET name = EXCLUDED.name, category = EXCLUDED.category,
+    status = EXCLUDED.status, reorder_point = EXCLUDED.reorder_point
 RETURNING *;
 
 -- name: GetItemBySKU :one

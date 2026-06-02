@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/labstack/echo/v4"
 
 	pkgauth "github.com/live-rack/pkg/auth"
@@ -31,17 +32,26 @@ type LocationAdjuster interface {
 	AdjustItemLocationQty(ctx context.Context, arg store.AdjustItemLocationQtyParams) (store.ItemLocation, error)
 }
 
-// Handler handles scan validation endpoints.
-type Handler struct {
-	q   ZoneGetter
-	rec ScanRecorder
-	loc LocationAdjuster
-	pub events.Publisher
+// Restocker provides the data ops needed to auto-create restock tasks when a
+// pick drops on-hand qty to/below the item's reorder point.
+type Restocker interface {
+	GetItemBySKU(ctx context.Context, arg store.GetItemBySKUParams) (store.Item, error)
+	CountOpenTasksByTitle(ctx context.Context, arg store.CountOpenTasksByTitleParams) (int64, error)
+	CreateTask(ctx context.Context, arg store.CreateTaskParams) (store.Task, error)
 }
 
-// New creates a Handler.
-func New(q ZoneGetter, rec ScanRecorder, loc LocationAdjuster, pub events.Publisher) *Handler {
-	return &Handler{q: q, rec: rec, loc: loc, pub: pub}
+// Handler handles scan validation endpoints.
+type Handler struct {
+	q       ZoneGetter
+	rec     ScanRecorder
+	loc     LocationAdjuster
+	restock Restocker
+	pub     events.Publisher
+}
+
+// New creates a Handler. restock may be nil to disable auto-restock tasks.
+func New(q ZoneGetter, rec ScanRecorder, loc LocationAdjuster, restock Restocker, pub events.Publisher) *Handler {
+	return &Handler{q: q, rec: rec, loc: loc, restock: restock, pub: pub}
 }
 
 // Register mounts scan routes onto g (expected: /api/v1/stores).
@@ -139,14 +149,18 @@ func (h *Handler) Validate(c echo.Context) error {
 	// Only valid scans mutate on-hand inventory.
 	if resp.Valid {
 		delta := domain.QtyDelta(domain.ScanAction(req.Action), req.ScanQty)
-		if _, err := h.loc.AdjustItemLocationQty(ctx, store.AdjustItemLocationQtyParams{
+		loc, err := h.loc.AdjustItemLocationQty(ctx, store.AdjustItemLocationQtyParams{
 			OrgID:   orgID,
 			StoreID: storeID,
 			ZoneID:  req.ZoneID,
 			Sku:     req.SKU,
 			Qty:     int32(delta),
-		}); err != nil {
+		})
+		if err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, "adjust inventory")
+		}
+		if err := h.maybeRestock(ctx, orgID, storeID, req.ZoneID, req.SKU, int(loc.Qty)); err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "auto restock")
 		}
 	}
 
@@ -165,6 +179,56 @@ func (h *Handler) Validate(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, resp)
+}
+
+// maybeRestock creates a high-priority restock task when the SKU's on-hand qty
+// in a zone has fallen to/below its reorder point and no open restock task
+// already exists for it. No-op when restock is unconfigured or the item is
+// unknown. Reorder point 0 disables the trigger.
+func (h *Handler) maybeRestock(
+	ctx context.Context,
+	orgID, storeID, zoneID uuid.UUID,
+	sku string,
+	qty int,
+) error {
+	if h.restock == nil {
+		return nil
+	}
+
+	item, err := h.restock.GetItemBySKU(ctx, store.GetItemBySKUParams{OrgID: orgID, Sku: sku})
+	if err != nil {
+		// Unknown SKU has no reorder policy — nothing to restock.
+		return nil
+	}
+	if !domain.NeedsReorder(qty, int(item.ReorderPoint)) {
+		return nil
+	}
+
+	zoneArg := pgtype.UUID{Bytes: zoneID, Valid: true}
+	title := domain.RestockTaskTitle(sku)
+
+	n, err := h.restock.CountOpenTasksByTitle(ctx, store.CountOpenTasksByTitleParams{
+		OrgID:   orgID,
+		StoreID: storeID,
+		ZoneID:  zoneArg,
+		Title:   title,
+	})
+	if err != nil {
+		return err
+	}
+	if n > 0 {
+		return nil // already an open restock task for this SKU+zone
+	}
+
+	_, err = h.restock.CreateTask(ctx, store.CreateTaskParams{
+		OrgID:    orgID,
+		StoreID:  storeID,
+		ZoneID:   zoneArg,
+		Title:    title,
+		Status:   string(domain.TaskStatusTodo),
+		Priority: string(domain.TaskPriorityHigh),
+	})
+	return err
 }
 
 func decision(err error) ValidateResponse {

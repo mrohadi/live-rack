@@ -1,5 +1,6 @@
 import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { useEffect, useState } from "react";
+import { useToast } from "../../components/feedback/toast-context";
 import { useCurrentStore } from "../map/useCurrentStore";
 import { StageColumn } from "./StageColumn";
 import {
@@ -24,6 +25,7 @@ export function PipelinesPage() {
   const { data: board, isLoading: loadingBoard } = useBoard(storeId, selected);
   const move = useMoveCard(storeId, selected ?? "");
   const createFromTemplate = useCreateFromTemplate(storeId);
+  const toast = useToast();
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
@@ -35,7 +37,7 @@ export function PipelinesPage() {
     const id = String(ev.active.id);
     const card = board.cards.find((c) => c.id === id);
     if (!card || card.stage_position === stagePosition) return;
-    move.mutate({ id, stagePosition });
+    move.mutate({ id, stagePosition }, { onError: () => toast.error("Failed to move card") });
   }
 
   if (loadingList) {
@@ -48,7 +50,12 @@ export function PipelinesPage() {
         <button
           type="button"
           disabled={createFromTemplate.isPending}
-          onClick={() => createFromTemplate.mutate("item-restoration")}
+          onClick={() =>
+            createFromTemplate.mutate("item-restoration", {
+              onSuccess: () => toast.success("Pipeline created"),
+              onError: () => toast.error("Failed to create pipeline"),
+            })
+          }
           className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
         >
           {createFromTemplate.isPending ? "Creating…" : "Start Item Restoration template"}

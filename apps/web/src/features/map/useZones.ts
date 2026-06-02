@@ -47,3 +47,15 @@ export function useUpdateZone(storeId: string) {
     },
   });
 }
+
+/** Delete a zone from a store. */
+export function useDeleteZone(storeId: string) {
+  const { del } = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => del<void>(`${zonesPath(storeId)}/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: zoneKeys.list(storeId) });
+    },
+  });
+}

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useToast } from "../../components/feedback/toast-context";
 import { ASSIGNABLE_ROLES, useSetRole, type AssignableRole, type OrgUser } from "./useUsers";
 
 interface EditAccessModalProps {
@@ -14,10 +15,20 @@ export function EditAccessModal({ user, onClose }: EditAccessModalProps) {
       : "staff",
   );
   const setRoleMut = useSetRole();
+  const toast = useToast();
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    setRoleMut.mutate({ id: user.id, idpUserId: user.idp_user_id, role }, { onSuccess: onClose });
+    setRoleMut.mutate(
+      { id: user.id, idpUserId: user.idp_user_id, role },
+      {
+        onSuccess: () => {
+          toast.success("Role updated");
+          onClose();
+        },
+        onError: () => toast.error("Failed to update role"),
+      },
+    );
   };
 
   return (

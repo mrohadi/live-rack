@@ -1,4 +1,5 @@
 import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { useToast } from "../../components/feedback/toast-context";
 import { useCurrentStore } from "../map/useCurrentStore";
 import { KanbanColumn } from "./KanbanColumn";
 import { TASK_COLUMNS, type TaskStatus } from "./types";
@@ -8,6 +9,7 @@ export function TasksPage() {
   const storeId = useCurrentStore();
   const { data: tasks = [], isLoading } = useTasks(storeId);
   const move = useMoveTask(storeId);
+  const toast = useToast();
 
   // Require a small drag distance so clicks don't trigger a move.
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
@@ -18,7 +20,7 @@ export function TasksPage() {
     if (!status) return;
     const task = tasks.find((t) => t.id === id);
     if (!task || task.status === status) return;
-    move.mutate({ id, status });
+    move.mutate({ id, status }, { onError: () => toast.error("Failed to move task") });
   }
 
   if (isLoading) {

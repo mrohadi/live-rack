@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useScanStream } from "../../lib/useScanStream";
 import type { ScanRecorded } from "../../lib/ws";
@@ -61,7 +62,8 @@ export function InventoryPage() {
   );
   useScanStream(onScan);
 
-  const [zone, setZone] = useState("all");
+  const [searchParams] = useSearchParams();
+  const [zone, setZone] = useState(searchParams.get("zone") ?? "all");
   const [status, setStatus] = useState("all");
   const [velocity, setVelocity] = useState("all");
 

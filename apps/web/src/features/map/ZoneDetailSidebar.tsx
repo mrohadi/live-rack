@@ -1,12 +1,30 @@
+import { useEffect, useRef, useState } from "react";
 import type { Zone } from "./types";
 
 interface Props {
   zone: Zone | null;
+  onRename?: (id: string, name: string) => void;
+  onDelete?: (id: string) => void;
+  onOpen?: (id: string) => void;
 }
 
 /** Right-hand zone inspector: capacity, fill, sales, dwell, misplaced, last
  *  scan, and constraint chips, with Open / Assign actions. */
-export function ZoneDetailSidebar({ zone }: Props) {
+export function ZoneDetailSidebar({ zone, onRename, onDelete, onOpen }: Props) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [draftName, setDraftName] = useState("");
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const close = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [menuOpen]);
+
   if (!zone) {
     return (
       <aside className="flex w-72 shrink-0 items-center justify-center border-l border-border bg-surface text-sm text-muted-foreground">
@@ -23,18 +41,63 @@ export function ZoneDetailSidebar({ zone }: Props) {
     <aside className="flex w-72 shrink-0 flex-col border-l border-border bg-surface">
       <div className="flex items-start gap-2 border-b border-border p-4">
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-semibold text-foreground">{zone.name}</div>
+          {renaming ? (
+            <input
+              autoFocus
+              value={draftName}
+              onChange={(e) => setDraftName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && draftName.trim()) {
+                  onRename?.(zone.id, draftName.trim());
+                  setRenaming(false);
+                }
+                if (e.key === "Escape") setRenaming(false);
+              }}
+              onBlur={() => setRenaming(false)}
+              className="w-full rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground"
+            />
+          ) : (
+            <div className="truncate text-sm font-semibold text-foreground">{zone.name}</div>
+          )}
           <div className="mt-0.5 text-xs capitalize text-muted-foreground">
             {zone.type} · zone {zone.id}
           </div>
         </div>
-        <button
-          type="button"
-          aria-label="more"
-          className="rounded-md p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
-        >
-          ⋯
-        </button>
+        <div ref={menuRef} className="relative">
+          <button
+            type="button"
+            aria-label="more"
+            onClick={() => setMenuOpen((o) => !o)}
+            className="rounded-md p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          >
+            ⋯
+          </button>
+          {menuOpen && (
+            <div className="absolute right-0 z-20 mt-1 w-32 overflow-hidden rounded-md border border-border bg-surface shadow-md">
+              <button
+                type="button"
+                onClick={() => {
+                  setDraftName(zone.name);
+                  setRenaming(true);
+                  setMenuOpen(false);
+                }}
+                className="block w-full px-3 py-2 text-left text-sm text-foreground hover:bg-muted"
+              >
+                Rename
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onDelete?.(zone.id);
+                  setMenuOpen(false);
+                }}
+                className="block w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-muted"
+              >
+                Delete
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
@@ -64,7 +127,11 @@ export function ZoneDetailSidebar({ zone }: Props) {
       </div>
 
       <div className="flex items-center justify-between gap-2 border-t border-border p-4">
-        <button type="button" className="text-sm font-medium text-foreground hover:underline">
+        <button
+          type="button"
+          onClick={() => onOpen?.(zone.id)}
+          className="text-sm font-medium text-foreground hover:underline"
+        >
           Open zone
         </button>
         <button

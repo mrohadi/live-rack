@@ -56,7 +56,7 @@ const cancelPickList = `-- name: CancelPickList :one
 UPDATE pick_lists
 SET status = 'cancelled'
 WHERE org_id = $1 AND id = $2 AND status IN ('open', 'picking')
-RETURNING id, org_id, store_id, reference, status, created_by, assignee_id, created_at, completed_at
+RETURNING id, org_id, store_id, reference, status, created_by, assignee_id, created_at, completed_at, wave_id
 `
 
 type CancelPickListParams struct {
@@ -77,6 +77,7 @@ func (q *Queries) CancelPickList(ctx context.Context, arg CancelPickListParams) 
 		&i.AssigneeID,
 		&i.CreatedAt,
 		&i.CompletedAt,
+		&i.WaveID,
 	)
 	return i, err
 }
@@ -85,7 +86,7 @@ const completePickList = `-- name: CompletePickList :one
 UPDATE pick_lists
 SET status = 'completed', completed_at = NOW()
 WHERE org_id = $1 AND id = $2 AND status IN ('open', 'picking')
-RETURNING id, org_id, store_id, reference, status, created_by, assignee_id, created_at, completed_at
+RETURNING id, org_id, store_id, reference, status, created_by, assignee_id, created_at, completed_at, wave_id
 `
 
 type CompletePickListParams struct {
@@ -106,6 +107,7 @@ func (q *Queries) CompletePickList(ctx context.Context, arg CompletePickListPara
 		&i.AssigneeID,
 		&i.CreatedAt,
 		&i.CompletedAt,
+		&i.WaveID,
 	)
 	return i, err
 }
@@ -113,7 +115,7 @@ func (q *Queries) CompletePickList(ctx context.Context, arg CompletePickListPara
 const createPickList = `-- name: CreatePickList :one
 INSERT INTO pick_lists (org_id, store_id, reference, created_by, assignee_id, status)
 VALUES ($1, $2, $3, $4, $5, 'open')
-RETURNING id, org_id, store_id, reference, status, created_by, assignee_id, created_at, completed_at
+RETURNING id, org_id, store_id, reference, status, created_by, assignee_id, created_at, completed_at, wave_id
 `
 
 type CreatePickListParams struct {
@@ -143,12 +145,13 @@ func (q *Queries) CreatePickList(ctx context.Context, arg CreatePickListParams) 
 		&i.AssigneeID,
 		&i.CreatedAt,
 		&i.CompletedAt,
+		&i.WaveID,
 	)
 	return i, err
 }
 
 const getPickList = `-- name: GetPickList :one
-SELECT id, org_id, store_id, reference, status, created_by, assignee_id, created_at, completed_at FROM pick_lists
+SELECT id, org_id, store_id, reference, status, created_by, assignee_id, created_at, completed_at, wave_id FROM pick_lists
 WHERE org_id = $1 AND id = $2
 `
 
@@ -170,6 +173,7 @@ func (q *Queries) GetPickList(ctx context.Context, arg GetPickListParams) (PickL
 		&i.AssigneeID,
 		&i.CreatedAt,
 		&i.CompletedAt,
+		&i.WaveID,
 	)
 	return i, err
 }
@@ -238,7 +242,7 @@ func (q *Queries) ListPickListLines(ctx context.Context, listID uuid.UUID) ([]Li
 
 const listPickListsByStore = `-- name: ListPickListsByStore :many
 SELECT
-    pl.id, pl.org_id, pl.store_id, pl.reference, pl.status, pl.created_by, pl.assignee_id, pl.created_at, pl.completed_at,
+    pl.id, pl.org_id, pl.store_id, pl.reference, pl.status, pl.created_by, pl.assignee_id, pl.created_at, pl.completed_at, pl.wave_id,
     (SELECT count(*) FROM pick_list_lines l WHERE l.list_id = pl.id)::int AS line_count,
     (SELECT count(*) FROM pick_list_lines l WHERE l.list_id = pl.id AND l.status <> 'pending')::int AS done_count
 FROM pick_lists pl
@@ -261,6 +265,7 @@ type ListPickListsByStoreRow struct {
 	AssigneeID  pgtype.UUID        `json:"assignee_id"`
 	CreatedAt   time.Time          `json:"created_at"`
 	CompletedAt pgtype.Timestamptz `json:"completed_at"`
+	WaveID      pgtype.UUID        `json:"wave_id"`
 	LineCount   int32              `json:"line_count"`
 	DoneCount   int32              `json:"done_count"`
 }
@@ -284,6 +289,7 @@ func (q *Queries) ListPickListsByStore(ctx context.Context, arg ListPickListsByS
 			&i.AssigneeID,
 			&i.CreatedAt,
 			&i.CompletedAt,
+			&i.WaveID,
 			&i.LineCount,
 			&i.DoneCount,
 		); err != nil {
@@ -381,7 +387,7 @@ const startPickList = `-- name: StartPickList :one
 UPDATE pick_lists
 SET status = 'picking'
 WHERE org_id = $1 AND id = $2 AND status = 'open'
-RETURNING id, org_id, store_id, reference, status, created_by, assignee_id, created_at, completed_at
+RETURNING id, org_id, store_id, reference, status, created_by, assignee_id, created_at, completed_at, wave_id
 `
 
 type StartPickListParams struct {
@@ -402,6 +408,7 @@ func (q *Queries) StartPickList(ctx context.Context, arg StartPickListParams) (P
 		&i.AssigneeID,
 		&i.CreatedAt,
 		&i.CompletedAt,
+		&i.WaveID,
 	)
 	return i, err
 }

@@ -23,7 +23,7 @@ export function AssignMemberModal({ task, onClose }: Props) {
     value: m.id,
     label: m.display_name || m.email,
     sub: m.email !== (m.display_name || m.email) ? m.email : undefined,
-    avatar: (m.display_name || m.email)[0].toUpperCase(),
+    avatar: ((m.display_name || m.email || "?")[0] ?? "?").toUpperCase(),
   }));
 
   const submit = (e: React.FormEvent) => {

@@ -51,7 +51,7 @@ export function AssignTaskModal({ zoneId, zoneName, onClose }: Props) {
       value: m.id,
       label: m.display_name || m.email,
       sub: m.email !== (m.display_name || m.email) ? m.email : undefined,
-      avatar: (m.display_name || m.email)[0].toUpperCase(),
+      avatar: ((m.display_name || m.email || "?")[0] ?? "?").toUpperCase(),
     })),
   ];
 

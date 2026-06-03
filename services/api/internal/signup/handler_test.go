@@ -62,7 +62,8 @@ func TestSignup_ProvisionsOrgAdmin(t *testing.T) {
 	assert.Equal(t, "zid-user-1", out.UserID)
 	assert.Equal(t, "pending_verification", out.Status)
 
-	assert.Equal(t, "Acme Co", fp.orgName)
+	assert.True(t, strings.HasPrefix(fp.orgName, "Acme Co-"), "org name must start with company + suffix: %s", fp.orgName)
+	assert.Len(t, strings.TrimPrefix(fp.orgName, "Acme Co-"), 6, "suffix must be 6 chars")
 	assert.Equal(t, "founder@acme.test", fp.createdEmail) // normalised
 	assert.Equal(t, "admin", fp.grantedRole)
 }

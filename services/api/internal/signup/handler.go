@@ -6,7 +6,9 @@ package signup
 
 import (
 	"context"
+	"crypto/rand"
 	"log/slog"
+	"math/big"
 	"net/http"
 	"net/mail"
 	"strings"
@@ -81,7 +83,7 @@ func (h *Handler) Signup(c echo.Context) error {
 	}
 
 	ctx := c.Request().Context()
-	orgID, err := h.zit.CreateOrg(ctx, company)
+	orgID, err := h.zit.CreateOrg(ctx, company+"-"+randSuffix(6))
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadGateway, "create org")
 	}
@@ -99,4 +101,16 @@ func (h *Handler) Signup(c echo.Context) error {
 	return c.JSON(http.StatusCreated, Response{
 		OrgID: orgID, UserID: userID, Status: "pending_verification",
 	})
+}
+
+// randSuffix returns n random lowercase alphanumeric characters using crypto/rand
+// so gosec is satisfied; the suffix is not a secret but collision avoidance only.
+func randSuffix(n int) string {
+	const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
+	b := make([]byte, n)
+	for i := range b {
+		idx, _ := rand.Int(rand.Reader, big.NewInt(int64(len(chars))))
+		b[i] = chars[idx.Int64()]
+	}
+	return string(b)
 }

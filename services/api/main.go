@@ -211,10 +211,9 @@ func main() {
 	// Stripe billing webhook → org plan changes. Price→plan map from env (JSON).
 	billing.New(q, envOr("STRIPE_BILLING_SECRET", ""), parsePricePlans(os.Getenv("STRIPE_PRICE_PLANS"))).Register(e)
 
-	// Public self-service signup — provisions a tenant org + admin in Zitadel.
-	// Dev mode returns the email verification code directly (no SMTP required).
-	devMode := os.Getenv("ENV") == "development"
-	signup.New(mgmt, devMode, appBaseURL).Register(e)
+	// Public self-service signup — provisions a tenant org + admin in Zitadel,
+	// triggers a verification email via Zitadel's configured SMTP (Resend).
+	signup.New(mgmt).Register(e)
 
 	// Public custom-login proxy — drives Zitadel's Session API for our own sign-in UI.
 	login.New(loginClient).Register(e)

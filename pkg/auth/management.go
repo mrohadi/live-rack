@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -452,6 +453,8 @@ func (m *ZitadelManagement) SetPassword(ctx context.Context, orgID, userID, pass
 // RegisterTOTP starts authenticator enrollment via the v2 user service. The
 // returned uri encodes the otpauth:// provisioning string for a QR code; secret
 // is the manual-entry fallback. Enrollment is not active until VerifyTOTP.
+// The otpauth issuer is rewritten from the Zitadel instance name to "live-rack"
+// so authenticator apps show the correct label.
 func (m *ZitadelManagement) RegisterTOTP(ctx context.Context, userID string) (string, string, error) {
 	var resp struct {
 		URI    string `json:"uri"`
@@ -464,7 +467,29 @@ func (m *ZitadelManagement) RegisterTOTP(ctx context.Context, userID string) (st
 	if resp.URI == "" || resp.Secret == "" {
 		return "", "", fmt.Errorf("zitadel: register totp returned empty uri/secret")
 	}
-	return resp.URI, resp.Secret, nil
+	return rewriteTOTPIssuer(resp.URI, "live-rack"), resp.Secret, nil
+}
+
+// rewriteTOTPIssuer replaces the issuer segment in an otpauth:// URI.
+// Format: otpauth://totp/<issuer>:<account>?issuer=<issuer>&...
+func rewriteTOTPIssuer(rawURI, newIssuer string) string {
+	u, err := url.Parse(rawURI)
+	if err != nil {
+		return rawURI
+	}
+	// The path is "/<issuer>:<account>" — replace the issuer prefix.
+	p := strings.TrimPrefix(u.Path, "/")
+	if idx := strings.Index(p, ":"); idx >= 0 {
+		account := p[idx+1:]
+		u.Path = "/" + url.PathEscape(newIssuer) + ":" + account
+	}
+	// Also fix the issuer query param and remove any encoded slash artefacts.
+	q := u.Query()
+	if q.Get("issuer") != "" {
+		q.Set("issuer", newIssuer)
+		u.RawQuery = q.Encode()
+	}
+	return u.String()
 }
 
 // VerifyTOTP confirms authenticator enrollment with the user's first code.

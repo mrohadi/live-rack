@@ -21,6 +21,10 @@ type Management interface {
 	// CreateHumanUser creates a human user inside orgID and triggers an invite /
 	// initialization email so they can set their own password + second factor.
 	CreateHumanUser(ctx context.Context, orgID, email, displayName string) (userID string, err error)
+	// CreateHumanUserReturnCode creates a human user and returns the email
+	// verification code directly instead of sending it via email. Use in
+	// development so the signup flow works without SMTP delivery.
+	CreateHumanUserReturnCode(ctx context.Context, orgID, email, displayName string) (userID, code string, err error)
 	// GrantProjectRole grants the configured project's role to a user in orgID.
 	GrantProjectRole(ctx context.Context, orgID, userID, role string) error
 	// ResendInvite re-sends the initialization email for a not-yet-active user.
@@ -238,6 +242,32 @@ func (m *ZitadelManagement) CreateHumanUser(ctx context.Context, orgID, email, d
 		return "", fmt.Errorf("zitadel: create user returned empty id")
 	}
 	return resp.UserID, nil
+}
+
+// CreateHumanUserReturnCode creates a user and returns the email verification
+// code directly (Zitadel returnCode mode). Use only in development — no email
+// is sent; the caller is responsible for presenting the code to the user.
+func (m *ZitadelManagement) CreateHumanUserReturnCode(ctx context.Context, orgID, email, displayName string) (string, string, error) {
+	given, family := splitName(displayName)
+	reqBody := map[string]any{
+		"organization": map[string]string{"orgId": orgID},
+		"profile":      map[string]string{"givenName": given, "familyName": family},
+		"email": map[string]any{
+			"email":      email,
+			"returnCode": map[string]any{},
+		},
+	}
+	var resp struct {
+		UserID    string `json:"userId"`
+		EmailCode string `json:"emailCode"`
+	}
+	if err := m.post(ctx, "/v2/users/human", orgID, reqBody, &resp); err != nil {
+		return "", "", err
+	}
+	if resp.UserID == "" {
+		return "", "", fmt.Errorf("zitadel: create user returned empty id")
+	}
+	return resp.UserID, resp.EmailCode, nil
 }
 
 // GrantProjectRole grants the configured project's role to a user.

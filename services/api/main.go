@@ -212,7 +212,9 @@ func main() {
 	billing.New(q, envOr("STRIPE_BILLING_SECRET", ""), parsePricePlans(os.Getenv("STRIPE_PRICE_PLANS"))).Register(e)
 
 	// Public self-service signup — provisions a tenant org + admin in Zitadel.
-	signup.New(mgmt).Register(e)
+	// Dev mode returns the email verification code directly (no SMTP required).
+	devMode := os.Getenv("ENV") == "development"
+	signup.New(mgmt, devMode, appBaseURL).Register(e)
 
 	// Public custom-login proxy — drives Zitadel's Session API for our own sign-in UI.
 	login.New(loginClient).Register(e)

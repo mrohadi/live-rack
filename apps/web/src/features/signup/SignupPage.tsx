@@ -21,17 +21,27 @@ export function SignupPage() {
   };
 
   if (signup.isSuccess) {
+    const verifyUrl = signup.data?.verify_url;
     return (
       <AuthLayout title="Check your email" subtitle="Your workspace is ready.">
         <p className="text-sm text-muted-foreground">
           We created your workspace. Verify your email and set a password to finish signing up.
         </p>
-        <Link
-          to="/"
-          className="mt-6 block w-full rounded-md bg-primary px-3 py-2.5 text-center text-sm font-medium text-white transition hover:opacity-90"
-        >
-          Go to sign in
-        </Link>
+        {verifyUrl ? (
+          <a
+            href={verifyUrl}
+            className="mt-6 block w-full rounded-md bg-primary px-3 py-2.5 text-center text-sm font-medium text-white transition hover:opacity-90"
+          >
+            Verify email now
+          </a>
+        ) : (
+          <Link
+            to="/"
+            className="mt-6 block w-full rounded-md bg-primary px-3 py-2.5 text-center text-sm font-medium text-white transition hover:opacity-90"
+          >
+            Go to sign in
+          </Link>
+        )}
       </AuthLayout>
     );
   }

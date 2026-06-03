@@ -12,6 +12,7 @@ export interface SignupResult {
   org_id: string;
   user_id: string;
   status: string;
+  verify_url?: string;
 }
 
 /** Self-service signup — public, no auth token. Provisions a tenant + admin. */

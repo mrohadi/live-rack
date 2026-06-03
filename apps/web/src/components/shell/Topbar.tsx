@@ -1,4 +1,5 @@
 import { useLocation } from "react-router-dom";
+import { useCurrentStoreData } from "../../features/stores/useStores";
 import { Icon, Icons } from "./Icon";
 
 const PAGE_LABELS: Record<string, string> = {
@@ -34,11 +35,12 @@ export function Topbar({
 }: TopbarProps) {
   const { pathname } = useLocation();
   const label = PAGE_LABELS[pathname] ?? pathname.slice(1);
+  const store = useCurrentStoreData();
 
   return (
     <header className="topbar">
       <div className="crumbs">
-        <span>Store #14</span>
+        <span>{store?.name ?? "…"}</span>
         <span>›</span>
         <span className="now">{label}</span>
       </div>

@@ -1,5 +1,8 @@
+import { useState } from "react";
 import { useAuth } from "react-oidc-context";
 import { NavLink } from "react-router-dom";
+import { useStores, useCreateStore } from "../../features/stores/useStores";
+import { getSelectedStoreId, setSelectedStoreId } from "../../lib/storeState";
 import { isAdmin } from "../../lib/roles";
 import { BrandMark } from "./BrandMark";
 import { Icon, Icons } from "./Icon";
@@ -50,6 +53,12 @@ export function Sidebar({ accent = "#2563eb", onNavigate }: SidebarProps) {
   const auth = useAuth();
   const profile = auth.user?.profile;
   const admin = isAdmin(profile);
+  const { data: stores = [] } = useStores();
+  const createStore = useCreateStore();
+  const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [newStoreName, setNewStoreName] = useState("");
+  const selectedId = getSelectedStoreId();
+  const currentStore = stores.find((s) => s.id === selectedId) ?? stores[0];
   const fullName = (profile?.name as string | undefined) ?? "";
   const email = (profile?.email as string | undefined) ?? "";
   const initials =
@@ -60,12 +69,135 @@ export function Sidebar({ accent = "#2563eb", onNavigate }: SidebarProps) {
       .slice(0, 2)
       .toUpperCase() || "?";
 
+  const handleCreateStore = () => {
+    const name = newStoreName.trim();
+    if (!name) return;
+    createStore.mutate(
+      { name, timezone: "UTC" },
+      {
+        onSuccess: (s) => {
+          setSelectedStoreId(s.id);
+          setNewStoreName("");
+          setSwitcherOpen(false);
+          window.location.reload();
+        },
+      },
+    );
+  };
+
   return (
     <aside className="sidebar">
       <div className="brand">
         <BrandMark accent={accent} />
         <div className="brand-name">live-rack</div>
         <div className="brand-sub">v0.1</div>
+      </div>
+
+      {/* Store switcher */}
+      <div style={{ padding: "0 12px 8px" }}>
+        <button
+          type="button"
+          onClick={() => setSwitcherOpen((o) => !o)}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            width: "100%",
+            padding: "6px 8px",
+            borderRadius: 6,
+            border: "1px solid var(--border)",
+            background: "var(--surface)",
+            cursor: "pointer",
+            fontSize: 12,
+            color: "var(--foreground)",
+            textAlign: "left",
+          }}
+        >
+          <Icon d={Icons.map} size={13} />
+          <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {currentStore?.name ?? "Select store…"}
+          </span>
+          <svg viewBox="0 0 10 6" width={10} height={10} fill="currentColor" aria-hidden>
+            <path d="M0 0l5 6 5-6z" />
+          </svg>
+        </button>
+
+        {switcherOpen && (
+          <div
+            style={{
+              marginTop: 4,
+              background: "var(--surface)",
+              border: "1px solid var(--border)",
+              borderRadius: 6,
+              overflow: "hidden",
+              boxShadow: "0 4px 12px rgba(0,0,0,.12)",
+            }}
+          >
+            {stores.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => {
+                  setSelectedStoreId(s.id);
+                  setSwitcherOpen(false);
+                  window.location.reload();
+                }}
+                style={{
+                  display: "block",
+                  width: "100%",
+                  padding: "7px 10px",
+                  textAlign: "left",
+                  fontSize: 12,
+                  color: s.id === (selectedId ?? stores[0]?.id) ? "var(--primary)" : "var(--foreground)",
+                  background: s.id === (selectedId ?? stores[0]?.id) ? "var(--primary-faint, #eff6ff)" : "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                }}
+              >
+                {s.name}
+              </button>
+            ))}
+            {admin && (
+              <div style={{ borderTop: "1px solid var(--border)", padding: "6px 8px" }}>
+                <div style={{ display: "flex", gap: 4 }}>
+                  <input
+                    value={newStoreName}
+                    onChange={(e) => setNewStoreName(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleCreateStore()}
+                    placeholder="New store name…"
+                    style={{
+                      flex: 1,
+                      fontSize: 11,
+                      padding: "4px 6px",
+                      border: "1px solid var(--border)",
+                      borderRadius: 4,
+                      background: "var(--bg)",
+                      color: "var(--foreground)",
+                      outline: "none",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCreateStore}
+                    disabled={createStore.isPending || !newStoreName.trim()}
+                    style={{
+                      padding: "4px 8px",
+                      fontSize: 11,
+                      background: "var(--primary)",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: 4,
+                      cursor: "pointer",
+                      opacity: createStore.isPending || !newStoreName.trim() ? 0.5 : 1,
+                    }}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {NAV_SECTIONS.map((section) => (

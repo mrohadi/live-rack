@@ -60,6 +60,7 @@ import (
 	"github.com/live-rack/services/api/internal/servicetokens"
 	"github.com/live-rack/services/api/internal/shipments"
 	"github.com/live-rack/services/api/internal/signup"
+	apistores "github.com/live-rack/services/api/internal/stores"
 	"github.com/live-rack/services/api/internal/tasks"
 	"github.com/live-rack/services/api/internal/users"
 	"github.com/live-rack/services/api/internal/waves"
@@ -227,6 +228,7 @@ func main() {
 	// Authenticated API group.
 	api := e.Group("/api/v1", apimw.Auth(verifier, setSession))
 
+	apistores.New(q).Register(api)
 	zones.New(q).Register(api.Group("/stores"))
 	scans.New(q, q, q, q, publisher).Register(api.Group("/stores"))
 	inventory.New(q, auditWriter).Register(api.Group("/stores"))

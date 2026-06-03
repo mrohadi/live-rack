@@ -61,6 +61,17 @@ func (a *Adapter) UpsertOrg(ctx context.Context, idpOrgID, name string) (pkgauth
 	if err != nil {
 		return pkgauth.OrgRow{}, err
 	}
+	// Ensure every org has at least one store. Idempotent: checked on every
+	// first-login provision; the list query is cheap and almost always returns
+	// one row after the initial creation.
+	existing, _ := a.q.ListStoresByOrg(ctx, org.ID)
+	if len(existing) == 0 {
+		_, _ = a.q.CreateStore(ctx, store.CreateStoreParams{
+			OrgID:    org.ID,
+			Name:     name + " Warehouse",
+			Timezone: "UTC",
+		})
+	}
 	return orgRow(org), nil
 }
 

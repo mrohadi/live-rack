@@ -24,6 +24,7 @@ export function useSignup() {
         body: JSON.stringify(body),
       });
       if (!res.ok) {
+        if (res.status === 409) throw new Error("email_taken");
         const text = await res.text().catch(() => "");
         throw new Error(`${res.status}: ${text}`);
       }

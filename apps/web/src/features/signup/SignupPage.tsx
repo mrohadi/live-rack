@@ -79,7 +79,9 @@ export function SignupPage() {
 
         {signup.isError && (
           <p role="alert" className="text-xs text-destructive">
-            Signup failed. That email or company may already exist.
+            {signup.error instanceof Error && signup.error.message === "email_taken"
+              ? "That email is already registered. Try signing in instead."
+              : "Signup failed. Please try again."}
           </p>
         )}
 

@@ -89,6 +89,9 @@ func (h *Handler) Signup(c echo.Context) error {
 	}
 	userID, err := h.zit.CreateHumanUser(ctx, orgID, email, display)
 	if err != nil {
+		if strings.Contains(err.Error(), "User already exists") {
+			return echo.NewHTTPError(http.StatusConflict, "email already registered")
+		}
 		return echo.NewHTTPError(http.StatusBadGateway, "create user")
 	}
 	if err := h.zit.GrantProjectRole(ctx, orgID, userID, string(domain.RoleAdmin)); err != nil {

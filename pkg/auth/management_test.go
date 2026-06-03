@@ -17,6 +17,8 @@ func TestZitadelManagement_CreateOrgUserGrant(t *testing.T) {
 	var seen []string // method+path log
 	var lastOrgHeader, lastAuth string
 
+	var grantBody map[string]any
+
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		seen = append(seen, r.Method+" "+r.URL.Path)
 		lastOrgHeader = r.Header.Get("x-zitadel-orgid")
@@ -32,7 +34,17 @@ func TestZitadelManagement_CreateOrgUserGrant(t *testing.T) {
 			org := body["organization"].(map[string]any)
 			assert.Equal(t, "org-123", org["orgId"])
 			_ = json.NewEncoder(w).Encode(map[string]string{"userId": "user-456"})
-		default: // grant
+		case "/management/v1/projects/proj-1":
+			// The project is owned by a different org than the new tenant.
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"project": map[string]any{"details": map[string]any{"resourceOwner": "owner-org"}},
+			})
+		case "/management/v1/projects/proj-1/grants/_search":
+			_ = json.NewEncoder(w).Encode(map[string]any{"result": []any{}})
+		case "/management/v1/projects/proj-1/grants":
+			_ = json.NewEncoder(w).Encode(map[string]string{"grantId": "grant-1"})
+		default: // user grant
+			_ = json.NewDecoder(r.Body).Decode(&grantBody)
 			w.WriteHeader(http.StatusOK)
 		}
 	}))
@@ -51,11 +63,17 @@ func TestZitadelManagement_CreateOrgUserGrant(t *testing.T) {
 
 	require.NoError(t, m.GrantProjectRole(ctx, orgID, userID, "admin"))
 
+	// A tenant org first gets the project granted to it, then the user grant
+	// references that project grant.
 	assert.Equal(t, []string{
 		"POST /management/v1/orgs",
 		"POST /v2/users/human",
+		"GET /management/v1/projects/proj-1",
+		"POST /management/v1/projects/proj-1/grants/_search",
+		"POST /management/v1/projects/proj-1/grants",
 		"POST /management/v1/users/user-456/grants",
 	}, seen)
+	assert.Equal(t, "grant-1", grantBody["projectGrantId"])
 	assert.Equal(t, "org-123", lastOrgHeader)
 	assert.Equal(t, "Bearer svc-token", lastAuth)
 }

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -71,7 +72,14 @@ type ZitadelManagement struct {
 	appBaseURL string
 	token      TokenSource
 	hc         *http.Client
+
+	ownerMu  sync.Mutex
+	ownerOrg string // resolved org that owns projectID (cached)
 }
+
+// projectRoleKeys are every role the live-rack project defines. A tenant org
+// receives all of them via its project grant; users are then granted a subset.
+var projectRoleKeys = []string{"admin", "manager", "staff", "readonly", "service"}
 
 // NewZitadelManagement builds a management client. baseURL is the issuer origin
 // (e.g. http://localhost:8081); projectID scopes role grants; appBaseURL is the
@@ -233,13 +241,95 @@ func (m *ZitadelManagement) CreateHumanUser(ctx context.Context, orgID, email, d
 }
 
 // GrantProjectRole grants the configured project's role to a user.
+//
+// The live-rack project is owned by one org. Users in that owner org get a
+// direct user grant. Users in a *tenant* org (created by self-service signup)
+// cannot be granted a project they do not own — Zitadel returns "Project not
+// found" — so we first ensure the project is granted to that tenant org, then
+// reference the resulting project grant on the user grant.
 func (m *ZitadelManagement) GrantProjectRole(ctx context.Context, orgID, userID, role string) error {
+	owner, err := m.projectOwnerOrg(ctx)
+	if err != nil {
+		return err
+	}
+
 	reqBody := map[string]any{
 		"projectId": m.projectID,
 		"roleKeys":  []string{role},
 	}
+	if orgID != owner {
+		grantID, gerr := m.ensureProjectGrant(ctx, owner, orgID)
+		if gerr != nil {
+			return gerr
+		}
+		reqBody["projectGrantId"] = grantID
+	}
+
 	return m.post(ctx,
 		fmt.Sprintf("/management/v1/users/%s/grants", userID), orgID, reqBody, nil)
+}
+
+// projectOwnerOrg returns the org that owns the configured project, caching it
+// after the first lookup.
+func (m *ZitadelManagement) projectOwnerOrg(ctx context.Context) (string, error) {
+	m.ownerMu.Lock()
+	defer m.ownerMu.Unlock()
+	if m.ownerOrg != "" {
+		return m.ownerOrg, nil
+	}
+	var resp struct {
+		Project struct {
+			Details struct {
+				ResourceOwner string `json:"resourceOwner"`
+			} `json:"details"`
+		} `json:"project"`
+	}
+	if err := m.get(ctx, "/management/v1/projects/"+m.projectID, &resp); err != nil {
+		return "", err
+	}
+	owner := resp.Project.Details.ResourceOwner
+	if owner == "" {
+		return "", fmt.Errorf("zitadel: project %s has no resource owner", m.projectID)
+	}
+	m.ownerOrg = owner
+	return owner, nil
+}
+
+// ensureProjectGrant returns the id of the project grant that shares the project
+// with grantedOrg, creating it (with every project role) if absent. Idempotent.
+func (m *ZitadelManagement) ensureProjectGrant(ctx context.Context, ownerOrg, grantedOrg string) (string, error) {
+	var search struct {
+		Result []struct {
+			GrantID      string `json:"grantId"`
+			GrantedOrgID string `json:"grantedOrgId"`
+		} `json:"result"`
+	}
+	if err := m.post(ctx,
+		fmt.Sprintf("/management/v1/projects/%s/grants/_search", m.projectID),
+		ownerOrg, map[string]any{}, &search); err != nil {
+		return "", err
+	}
+	for _, g := range search.Result {
+		if g.GrantedOrgID == grantedOrg {
+			return g.GrantID, nil
+		}
+	}
+
+	var created struct {
+		GrantID string `json:"grantId"`
+	}
+	if err := m.post(ctx,
+		fmt.Sprintf("/management/v1/projects/%s/grants", m.projectID),
+		ownerOrg, map[string]any{
+			"grantedOrgId": grantedOrg,
+			"roleKeys":     projectRoleKeys,
+		}, &created); err != nil {
+		return "", err
+	}
+	if created.GrantID == "" {
+		return "", fmt.Errorf("zitadel: project grant to org %s returned empty id", grantedOrg)
+	}
+	return created.GrantID, nil
 }
 
 // ResendInvite re-sends a user's initialization email.

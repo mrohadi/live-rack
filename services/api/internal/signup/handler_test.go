@@ -19,6 +19,7 @@ import (
 type fakeProvisioner struct {
 	orgName, createdEmail, grantedRole string
 	createOrgErr                       error
+	createUserErr                      error
 }
 
 func (f *fakeProvisioner) CreateOrg(_ context.Context, name string) (string, error) {
@@ -30,6 +31,9 @@ func (f *fakeProvisioner) CreateOrg(_ context.Context, name string) (string, err
 }
 
 func (f *fakeProvisioner) CreateHumanUser(_ context.Context, _, email, _ string) (string, error) {
+	if f.createUserErr != nil {
+		return "", f.createUserErr
+	}
 	f.createdEmail = email
 	return "zid-user-1", nil
 }
@@ -88,4 +92,16 @@ func TestSignup_PropagatesProviderError(t *testing.T) {
 	rec := httptest.NewRecorder()
 	e.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusBadGateway, rec.Code)
+}
+
+func TestSignup_DuplicateEmailReturns409(t *testing.T) {
+	fp := &fakeProvisioner{createUserErr: errors.New("zitadel: POST /v2/users/human: status 409: User already exists")}
+	e := echo.New()
+	signup.New(fp).Register(e)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/v1/signup",
+		strings.NewReader(`{"company":"Acme","email":"dup@acme.test"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusConflict, rec.Code)
 }

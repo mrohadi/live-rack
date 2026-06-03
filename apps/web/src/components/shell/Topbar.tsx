@@ -12,6 +12,7 @@ const PAGE_LABELS: Record<string, string> = {
   "/analytics": "Analytics",
   "/integrations": "Integrations",
   "/users": "Users & Access",
+  "/stores": "Stores",
 };
 
 interface TopbarProps {

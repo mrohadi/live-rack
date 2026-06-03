@@ -54,12 +54,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={api}>
       {children}
       {createPortal(
-        <div className="pointer-events-none fixed bottom-4 right-4 z-50 flex flex-col gap-2">
+        <div className="pointer-events-none fixed left-1/2 top-5 z-50 flex -translate-x-1/2 flex-col items-center gap-2">
           {toasts.map((t) => (
             <div
               key={t.id}
               role="status"
-              className={`pointer-events-auto flex items-center gap-2 rounded-md border px-3 py-2 text-sm shadow-md ${VARIANT_STYLES[t.variant]}`}
+              className={`pointer-events-auto flex min-w-[320px] items-center gap-3 rounded-lg border px-4 py-3 text-sm font-medium shadow-lg ${VARIANT_STYLES[t.variant]}`}
             >
               <span aria-hidden>{VARIANT_ICON[t.variant]}</span>
               <span>{t.message}</span>

@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "react-oidc-context";
 import { NavLink } from "react-router-dom";
-import { useStores, useCreateStore } from "../../features/stores/useStores";
+import { useStores } from "../../features/stores/useStores";
 import { getSelectedStoreId, setSelectedStoreId } from "../../lib/storeState";
 import { isAdmin } from "../../lib/roles";
 import { BrandMark } from "./BrandMark";
@@ -45,6 +45,14 @@ const NAV_SECTIONS = [
         end: false,
         adminOnly: true,
       },
+      {
+        to: "/stores",
+        name: "Stores",
+        icon: Icons.map,
+        badge: null,
+        end: false,
+        adminOnly: true,
+      },
     ],
   },
 ] as const;
@@ -54,11 +62,11 @@ export function Sidebar({ accent = "#2563eb", onNavigate }: SidebarProps) {
   const profile = auth.user?.profile;
   const admin = isAdmin(profile);
   const { data: stores = [] } = useStores();
-  const createStore = useCreateStore();
   const [switcherOpen, setSwitcherOpen] = useState(false);
-  const [newStoreName, setNewStoreName] = useState("");
+  const switcherRef = useRef<HTMLDivElement>(null);
   const selectedId = getSelectedStoreId();
   const currentStore = stores.find((s) => s.id === selectedId) ?? stores[0];
+
   const fullName = (profile?.name as string | undefined) ?? "";
   const email = (profile?.email as string | undefined) ?? "";
   const initials =
@@ -69,21 +77,17 @@ export function Sidebar({ accent = "#2563eb", onNavigate }: SidebarProps) {
       .slice(0, 2)
       .toUpperCase() || "?";
 
-  const handleCreateStore = () => {
-    const name = newStoreName.trim();
-    if (!name) return;
-    createStore.mutate(
-      { name, timezone: "UTC" },
-      {
-        onSuccess: (s) => {
-          setSelectedStoreId(s.id);
-          setNewStoreName("");
-          setSwitcherOpen(false);
-          window.location.reload();
-        },
-      },
-    );
-  };
+  // Close on outside click
+  useEffect(() => {
+    if (!switcherOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (switcherRef.current && !switcherRef.current.contains(e.target as Node)) {
+        setSwitcherOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [switcherOpen]);
 
   return (
     <aside className="sidebar">
@@ -93,8 +97,8 @@ export function Sidebar({ accent = "#2563eb", onNavigate }: SidebarProps) {
         <div className="brand-sub">v0.1</div>
       </div>
 
-      {/* Store switcher */}
-      <div style={{ padding: "0 12px 8px" }}>
+      {/* Store switcher — absolute dropdown so it never pushes nav down */}
+      <div ref={switcherRef} style={{ position: "relative", padding: "10px 12px 6px" }}>
         <button
           type="button"
           onClick={() => setSwitcherOpen((o) => !o)}
@@ -114,10 +118,24 @@ export function Sidebar({ accent = "#2563eb", onNavigate }: SidebarProps) {
           }}
         >
           <Icon d={Icons.map} size={13} />
-          <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <span
+            style={{
+              flex: 1,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
             {currentStore?.name ?? "Select store…"}
           </span>
-          <svg viewBox="0 0 10 6" width={10} height={10} fill="currentColor" aria-hidden>
+          <svg
+            viewBox="0 0 10 6"
+            width={10}
+            height={10}
+            fill="currentColor"
+            aria-hidden
+            style={{ transform: switcherOpen ? "rotate(180deg)" : "none", transition: "transform .15s" }}
+          >
             <path d="M0 0l5 6 5-6z" />
           </svg>
         </button>
@@ -125,12 +143,16 @@ export function Sidebar({ accent = "#2563eb", onNavigate }: SidebarProps) {
         {switcherOpen && (
           <div
             style={{
-              marginTop: 4,
-              background: "var(--surface)",
+              position: "absolute",
+              top: "calc(100% - 4px)",
+              left: 12,
+              right: 12,
+              zIndex: 40,
+              background: "var(--surface, #fff)",
               border: "1px solid var(--border)",
               borderRadius: 6,
               overflow: "hidden",
-              boxShadow: "0 4px 12px rgba(0,0,0,.12)",
+              boxShadow: "0 6px 16px rgba(0,0,0,.14)",
             }}
           >
             {stores.map((s) => (
@@ -143,59 +165,33 @@ export function Sidebar({ accent = "#2563eb", onNavigate }: SidebarProps) {
                   window.location.reload();
                 }}
                 style={{
-                  display: "block",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
                   width: "100%",
-                  padding: "7px 10px",
+                  padding: "8px 10px",
                   textAlign: "left",
                   fontSize: 12,
-                  color: s.id === (selectedId ?? stores[0]?.id) ? "var(--primary)" : "var(--foreground)",
-                  background: s.id === (selectedId ?? stores[0]?.id) ? "var(--primary-faint, #eff6ff)" : "transparent",
+                  color:
+                    s.id === (selectedId ?? stores[0]?.id) ? "var(--primary)" : "var(--foreground)",
+                  background:
+                    s.id === (selectedId ?? stores[0]?.id)
+                      ? "var(--primary-faint, #eff6ff)"
+                      : "transparent",
                   border: "none",
                   cursor: "pointer",
                 }}
               >
-                {s.name}
+                {s.id === (selectedId ?? stores[0]?.id) && (
+                  <svg viewBox="0 0 8 8" width={8} height={8} fill="currentColor" aria-hidden>
+                    <circle cx="4" cy="4" r="4" />
+                  </svg>
+                )}
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {s.name}
+                </span>
               </button>
             ))}
-            {admin && (
-              <div style={{ borderTop: "1px solid var(--border)", padding: "6px 8px" }}>
-                <div style={{ display: "flex", gap: 4 }}>
-                  <input
-                    value={newStoreName}
-                    onChange={(e) => setNewStoreName(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleCreateStore()}
-                    placeholder="New store name…"
-                    style={{
-                      flex: 1,
-                      fontSize: 11,
-                      padding: "4px 6px",
-                      border: "1px solid var(--border)",
-                      borderRadius: 4,
-                      background: "var(--bg)",
-                      color: "var(--foreground)",
-                      outline: "none",
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={handleCreateStore}
-                    disabled={createStore.isPending || !newStoreName.trim()}
-                    style={{
-                      padding: "4px 8px",
-                      fontSize: 11,
-                      background: "var(--primary)",
-                      color: "#fff",
-                      border: "none",
-                      borderRadius: 4,
-                      cursor: "pointer",
-                      opacity: createStore.isPending || !newStoreName.trim() ? 0.5 : 1,
-                    }}
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         )}
       </div>
@@ -232,9 +228,7 @@ export function Sidebar({ accent = "#2563eb", onNavigate }: SidebarProps) {
             type="button"
             aria-label="Sign out"
             title="Sign out"
-            onClick={() => {
-              void auth.signoutRedirect();
-            }}
+            onClick={() => void auth.signoutRedirect()}
             className="ml-auto rounded-md p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
           >
             <svg

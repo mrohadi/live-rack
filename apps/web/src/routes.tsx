@@ -130,6 +130,13 @@ export const routes: RouteObject[] = [
                 lazy: () =>
                   import("./features/users/UsersPage").then((m) => ({ Component: m.UsersPage })),
               },
+              {
+                path: "stores",
+                lazy: () =>
+                  import("./features/stores/StoresPage").then((m) => ({
+                    Component: m.StoresPage,
+                  })),
+              },
             ],
           },
         ],

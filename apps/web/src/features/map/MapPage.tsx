@@ -31,6 +31,12 @@ const FILL_BANDS: { label: string; value: FillBand }[] = [
   { label: "High (> 85%)", value: "high" },
 ];
 
+const TABS: { label: string; value: ViewMode }[] = [
+  { label: "Zones", value: "zones" },
+  { label: "Heat", value: "heat" },
+  { label: "Items", value: "items" },
+];
+
 export function MapPage() {
   const storeId = useCurrentStore();
   const navigate = useNavigate();

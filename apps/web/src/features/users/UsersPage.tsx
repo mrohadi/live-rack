@@ -33,6 +33,7 @@ const ROLE_TONES: Record<string, string> = {
   service: "bg-violet-500/15 text-violet-500",
 };
 
+// Deterministic per-member avatar color, like the design roster.
 const AVATAR_TONES = [
   "bg-primary",
   "bg-success",

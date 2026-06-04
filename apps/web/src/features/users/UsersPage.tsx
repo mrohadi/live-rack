@@ -196,7 +196,7 @@ export function UsersPage() {
 
       {/* Scrollable body */}
       <div className="flex-1 overflow-auto p-4 sm:p-6">
-      <div className="mx-auto max-w-5xl space-y-6">
+      <div className="space-y-6">
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">

@@ -162,6 +162,9 @@ func main() {
 		log.Error("init oidc verifier", "err", err)
 		os.Exit(1)
 	}
+	// Composite verifier: opaque service tokens ("lrk_...") resolve to service
+	// principals; everything else goes through OIDC.
+	verifier := pkgauth.NewCompositeVerifier(pkgauth.NewServiceVerifier(adapter), oidcVerifier)
 
 	// Zitadel management client drives onboarding (signup + invites). The
 	// service-account token authorises org/user creation and role grants.
@@ -177,9 +180,6 @@ func main() {
 		loginTok = os.Getenv("ZITADEL_MGMT_TOKEN")
 	}
 	loginClient := pkgauth.NewZitadelLogin(issuer, pkgauth.StaticToken(loginTok))
-	// Composite verifier: opaque service tokens ("lrk_...") resolve to service
-	// principals; everything else goes through OIDC.
-	verifier := pkgauth.NewCompositeVerifier(pkgauth.NewServiceVerifier(adapter), oidcVerifier)
 
 	e := echo.New()
 	e.HideBanner = true

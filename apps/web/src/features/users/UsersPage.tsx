@@ -150,12 +150,12 @@ export function UsersPage() {
     users.find((u) => u.id === selectedId) ?? filtered[0] ?? users[0];
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      {/* Page header — matches Stores page style */}
-      <div className="flex items-start justify-between gap-4">
+    <div className="flex h-full flex-col">
+      {/* Sticky header — matches Map / Inventory / Tasks pattern */}
+      <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Users &amp; Access</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h1 className="text-lg font-semibold text-foreground">Users &amp; Access</h1>
+          <p className="text-xs text-muted-foreground">
             {stats.data?.members ?? users.length} members
             {me.data ? ` · you: ${me.data.role}${mfaOn ? " · 2FA on" : ""}` : ""}
           </p>
@@ -164,7 +164,7 @@ export function UsersPage() {
           <button
             type="button"
             onClick={() => setAuditOpen(true)}
-            className="rounded-md border border-border px-3 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
+            className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-muted"
           >
             Audit log
           </button>
@@ -173,26 +173,30 @@ export function UsersPage() {
               <button
                 type="button"
                 onClick={copyInviteLink}
-                className="rounded-md border border-border px-3 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
+                className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-muted"
               >
                 {linkCopied ? "Copied ✓" : "Invite link"}
               </button>
               <button
                 type="button"
                 onClick={() => setInviting(true)}
-                className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-white transition hover:opacity-90"
+                className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white transition hover:opacity-90"
               >
                 + Add user
               </button>
             </>
           )}
         </div>
-      </div>
+      </header>
 
       {inviting && <InviteUserModal onClose={() => setInviting(false)} />}
       {auditOpen && <AuditLogModal onClose={() => setAuditOpen(false)} />}
       {editing && selected && <EditAccessModal user={selected} onClose={() => setEditing(false)} />}
       {enrolling && <Enroll2FAModal onClose={() => setEnrolling(false)} />}
+
+      {/* Scrollable body */}
+      <div className="flex-1 overflow-auto p-4 sm:p-6">
+      <div className="mx-auto max-w-5xl space-y-6">
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -440,6 +444,9 @@ export function UsersPage() {
           </aside>
         )}
       </div>
+
+      </div>{/* end max-w-5xl */}
+      </div>{/* end overflow-auto */}
     </div>
   );
 }

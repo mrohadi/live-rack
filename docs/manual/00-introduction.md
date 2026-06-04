@@ -39,13 +39,13 @@ zones; the quantity in each zone is an **item location**.
 
 What you are allowed to do. Every user has one role per organization:
 
-| Role | Can do |
-|------|--------|
-| **Admin** | Everything, including users, integrations, billing |
-| **Manager** | Run operations, edit zones, manage pipelines & tasks, export reports |
-| **Staff** | Scan, move inventory, work their own tasks |
-| **Read-only** | View dashboards and export reports; no changes |
-| **Service** | A non-human token for integrations (scan + move inventory) |
+| Role          | Can do                                                               |
+| ------------- | -------------------------------------------------------------------- |
+| **Admin**     | Everything, including users, integrations, billing                   |
+| **Manager**   | Run operations, edit zones, manage pipelines & tasks, export reports |
+| **Staff**     | Scan, move inventory, work their own tasks                           |
+| **Read-only** | View dashboards and export reports; no changes                       |
+| **Service**   | A non-human token for integrations (scan + move inventory)           |
 
 If a button is missing or you get a "forbidden" message, your role does not
 have that permission. See [Users & Access](13-users-and-access.md) for the full

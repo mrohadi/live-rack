@@ -48,7 +48,24 @@ export function ZoneDetailSidebar({
       {/* Header */}
       <div className="flex items-start gap-2 border-b border-border p-4">
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-semibold text-foreground">{zone.name}</div>
+          {renaming ? (
+            <input
+              autoFocus
+              value={draftName}
+              onChange={(e) => setDraftName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && draftName.trim()) {
+                  onRename?.(zone.id, draftName.trim());
+                  setRenaming(false);
+                }
+                if (e.key === "Escape") setRenaming(false);
+              }}
+              onBlur={() => setRenaming(false)}
+              className="w-full rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground"
+            />
+          ) : (
+            <div className="truncate text-sm font-semibold text-foreground">{zone.name}</div>
+          )}
           <div className="mt-0.5 text-xs capitalize text-muted-foreground">
             {zone.type} · zone {zone.id}
           </div>

@@ -186,7 +186,7 @@ export function StoresPage() {
       </header>
 
       <div className="flex-1 overflow-auto p-4 sm:p-6">
-        <div className="mx-auto max-w-2xl space-y-3">
+        <div className="space-y-3">
           {isLoading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : stores.length === 0 ? (

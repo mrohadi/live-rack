@@ -145,10 +145,13 @@ export function MapPage() {
     return () => document.removeEventListener("mousedown", close);
   }, [filterOpen]);
 
-  const zoneTypes = useMemo(() => Array.from(new Set(zones.map((z) => z.type))), [zones]);
+  const zoneTypes = useMemo(
+    () => Array.from(new Set(zonesWithCounts.map((z) => z.type))),
+    [zonesWithCounts],
+  );
 
   const visibleZones = useMemo(() => {
-    return zones.filter((z) => {
+    return zonesWithCounts.filter((z) => {
       if (typeFilter !== "all" && z.type !== typeFilter) return false;
       if (fillFilter !== "all") {
         const fill = z.capacity && z.items != null ? z.items / z.capacity : 0;
@@ -158,7 +161,7 @@ export function MapPage() {
       }
       return true;
     });
-  }, [zones, typeFilter, fillFilter]);
+  }, [zonesWithCounts, typeFilter, fillFilter]);
 
   const filterActive = typeFilter !== "all" || fillFilter !== "all";
 
@@ -334,6 +337,10 @@ export function MapPage() {
           onClose={() => setAssignTaskZone(null)}
         />
       )}
+
+      {editZone && <ZoneEditModal zone={editZone} onClose={() => setEditZone(null)} />}
+
+      {showCreateZone && <ZoneCreateModal zones={zones} onClose={() => setShowCreateZone(false)} />}
     </div>
   );
 }

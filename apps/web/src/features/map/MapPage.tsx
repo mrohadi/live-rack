@@ -31,21 +31,6 @@ const FILL_BANDS: { label: string; value: FillBand }[] = [
   { label: "High (> 85%)", value: "high" },
 ];
 
-const TABS: { label: string; value: ViewMode }[] = [
-  { label: "Zones", value: "zones" },
-  { label: "Heat", value: "heat" },
-  { label: "Items", value: "items" },
-];
-
-type FillBand = "all" | "low" | "mid" | "high";
-
-const FILL_BANDS: { label: string; value: FillBand }[] = [
-  { label: "All fill levels", value: "all" },
-  { label: "Low (< 50%)", value: "low" },
-  { label: "Mid (50–85%)", value: "mid" },
-  { label: "High (> 85%)", value: "high" },
-];
-
 export function MapPage() {
   const storeId = useCurrentStore();
   const navigate = useNavigate();
@@ -96,40 +81,6 @@ export function MapPage() {
   const [addItemZoneId, setAddItemZoneId] = useState<string | null>(null);
   const [editZone, setEditZone] = useState<Zone | null>(null);
   const [assignTaskZone, setAssignTaskZone] = useState<Zone | null>(null);
-
-  const [filterOpen, setFilterOpen] = useState(false);
-  const [typeFilter, setTypeFilter] = useState<Zone["type"] | "all">("all");
-  const [fillFilter, setFillFilter] = useState<FillBand>("all");
-  const filterRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!filterOpen) return;
-    const close = (e: MouseEvent) => {
-      if (filterRef.current && !filterRef.current.contains(e.target as Node)) setFilterOpen(false);
-    };
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
-  }, [filterOpen]);
-
-  const zoneTypes = useMemo(
-    () => Array.from(new Set(zonesWithCounts.map((z) => z.type))),
-    [zonesWithCounts],
-  );
-
-  const visibleZones = useMemo(() => {
-    return zonesWithCounts.filter((z) => {
-      if (typeFilter !== "all" && z.type !== typeFilter) return false;
-      if (fillFilter !== "all") {
-        const fill = z.capacity && z.items != null ? z.items / z.capacity : 0;
-        if (fillFilter === "low" && fill >= 0.5) return false;
-        if (fillFilter === "mid" && (fill < 0.5 || fill > 0.85)) return false;
-        if (fillFilter === "high" && fill <= 0.85) return false;
-      }
-      return true;
-    });
-  }, [zonesWithCounts, typeFilter, fillFilter]);
-
-  const filterActive = typeFilter !== "all" || fillFilter !== "all";
 
   const [filterOpen, setFilterOpen] = useState(false);
   const [typeFilter, setTypeFilter] = useState<Zone["type"] | "all">("all");

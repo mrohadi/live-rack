@@ -162,6 +162,7 @@ func main() {
 		log.Error("init oidc verifier", "err", err)
 		os.Exit(1)
 	}
+
 	// Composite verifier: opaque service tokens ("lrk_...") resolve to service
 	// principals; everything else goes through OIDC.
 	verifier := pkgauth.NewCompositeVerifier(pkgauth.NewServiceVerifier(adapter), oidcVerifier)

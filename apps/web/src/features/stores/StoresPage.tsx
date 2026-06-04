@@ -168,48 +168,50 @@ export function StoresPage() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="flex h-full flex-col">
+      <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Stores</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h1 className="text-lg font-semibold text-foreground">Stores</h1>
+          <p className="text-xs text-muted-foreground">
             Manage warehouse locations for your organisation.
           </p>
         </div>
         <button
           type="button"
           onClick={() => setAddOpen(true)}
-          className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-white transition hover:opacity-90"
+          className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white transition hover:opacity-90"
         >
           + Add store
         </button>
-      </div>
+      </header>
 
-      {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
-      ) : stores.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-border p-10 text-center">
-          <p className="text-sm text-muted-foreground">No stores yet.</p>
-          <button
-            type="button"
-            onClick={() => setAddOpen(true)}
-            className="mt-3 text-sm font-medium text-primary hover:underline"
-          >
-            Create your first store →
-          </button>
+      <div className="flex-1 overflow-auto p-4 sm:p-6">
+        <div className="mx-auto max-w-2xl space-y-3">
+          {isLoading ? (
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          ) : stores.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-border p-10 text-center">
+              <p className="text-sm text-muted-foreground">No stores yet.</p>
+              <button
+                type="button"
+                onClick={() => setAddOpen(true)}
+                className="mt-3 text-sm font-medium text-primary hover:underline"
+              >
+                Create your first store →
+              </button>
+            </div>
+          ) : (
+            stores.map((s) => (
+              <StoreCard
+                key={s.id}
+                store={s}
+                active={s.id === (selectedId ?? stores[0]?.id)}
+                onSelect={() => handleSelect(s.id, s.name)}
+              />
+            ))
+          )}
         </div>
-      ) : (
-        <div className="space-y-3">
-          {stores.map((s) => (
-            <StoreCard
-              key={s.id}
-              store={s}
-              active={s.id === (selectedId ?? stores[0]?.id)}
-              onSelect={() => handleSelect(s.id, s.name)}
-            />
-          ))}
-        </div>
-      )}
+      </div>
 
       {addOpen && <AddStoreModal onClose={() => setAddOpen(false)} />}
     </div>

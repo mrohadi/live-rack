@@ -31,6 +31,25 @@ func New(ch Reader) *Handler {
 	return &Handler{ch: ch}
 }
 
+// DisabledHandler registers the analytics routes returning 503 Service
+// Unavailable. Used when CLICKHOUSE_URL is unset (MVP / demo deploy without
+// ClickHouse). Lets the rest of the API stay up.
+type DisabledHandler struct{}
+
+// NewDisabled creates a no-op analytics handler.
+func NewDisabled() *DisabledHandler {
+	return &DisabledHandler{}
+}
+
+// Register mounts the disabled analytics endpoints.
+func (h *DisabledHandler) Register(g *echo.Group) {
+	disabled := func(c echo.Context) error {
+		return echo.NewHTTPError(http.StatusServiceUnavailable, "analytics disabled (CLICKHOUSE_URL not set)")
+	}
+	g.GET("/analytics/heatmap", disabled)
+	g.GET("/analytics/zones", disabled)
+}
+
 // Register mounts analytics routes on the authenticated API group.
 func (h *Handler) Register(g *echo.Group) {
 	g.GET("/analytics/heatmap", h.Heatmap)

@@ -244,12 +244,19 @@ func main() {
 	search.New(q).Register(api)
 
 	// ClickHouse-backed analytics reads.
-	chCfg, err := chstore.ParseConfig(mustEnv("CLICKHOUSE_URL"), envOr("CLICKHOUSE_DB", "liverack"))
-	if err != nil {
-		log.Error("parse clickhouse url", "err", err)
-		os.Exit(1)
+	// MVP: optional. When CLICKHOUSE_URL is empty the analytics endpoints
+	// register a no-op handler that returns 503, so the rest of the API stays up.
+	if chURL := os.Getenv("CLICKHOUSE_URL"); chURL != "" {
+		chCfg, err := chstore.ParseConfig(chURL, envOr("CLICKHOUSE_DB", "liverack"))
+		if err != nil {
+			log.Error("parse clickhouse url", "err", err)
+			os.Exit(1)
+		}
+		analytics.New(chstore.New(chCfg)).Register(api)
+	} else {
+		log.Warn("CLICKHOUSE_URL not set — analytics endpoints disabled")
+		analytics.NewDisabled().Register(api)
 	}
-	analytics.New(chstore.New(chCfg)).Register(api)
 	recommendations.New(q).Register(api)
 	users.New(q).Register(api)
 	users.NewMetrics(q, mgmt).Register(api)

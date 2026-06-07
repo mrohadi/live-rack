@@ -5,8 +5,8 @@ FROM node:20-alpine AS build
 WORKDIR /src
 RUN corepack enable
 
-# Workspace files
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+# Workspace files (no root package.json — repo uses workspace root only)
+COPY pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json ./apps/web/
 
 # Install with frozen lockfile (workspace-aware)

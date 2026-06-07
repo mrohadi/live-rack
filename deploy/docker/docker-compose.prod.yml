@@ -29,7 +29,7 @@ x-restart: &restart
 x-app-net: &app-net
   networks:
     - liverack_internal
-    - caddy_default
+    - caddy
 
 x-internal-only: &internal-only
   networks:
@@ -41,7 +41,7 @@ services:
     image: ghcr.io/${GHCR_OWNER}/liverack-web:${IMAGE_TAG:-latest}
     <<: *restart
     networks:
-      - caddy_default
+      - caddy
     mem_limit: 60m
 
   # ── API gateway ──────────────────────────────────────────────────────────────
@@ -220,7 +220,7 @@ services:
 networks:
   liverack_internal:
     driver: bridge
-  caddy_default:
+  caddy:
     external: true
 
 volumes:

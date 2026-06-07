@@ -1,0 +1,28 @@
+# Semgrep paths to skip (applies to GitHub default code scanning too)
+
+# Design-reference JSX bundle — not shipped, contains demo-only patterns
+ui-references/
+references/
+
+# Build / dependency dirs
+node_modules/
+dist/
+build/
+coverage/
+playwright-report/
+test-results/
+
+# Generated
+*_gen.go
+*.pb.go
+**/sqlc/
+
+# Tests legitimately use unsafe patterns (mocks, fixtures)
+**/*.test.ts
+**/*.test.tsx
+**/*_test.go
+**/__tests__/
+**/__mocks__/
+
+# Docs
+docs/

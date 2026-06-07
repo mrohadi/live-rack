@@ -116,8 +116,10 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: ${{ steps.web_args.outputs.args }}
+          # ignore-error=true so a GHA Cache outage doesn't fail a build
+          # that already pushed its image successfully.
           cache-from: type=gha,scope=${{ matrix.image }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }},ignore-error=true
 
   deploy:
     name: Deploy to Lightsail

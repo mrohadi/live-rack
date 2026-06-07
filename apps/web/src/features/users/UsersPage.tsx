@@ -196,257 +196,262 @@ export function UsersPage() {
 
       {/* Scrollable body */}
       <div className="flex-1 overflow-auto p-4 sm:p-6">
-      <div className="space-y-6">
-
-      {/* Stat cards */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <StatCard
-          label="Active now"
-          value={String(stats.data?.active_now ?? "—")}
-          meta="on floor · scanning"
-        />
-        <StatCard
-          label="Pending invites"
-          value={String(stats.data?.pending_invites ?? "—")}
-          meta="awaiting verification"
-        />
-        <StatCard
-          label="2FA coverage"
-          value={stats.data ? `${stats.data.twofa_coverage}%` : "—"}
-          meta="of members"
-        />
-      </div>
-
-      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[1fr_300px]">
-        <div className="space-y-4">
-          {/* Role filter tabs */}
-          <div className="inline-flex flex-wrap gap-1 rounded-lg border border-border bg-surface p-1">
-            {ROLE_TABS.map((t) => {
-              const count =
-                t.key === "all" ? users.length : users.filter((u) => u.role === t.key).length;
-              return (
-                <button
-                  key={t.key}
-                  type="button"
-                  onClick={() => setFilter(t.key)}
-                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
-                    filter === t.key
-                      ? "bg-primary text-white"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {t.label}
-                  {t.key === "all" ? ` · ${count}` : ""}
-                </button>
-              );
-            })}
+        <div className="space-y-6">
+          {/* Stat cards */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <StatCard
+              label="Active now"
+              value={String(stats.data?.active_now ?? "—")}
+              meta="on floor · scanning"
+            />
+            <StatCard
+              label="Pending invites"
+              value={String(stats.data?.pending_invites ?? "—")}
+              meta="awaiting verification"
+            />
+            <StatCard
+              label="2FA coverage"
+              value={stats.data ? `${stats.data.twofa_coverage}%` : "—"}
+              meta="of members"
+            />
           </div>
 
-          {/* Roster table */}
-          <div className="overflow-hidden rounded-lg border border-border bg-surface">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-                  <th className="px-3 py-2 font-medium">Member</th>
-                  <th className="px-3 py-2 font-medium">Role</th>
-                  <th className="px-3 py-2 font-medium">Zones</th>
-                  <th className="px-3 py-2 font-medium">Shift</th>
-                  <th className="px-3 py-2 font-medium">Status</th>
-                  <th className="px-3 py-2 font-medium">Last seen</th>
-                </tr>
-              </thead>
-              <tbody>
-                {usersQuery.isLoading ? (
-                  <tr>
-                    <td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">
-                      Loading users…
-                    </td>
-                  </tr>
-                ) : (
-                  filtered.map((u) => (
-                    <tr
-                      key={u.id}
-                      data-testid="user-row"
-                      onClick={() => setSelectedId(u.id)}
-                      className={`cursor-pointer border-t border-border transition hover:bg-muted/40 ${
-                        selected?.id === u.id ? "bg-muted/50" : ""
+          <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[1fr_300px]">
+            <div className="space-y-4">
+              {/* Role filter tabs */}
+              <div className="inline-flex flex-wrap gap-1 rounded-lg border border-border bg-surface p-1">
+                {ROLE_TABS.map((t) => {
+                  const count =
+                    t.key === "all" ? users.length : users.filter((u) => u.role === t.key).length;
+                  return (
+                    <button
+                      key={t.key}
+                      type="button"
+                      onClick={() => setFilter(t.key)}
+                      className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
+                        filter === t.key
+                          ? "bg-primary text-white"
+                          : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
-                      <td className="px-3 py-2">
-                        <div className="flex items-center gap-2.5">
-                          <Avatar name={displayLabel(u)} />
-                          <div className="min-w-0">
-                            <div className="truncate font-medium text-foreground">
-                              {displayLabel(u)}
-                            </div>
-                            <div className="truncate text-[11.5px] text-muted-foreground">
-                              {u.title ? `${u.title} · ` : ""}
-                              {u.email}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-3 py-2">
-                        <RoleChip role={u.role} />
-                      </td>
-                      <td className="px-3 py-2 font-mono text-xs text-foreground">
-                        {zonesLabel(u.zones)}
-                      </td>
-                      <td className="px-3 py-2 capitalize text-foreground">{u.shift}</td>
-                      <td className="px-3 py-2">
-                        <StatusChip status={u.status} />
-                      </td>
-                      <td className="px-3 py-2 font-mono text-xs text-muted-foreground">
-                        {relativeTime(u.last_seen_at)}
-                      </td>
-                    </tr>
-                  ))
-                )}
-                {!usersQuery.isLoading && filtered.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="px-3 py-8 text-center text-muted-foreground">
-                      No members in this role.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                      {t.label}
+                      {t.key === "all" ? ` · ${count}` : ""}
+                    </button>
+                  );
+                })}
+              </div>
 
-          {/* Role permissions matrix */}
-          <div className="rounded-lg border border-border bg-surface p-4">
-            <div className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Role permissions
-            </div>
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="text-xs uppercase tracking-wide text-muted-foreground">
-                  <th className="py-1 pr-3 font-medium">Capability</th>
-                  {ROLE_COLUMNS.map((r) => (
-                    <th key={r} className="px-2 py-1 text-center font-medium">
-                      {r}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {PERMISSION_MATRIX.map((row) => (
-                  <tr key={row.label} className="border-t border-border">
-                    <td className="py-1.5 pr-3 text-foreground">{row.label}</td>
-                    {row.allow.map((ok, i) => (
-                      <td key={ROLE_COLUMNS[i]} className="px-2 py-1.5 text-center">
-                        <span className={ok ? "text-primary" : "text-muted-foreground/40"}>
-                          {ok ? "✓" : "—"}
-                        </span>
-                      </td>
+              {/* Roster table */}
+              <div className="overflow-hidden rounded-lg border border-border bg-surface">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+                      <th className="px-3 py-2 font-medium">Member</th>
+                      <th className="px-3 py-2 font-medium">Role</th>
+                      <th className="px-3 py-2 font-medium">Zones</th>
+                      <th className="px-3 py-2 font-medium">Shift</th>
+                      <th className="px-3 py-2 font-medium">Status</th>
+                      <th className="px-3 py-2 font-medium">Last seen</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {usersQuery.isLoading ? (
+                      <tr>
+                        <td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">
+                          Loading users…
+                        </td>
+                      </tr>
+                    ) : (
+                      filtered.map((u) => (
+                        <tr
+                          key={u.id}
+                          data-testid="user-row"
+                          onClick={() => setSelectedId(u.id)}
+                          className={`cursor-pointer border-t border-border transition hover:bg-muted/40 ${
+                            selected?.id === u.id ? "bg-muted/50" : ""
+                          }`}
+                        >
+                          <td className="px-3 py-2">
+                            <div className="flex items-center gap-2.5">
+                              <Avatar name={displayLabel(u)} />
+                              <div className="min-w-0">
+                                <div className="truncate font-medium text-foreground">
+                                  {displayLabel(u)}
+                                </div>
+                                <div className="truncate text-[11.5px] text-muted-foreground">
+                                  {u.title ? `${u.title} · ` : ""}
+                                  {u.email}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-3 py-2">
+                            <RoleChip role={u.role} />
+                          </td>
+                          <td className="px-3 py-2 font-mono text-xs text-foreground">
+                            {zonesLabel(u.zones)}
+                          </td>
+                          <td className="px-3 py-2 capitalize text-foreground">{u.shift}</td>
+                          <td className="px-3 py-2">
+                            <StatusChip status={u.status} />
+                          </td>
+                          <td className="px-3 py-2 font-mono text-xs text-muted-foreground">
+                            {relativeTime(u.last_seen_at)}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                    {!usersQuery.isLoading && filtered.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="px-3 py-8 text-center text-muted-foreground">
+                          No members in this role.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Role permissions matrix */}
+              <div className="rounded-lg border border-border bg-surface p-4">
+                <div className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Role permissions
+                </div>
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="text-xs uppercase tracking-wide text-muted-foreground">
+                      <th className="py-1 pr-3 font-medium">Capability</th>
+                      {ROLE_COLUMNS.map((r) => (
+                        <th key={r} className="px-2 py-1 text-center font-medium">
+                          {r}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {PERMISSION_MATRIX.map((row) => (
+                      <tr key={row.label} className="border-t border-border">
+                        <td className="py-1.5 pr-3 text-foreground">{row.label}</td>
+                        {row.allow.map((ok, i) => (
+                          <td key={ROLE_COLUMNS[i]} className="px-2 py-1.5 text-center">
+                            <span className={ok ? "text-primary" : "text-muted-foreground/40"}>
+                              {ok ? "✓" : "—"}
+                            </span>
+                          </td>
+                        ))}
+                      </tr>
                     ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Side detail panel */}
+            {selected && (
+              <aside className="rounded-lg border border-border bg-surface xl:sticky xl:top-4">
+                <div className="flex items-center gap-3 border-b border-border p-4">
+                  <Avatar name={displayLabel(selected)} size={44} />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-semibold text-foreground">
+                      {displayLabel(selected)}
+                    </div>
+                    <div className="truncate text-xs text-muted-foreground">
+                      {selected.title || selected.role}
+                    </div>
+                  </div>
+                  <StatusChip status={selected.status} />
+                </div>
+                <div className="space-y-3 p-4 text-sm">
+                  <Row
+                    k="Email"
+                    v={<span className="font-mono text-xs break-all">{selected.email}</span>}
+                  />
+                  <Row k="Role" v={<RoleChip role={selected.role} />} />
+                  <Row k="Zone access" v={zonesLabel(selected.zones)} />
+                  <Row k="Shift" v={<span className="capitalize">{selected.shift}</span>} />
+                  <Row
+                    k="Last seen"
+                    v={
+                      <span className="font-mono text-xs">
+                        {relativeTime(selected.last_seen_at)}
+                      </span>
+                    }
+                  />
+                  <Row
+                    k="2FA"
+                    v={
+                      selected.mfa_enabled ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-success/15 px-2 py-0.5 text-xs text-success">
+                          <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                          Enabled
+                        </span>
+                      ) : me.data?.user_id === selected.id ? (
+                        <button
+                          type="button"
+                          onClick={() => setEnrolling(true)}
+                          className="text-xs font-medium text-primary hover:underline"
+                        >
+                          Set up authenticator
+                        </button>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Not enabled</span>
+                      )
+                    }
+                  />
+
+                  <RecentActivity userId={selected.id} />
+
+                  {showInvite && selected.status === "pending" && (
+                    <div className="mt-2 flex items-center justify-between gap-2 border-t border-border pt-3">
+                      <span className="text-xs text-muted-foreground">Invitation pending</span>
+                      <button
+                        type="button"
+                        disabled={resendInvite.isPending || !selected.idp_user_id}
+                        onClick={() =>
+                          resendInvite.mutate(selected.idp_user_id, {
+                            onSuccess: () => toast.success("Invite resent"),
+                            onError: () => toast.error("Failed to resend invite"),
+                          })
+                        }
+                        className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-muted disabled:opacity-50"
+                      >
+                        {resendInvite.isPending ? "Sending…" : "Resend invite"}
+                      </button>
+                    </div>
+                  )}
+
+                  {showInvite && (
+                    <div className="mt-2 flex items-center justify-between gap-2 border-t border-border pt-3">
+                      <button
+                        type="button"
+                        disabled={resetPassword.isPending || !selected.idp_user_id}
+                        onClick={() =>
+                          resetPassword.mutate(selected.idp_user_id, {
+                            onSuccess: () => toast.success("Password reset email sent"),
+                            onError: () => toast.error("Failed to send reset email"),
+                          })
+                        }
+                        className="text-sm font-medium text-foreground hover:underline disabled:opacity-50"
+                      >
+                        {resetPassword.isPending ? "Sending…" : "Reset password"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditing(true)}
+                        className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white hover:opacity-90"
+                      >
+                        Edit access
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </aside>
+            )}
           </div>
         </div>
-
-        {/* Side detail panel */}
-        {selected && (
-          <aside className="rounded-lg border border-border bg-surface xl:sticky xl:top-4">
-            <div className="flex items-center gap-3 border-b border-border p-4">
-              <Avatar name={displayLabel(selected)} size={44} />
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold text-foreground">
-                  {displayLabel(selected)}
-                </div>
-                <div className="truncate text-xs text-muted-foreground">
-                  {selected.title || selected.role}
-                </div>
-              </div>
-              <StatusChip status={selected.status} />
-            </div>
-            <div className="space-y-3 p-4 text-sm">
-              <Row k="Email" v={<span className="font-mono text-xs break-all">{selected.email}</span>} />
-              <Row k="Role" v={<RoleChip role={selected.role} />} />
-              <Row k="Zone access" v={zonesLabel(selected.zones)} />
-              <Row k="Shift" v={<span className="capitalize">{selected.shift}</span>} />
-              <Row
-                k="Last seen"
-                v={
-                  <span className="font-mono text-xs">{relativeTime(selected.last_seen_at)}</span>
-                }
-              />
-              <Row
-                k="2FA"
-                v={
-                  selected.mfa_enabled ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-success/15 px-2 py-0.5 text-xs text-success">
-                      <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                      Enabled
-                    </span>
-                  ) : me.data?.user_id === selected.id ? (
-                    <button
-                      type="button"
-                      onClick={() => setEnrolling(true)}
-                      className="text-xs font-medium text-primary hover:underline"
-                    >
-                      Set up authenticator
-                    </button>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">Not enabled</span>
-                  )
-                }
-              />
-
-              <RecentActivity userId={selected.id} />
-
-              {showInvite && selected.status === "pending" && (
-                <div className="mt-2 flex items-center justify-between gap-2 border-t border-border pt-3">
-                  <span className="text-xs text-muted-foreground">Invitation pending</span>
-                  <button
-                    type="button"
-                    disabled={resendInvite.isPending || !selected.idp_user_id}
-                    onClick={() =>
-                      resendInvite.mutate(selected.idp_user_id, {
-                        onSuccess: () => toast.success("Invite resent"),
-                        onError: () => toast.error("Failed to resend invite"),
-                      })
-                    }
-                    className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-muted disabled:opacity-50"
-                  >
-                    {resendInvite.isPending ? "Sending…" : "Resend invite"}
-                  </button>
-                </div>
-              )}
-
-              {showInvite && (
-                <div className="mt-2 flex items-center justify-between gap-2 border-t border-border pt-3">
-                  <button
-                    type="button"
-                    disabled={resetPassword.isPending || !selected.idp_user_id}
-                    onClick={() =>
-                      resetPassword.mutate(selected.idp_user_id, {
-                        onSuccess: () => toast.success("Password reset email sent"),
-                        onError: () => toast.error("Failed to send reset email"),
-                      })
-                    }
-                    className="text-sm font-medium text-foreground hover:underline disabled:opacity-50"
-                  >
-                    {resetPassword.isPending ? "Sending…" : "Reset password"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEditing(true)}
-                    className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white hover:opacity-90"
-                  >
-                    Edit access
-                  </button>
-                </div>
-              )}
-            </div>
-          </aside>
-        )}
+        {/* end max-w-5xl */}
       </div>
-
-      </div>{/* end max-w-5xl */}
-      </div>{/* end overflow-auto */}
+      {/* end overflow-auto */}
     </div>
   );
 }

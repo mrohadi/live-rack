@@ -76,8 +76,11 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ steps.owner.outputs.lc }}/${{ matrix.image }}
+          # `prefix=` empty disables the default `sha-` prefix so the tag
+          # is the bare commit SHA — matches the IMAGE_TAG=${{ github.sha }}
+          # the deploy step writes to .env.prod on the host.
           tags: |
-            type=sha,format=long
+            type=sha,format=long,prefix=
             type=raw,value=latest,enable={{is_default_branch}}
 
       # Compose build args at step level so the `secrets` context resolves.

@@ -1,0 +1,230 @@
+# live-rack production compose — shared-host Lightsail target
+#
+# Shared infra on host (NOT managed by this compose):
+#   - caddy:2-alpine reverse proxy (network: caddy_default)
+#   - infra-redis-1 (reused; namespaced via REDIS_PREFIX)
+#
+# Owned by this compose:
+#   - web (nginx SPA)
+#   - api, ingest, insight, rollup, signals (Go services)
+#   - postgres (TimescaleDB — separate from infra-postgres-1, schema-conflict avoidance)
+#   - zitadel + zitadel-db
+#   - nats, minio
+#
+# Memory cap total ≈ 2.4GB. Leaves ~1.3GB on 4GB host for OS + other apps.
+#
+# Bring up:
+#   docker compose -f deploy/docker/docker-compose.prod.yml --env-file ../../.env.prod up -d
+#
+# Networks:
+#   - liverack_internal: service-to-service (api ↔ postgres etc.)
+#   - caddy_default: shared with the host Caddy so it can reach web/api/zitadel
+#     Create once on host: `docker network create caddy_default` if missing.
+
+name: liverack
+
+x-restart: &restart
+  restart: unless-stopped
+
+x-app-net: &app-net
+  networks:
+    - liverack_internal
+    - caddy
+
+x-internal-only: &internal-only
+  networks:
+    - liverack_internal
+
+services:
+  # ── SPA (nginx) ──────────────────────────────────────────────────────────────
+  web:
+    image: ghcr.io/${GHCR_OWNER}/liverack-web:${IMAGE_TAG:-latest}
+    <<: *restart
+    networks:
+      - caddy
+    mem_limit: 60m
+
+  # ── API gateway ──────────────────────────────────────────────────────────────
+  api:
+    image: ghcr.io/${GHCR_OWNER}/liverack-api:${IMAGE_TAG:-latest}
+    <<: [*restart, *app-net]
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      NATS_URL: nats://nats:4222
+      REDIS_URL: ${REDIS_URL}
+      REDIS_PREFIX: ${REDIS_PREFIX:-liverack:}
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      OIDC_ISSUER: ${OIDC_ISSUER}
+      OIDC_PROJECT_ID: ${OIDC_PROJECT_ID}
+      APP_ENV: production
+      LOG_LEVEL: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_started
+    mem_limit: 250m
+
+  # ── Workers ──────────────────────────────────────────────────────────────────
+  ingest:
+    image: ghcr.io/${GHCR_OWNER}/liverack-ingest:${IMAGE_TAG:-latest}
+    <<: [*restart, *internal-only]
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      NATS_URL: nats://nats:4222
+      APP_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_started
+    mem_limit: 200m
+
+  insight:
+    image: ghcr.io/${GHCR_OWNER}/liverack-insight:${IMAGE_TAG:-latest}
+    <<: [*restart, *internal-only]
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      NATS_URL: nats://nats:4222
+      APP_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_started
+    mem_limit: 200m
+
+  rollup:
+    image: ghcr.io/${GHCR_OWNER}/liverack-rollup:${IMAGE_TAG:-latest}
+    <<: [*restart, *internal-only]
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      APP_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    mem_limit: 150m
+
+  signals:
+    image: ghcr.io/${GHCR_OWNER}/liverack-signals:${IMAGE_TAG:-latest}
+    <<: [*restart, *internal-only]
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      NATS_URL: nats://nats:4222
+      APP_ENV: production
+    depends_on:
+      nats:
+        condition: service_started
+    mem_limit: 150m
+
+  # ── Postgres + Timescale (owned) ─────────────────────────────────────────────
+  postgres:
+    image: timescale/timescaledb:latest-pg16
+    <<: [*restart, *internal-only]
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: liverack
+    command: postgres -c shared_buffers=128MB -c work_mem=4MB -c max_connections=80
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 10s
+      retries: 10
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    mem_limit: 500m
+
+  nats:
+    image: nats:latest
+    <<: [*restart, *internal-only]
+    command: ["-js", "-sd", "/data", "-m", "8222"]
+    volumes:
+      - nats_data:/data
+    mem_limit: 100m
+
+  minio:
+    image: minio/minio:latest
+    <<: [*restart, *internal-only]
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY}
+    volumes:
+      - minio_data:/data
+    mem_limit: 200m
+
+  # ── Zitadel (self-hosted OIDC) ───────────────────────────────────────────────
+  zitadel-db:
+    image: postgres:16-alpine
+    <<: [*restart, *internal-only]
+    environment:
+      POSTGRES_USER: zitadel
+      POSTGRES_PASSWORD: ${ZITADEL_DB_PASSWORD}
+      POSTGRES_DB: zitadel
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zitadel -d zitadel"]
+      interval: 10s
+      retries: 10
+    volumes:
+      - zitadel_db_data:/var/lib/postgresql/data
+    mem_limit: 250m
+
+  zitadel:
+    image: ghcr.io/zitadel/zitadel:v2.71.9
+    <<: [*restart, *app-net]
+    command: 'start-from-init --masterkey "${ZITADEL_MASTERKEY}" --tlsMode external'
+    environment:
+      ZITADEL_EXTERNALSECURE: "true"
+      ZITADEL_EXTERNALDOMAIN: ${PUBLIC_DOMAIN}
+      ZITADEL_EXTERNALPORT: 443
+      ZITADEL_PORT: 8080
+      ZITADEL_OIDC_DEFAULTLOGINURLV2: ""
+      ZITADEL_OIDC_DEFAULTLOGOUTURLV2: ""
+
+      # Branding — shows on login page + WebAuthn / passkey prompts
+      ZITADEL_DEFAULTINSTANCE_INSTANCENAME: "live-rack"
+      ZITADEL_FIRSTINSTANCE_INSTANCENAME: "live-rack"
+      ZITADEL_FIRSTINSTANCE_ORG_NAME: "live-rack"
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_USERNAME: ${ZITADEL_ADMIN_EMAIL}
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_EMAIL_ADDRESS: ${ZITADEL_ADMIN_EMAIL}
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD: ${ZITADEL_ADMIN_PASSWORD}
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORDCHANGEREQUIRED: "true"
+      ZITADEL_WEBAUTHN_DISPLAYNAME: "live-rack"
+
+      # SMTP — verification emails, password resets, OTP-via-email
+      ZITADEL_DEFAULTINSTANCE_SMTPCONFIGURATION_SMTP_HOST: "${SMTP_HOST}:${SMTP_PORT}"
+      ZITADEL_DEFAULTINSTANCE_SMTPCONFIGURATION_SMTP_USER: ${SMTP_USER}
+      ZITADEL_DEFAULTINSTANCE_SMTPCONFIGURATION_SMTP_PASSWORD: ${SMTP_PASSWORD}
+      ZITADEL_DEFAULTINSTANCE_SMTPCONFIGURATION_TLS: ${SMTP_TLS}
+      ZITADEL_DEFAULTINSTANCE_SMTPCONFIGURATION_FROM: ${SMTP_FROM}
+      ZITADEL_DEFAULTINSTANCE_SMTPCONFIGURATION_FROMNAME: "live-rack"
+      ZITADEL_DEFAULTINSTANCE_SMTPCONFIGURATION_REPLYTOADDRESS: ${SMTP_FROM}
+
+      # DB
+      ZITADEL_DATABASE_POSTGRES_HOST: zitadel-db
+      ZITADEL_DATABASE_POSTGRES_PORT: 5432
+      ZITADEL_DATABASE_POSTGRES_DATABASE: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_USERNAME: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_PASSWORD: ${ZITADEL_DB_PASSWORD}
+      ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE: disable
+      ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME: zitadel
+      ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD: ${ZITADEL_DB_PASSWORD}
+      ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE: disable
+    depends_on:
+      zitadel-db:
+        condition: service_healthy
+    mem_limit: 700m
+
+networks:
+  liverack_internal:
+    driver: bridge
+  caddy:
+    external: true
+
+volumes:
+  postgres_data:
+  nats_data:
+  minio_data:
+  zitadel_db_data:

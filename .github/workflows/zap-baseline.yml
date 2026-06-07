@@ -19,7 +19,8 @@ jobs:
 
       - name: Start stack
         run: |
-          docker compose -f deploy/docker/docker-compose.yml up -d postgres nats clickhouse redis
+          # Lightweight subset — only what API needs to boot for DAST scan.
+          docker compose -f deploy/docker/docker-compose.yml up -d postgres nats redis
           # API under test (built image or `go run`); wait for health.
           ./scripts/wait-for-health.sh http://localhost:8080/healthz 120
 

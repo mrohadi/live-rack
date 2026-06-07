@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+!.env.prod.example
 
 # Go
 /bin/
@@ -71,3 +72,4 @@ serviceAccountKey.json
 # Grafana local state
 deploy/grafana/grafana.db
 deploy/grafana/grafana-storage/
+

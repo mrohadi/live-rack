@@ -43,25 +43,67 @@ export function Sidebar({ accent = "#2563eb", onNavigate }: SidebarProps) {
       items: [
         { to: "/", name: "Overview", icon: Icons.dash, badge: null as string | null, end: true },
         { to: "/map", name: "Map & Zones", icon: Icons.map, badge: counts.zones, end: false },
-        { to: "/scanner", name: "Scanner", icon: Icons.scan, badge: null as string | null, end: false },
-        { to: "/inventory", name: "Inventory", icon: Icons.box, badge: counts.inventory, end: false },
+        {
+          to: "/scanner",
+          name: "Scanner",
+          icon: Icons.scan,
+          badge: null as string | null,
+          end: false,
+        },
+        {
+          to: "/inventory",
+          name: "Inventory",
+          icon: Icons.box,
+          badge: counts.inventory,
+          end: false,
+        },
       ],
     },
     {
       label: "Workflows",
       items: [
         { to: "/tasks", name: "Tasks", icon: Icons.task, badge: counts.tasks, end: false },
-        { to: "/picking", name: "Picking", icon: Icons.pick, badge: null as string | null, end: false },
+        {
+          to: "/picking",
+          name: "Picking",
+          icon: Icons.pick,
+          badge: null as string | null,
+          end: false,
+        },
         { to: "/waves", name: "Waves", icon: Icons.wave, badge: null as string | null, end: false },
-        { to: "/shipments", name: "Dispatch", icon: Icons.truck, badge: null as string | null, end: false },
-        { to: "/pipelines", name: "Pipelines", icon: Icons.pipe, badge: null as string | null, end: false },
+        {
+          to: "/shipments",
+          name: "Dispatch",
+          icon: Icons.truck,
+          badge: null as string | null,
+          end: false,
+        },
+        {
+          to: "/pipelines",
+          name: "Pipelines",
+          icon: Icons.pipe,
+          badge: null as string | null,
+          end: false,
+        },
       ],
     },
     {
       label: "Insights & Setup",
       items: [
-        { to: "/analytics", name: "Analytics", icon: Icons.chart, badge: null as string | null, end: false },
-        { to: "/integrations", name: "Integrations", icon: Icons.plug, badge: counts.integrations, end: false },
+        {
+          to: "/analytics",
+          name: "Analytics",
+          icon: Icons.chart,
+          badge: null as string | null,
+          end: false,
+        },
+        {
+          to: "/integrations",
+          name: "Integrations",
+          icon: Icons.plug,
+          badge: counts.integrations,
+          end: false,
+        },
         {
           to: "/users",
           name: "Users & Access",
@@ -151,7 +193,10 @@ export function Sidebar({ accent = "#2563eb", onNavigate }: SidebarProps) {
             height={10}
             fill="currentColor"
             aria-hidden
-            style={{ transform: switcherOpen ? "rotate(180deg)" : "none", transition: "transform .15s" }}
+            style={{
+              transform: switcherOpen ? "rotate(180deg)" : "none",
+              transition: "transform .15s",
+            }}
           >
             <path d="M0 0l5 6 5-6z" />
           </svg>
@@ -204,7 +249,9 @@ export function Sidebar({ accent = "#2563eb", onNavigate }: SidebarProps) {
                     <circle cx="4" cy="4" r="4" />
                   </svg>
                 )}
-                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <span
+                  style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                >
                   {s.name}
                 </span>
               </button>
@@ -379,7 +426,10 @@ export function Sidebar({ accent = "#2563eb", onNavigate }: SidebarProps) {
                   { label: "Role", value: admin ? "Admin" : "Member" },
                   { label: "Active store", value: currentStore?.name ?? "—" },
                 ].map(({ label, value }) => (
-                  <div key={label} style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                  <div
+                    key={label}
+                    style={{ display: "flex", justifyContent: "space-between", gap: 8 }}
+                  >
                     <span style={{ color: "var(--text-3)" }}>{label}</span>
                     <span style={{ color: "var(--foreground)", fontWeight: 500 }}>{value}</span>
                   </div>

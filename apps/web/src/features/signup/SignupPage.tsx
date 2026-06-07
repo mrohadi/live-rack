@@ -24,7 +24,8 @@ export function SignupPage() {
     return (
       <AuthLayout title="Check your email" subtitle="Your workspace is ready.">
         <p className="text-sm text-muted-foreground">
-          We sent a verification link to your email. Click it to set your password and finish signing up.
+          We sent a verification link to your email. Click it to set your password and finish
+          signing up.
         </p>
         <Link
           to="/"

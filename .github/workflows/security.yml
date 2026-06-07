@@ -18,7 +18,16 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        module: [services/api, pkg/domain, pkg/auth]
+        module:
+          - services/api
+          - services/ingest
+          - services/insight
+          - services/rollup
+          - services/signals
+          - pkg/domain
+          - pkg/auth
+          - pkg/observability
+          - pkg/store
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -40,8 +49,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build API image
-        run: docker build -f deploy/docker/api.Dockerfile -t live-rack-api:scan .
-        continue-on-error: true
+        run: docker build -f services/api/Dockerfile -t live-rack-api:scan .
       - name: Trivy scan
         uses: aquasecurity/trivy-action@master
         with:
@@ -49,11 +57,10 @@ jobs:
           format: "sarif"
           output: "trivy.sarif"
           severity: "CRITICAL,HIGH"
-        continue-on-error: true
       - uses: github/codeql-action/upload-sarif@v3
+        if: always()
         with:
           sarif_file: trivy.sarif
-        continue-on-error: true
 
   semgrep:
     name: Semgrep SAST
@@ -63,7 +70,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run semgrep
-        run: semgrep scan --config=auto --sarif --output=semgrep.sarif
+        run: |
+          semgrep scan --config=auto --sarif --output=semgrep.sarif \
+            --exclude=ui-references \
+            --exclude=references \
+            --exclude='**/*.test.tsx' \
+            --exclude='**/*.test.ts'
         env:
           SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
         continue-on-error: true

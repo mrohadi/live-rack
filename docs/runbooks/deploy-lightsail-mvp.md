@@ -87,7 +87,10 @@ ssh ec2-user@18.140.191.209 'chmod 600 ~/live-rack/.env.prod'
 
 Required from CI (set as GitHub Action secrets):
 - `SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY`
-- `GHCR_READ_USER`, `GHCR_READ_TOKEN` (PAT with `read:packages`)
+
+No GHCR PAT needed — images are PUBLIC (see §4.1). To switch to
+private later, add a `read:packages` PAT and uncomment the login step
+in `deploy.yml`.
 
 Required as GitHub **vars** (Settings → Variables → Actions):
 - `VITE_OIDC_ISSUER`, `VITE_OIDC_CLIENT_ID`, `VITE_OIDC_REDIRECT_URI`, `VITE_API_BASE_URL`
@@ -100,16 +103,42 @@ Required as GitHub **vars** (Settings → Variables → Actions):
 
 Stages:
 1. **build-push** — matrix builds 6 images (web + 5 Go services), pushes to GHCR
-   with sha + `latest` tags. Uses gha cache for layer reuse.
+   with sha + `latest` tags. Auth via the workflow's built-in `GITHUB_TOKEN`
+   (no PAT). Uses gha cache for layer reuse.
 2. **deploy** — scp compose + caddy snippet + migrations to host, SSH:
    - inject `IMAGE_TAG=<sha>` into `.env.prod`
-   - `docker login ghcr.io`
-   - `docker compose pull && up -d --remove-orphans`
+   - `docker compose pull` (anonymous — images are public)
+   - `docker compose up -d --remove-orphans`
    - run goose migrations against live Postgres
    - prune dangling images
 3. **smoke** — curl `https://live-rack.mrohadi.com/api/health` with retries.
 
 Concurrency group `deploy-prod` ensures only one deploy at a time, never cancels.
+
+### 4.1 One-time: make GHCR packages public
+
+After the **first** successful `build-push` run, each package starts private.
+Flip to public so the host can pull anonymously:
+
+1. GitHub → your profile → **Packages** tab
+2. Click each package (`liverack-web`, `liverack-api`, `liverack-ingest`,
+   `liverack-insight`, `liverack-rollup`, `liverack-signals`)
+3. Right rail → **Package settings** → **Change visibility** → Public
+
+Repeat once per package — about 30 seconds total. Future image versions
+inherit the visibility setting.
+
+### 4.2 Alternative: keep private + use PAT
+
+If demo data is sensitive:
+
+1. Create a fine-grained PAT with `read:packages` scope
+2. Add GitHub secrets `GHCR_READ_USER` (your username) + `GHCR_READ_TOKEN`
+3. In `deploy.yml` `Pull + restart on host` step, re-add the login block:
+   ```yaml
+   echo "${{ secrets.GHCR_READ_TOKEN }}" | docker login ghcr.io \
+     -u ${{ secrets.GHCR_READ_USER }} --password-stdin
+   ```
 
 ---
 

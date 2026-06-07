@@ -143,9 +143,10 @@ jobs:
             mv .env.prod.tmp .env.prod
             chmod 600 .env.prod
 
-            # GHCR pull auth (token saved server-side once; below logs in fresh)
-            echo "${{ secrets.GHCR_READ_TOKEN }}" | docker login ghcr.io \
-              -u ${{ secrets.GHCR_READ_USER }} --password-stdin
+            # Images are PUBLIC on GHCR — no `docker login` needed.
+            # To switch back to private later:
+            #   1. GitHub → Package settings → change visibility to private
+            #   2. Re-add login step here using a PAT with read:packages.
 
             COMPOSE="docker compose -f deploy/docker/docker-compose.prod.yml --env-file .env.prod"
 

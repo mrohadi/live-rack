@@ -68,20 +68,11 @@ services:
     mem_limit: 250m
 
   # ── Workers ──────────────────────────────────────────────────────────────────
-  ingest:
-    image: ghcr.io/${GHCR_OWNER}/liverack-ingest:${IMAGE_TAG:-latest}
-    <<: [*restart, *internal-only]
-    environment:
-      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@postgres:5432/liverack?sslmode=disable
-      NATS_URL: nats://nats:4222
-      APP_ENV: production
-    depends_on:
-      postgres:
-        condition: service_healthy
-      nats:
-        condition: service_started
-    mem_limit: 200m
-
+  # MVP scope skips P7 (ClickHouse analytics) and P8 (external signals).
+  # ingest, rollup, and signals hard-require CLICKHOUSE_URL / OPENWEATHER_API_KEY
+  # which the MVP host does not provide. Disabled here. Re-enable post-funding
+  # alongside the ClickHouse + OpenWeather wiring. `insight` survives MVP — it
+  # only needs Postgres + NATS.
   insight:
     image: ghcr.io/${GHCR_OWNER}/liverack-insight:${IMAGE_TAG:-latest}
     <<: [*restart, *internal-only]
@@ -96,28 +87,38 @@ services:
         condition: service_started
     mem_limit: 200m
 
-  rollup:
-    image: ghcr.io/${GHCR_OWNER}/liverack-rollup:${IMAGE_TAG:-latest}
-    <<: [*restart, *internal-only]
-    environment:
-      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@postgres:5432/liverack?sslmode=disable
-      APP_ENV: production
-    depends_on:
-      postgres:
-        condition: service_healthy
-    mem_limit: 150m
+  # ingest:
+  #   image: ghcr.io/${GHCR_OWNER}/liverack-ingest:${IMAGE_TAG:-latest}
+  #   <<: [*restart, *internal-only]
+  #   environment:
+  #     DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@postgres:5432/liverack?sslmode=disable
+  #     NATS_URL: nats://nats:4222
+  #     CLICKHOUSE_URL: ${CLICKHOUSE_URL}
+  #     APP_ENV: production
+  #   depends_on:
+  #     postgres: { condition: service_healthy }
+  #     nats:     { condition: service_started }
+  #   mem_limit: 200m
 
-  signals:
-    image: ghcr.io/${GHCR_OWNER}/liverack-signals:${IMAGE_TAG:-latest}
-    <<: [*restart, *internal-only]
-    environment:
-      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@postgres:5432/liverack?sslmode=disable
-      NATS_URL: nats://nats:4222
-      APP_ENV: production
-    depends_on:
-      nats:
-        condition: service_started
-    mem_limit: 150m
+  # rollup:
+  #   image: ghcr.io/${GHCR_OWNER}/liverack-rollup:${IMAGE_TAG:-latest}
+  #   <<: [*restart, *internal-only]
+  #   environment:
+  #     CLICKHOUSE_URL: ${CLICKHOUSE_URL}
+  #     APP_ENV: production
+  #   mem_limit: 150m
+
+  # signals:
+  #   image: ghcr.io/${GHCR_OWNER}/liverack-signals:${IMAGE_TAG:-latest}
+  #   <<: [*restart, *internal-only]
+  #   environment:
+  #     DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@postgres:5432/liverack?sslmode=disable
+  #     NATS_URL: nats://nats:4222
+  #     OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY}
+  #     APP_ENV: production
+  #   depends_on:
+  #     nats: { condition: service_started }
+  #   mem_limit: 150m
 
   # ── Postgres + Timescale (owned) ─────────────────────────────────────────────
   postgres:

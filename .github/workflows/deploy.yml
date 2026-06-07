@@ -174,12 +174,18 @@ jobs:
             $COMPOSE pull
             $COMPOSE up -d --remove-orphans
 
-            # DB migrations
-            docker run --rm --network liverack_liverack_internal \
-              -e DATABASE_URL="$(grep ^DATABASE_URL .env.prod | cut -d= -f2-)" \
-              -v "$PWD/migrations:/m" \
-              ghcr.io/pressly/goose:latest \
-              -dir /m postgres "$(grep ^DATABASE_URL .env.prod | cut -d= -f2-)" up
+            # DB migrations — pressly/goose has no official Docker image,
+            # so run via a transient golang container that go-installs the
+            # binary then runs goose against the liverack network so it
+            # can reach the `postgres` service by name.
+            DB_URL="$(grep ^DATABASE_URL .env.prod | cut -d= -f2-)"
+            docker run --rm \
+              --network liverack_liverack_internal \
+              -v "$PWD/migrations:/m:ro" \
+              -e GOOSE_DRIVER=postgres \
+              -e GOOSE_DBSTRING="$DB_URL" \
+              golang:1.26-alpine \
+              sh -c "go install github.com/pressly/goose/v3/cmd/goose@v3.27.1 && /go/bin/goose -dir /m up"
 
             # Prune dangling images to free disk
             docker image prune -f

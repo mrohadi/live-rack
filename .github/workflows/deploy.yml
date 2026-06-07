@@ -161,9 +161,11 @@ jobs:
             chmod 600 .env.prod
 
             # Images are PUBLIC on GHCR — no `docker login` needed.
-            # To switch back to private later:
-            #   1. GitHub → Package settings → change visibility to private
-            #   2. Re-add login step here using a PAT with read:packages.
+            # Force a clean GHCR session: any stale auth (e.g., a token
+            # scoped to mrohadi/* from a prior manual login) makes pulls
+            # of foreign-namespace public images like zitadel/zitadel
+            # return "denied: denied" because the token lacks scope.
+            docker logout ghcr.io >/dev/null 2>&1 || true
 
             COMPOSE="docker compose -f deploy/docker/docker-compose.prod.yml --env-file .env.prod"
 

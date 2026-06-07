@@ -49,7 +49,7 @@ services:
     image: ghcr.io/${GHCR_OWNER}/liverack-api:${IMAGE_TAG:-latest}
     <<: [*restart, *app-net]
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@postgres:5432/liverack?sslmode=disable
       NATS_URL: nats://nats:4222
       REDIS_URL: ${REDIS_URL}
       REDIS_PREFIX: ${REDIS_PREFIX:-liverack:}
@@ -72,7 +72,7 @@ services:
     image: ghcr.io/${GHCR_OWNER}/liverack-ingest:${IMAGE_TAG:-latest}
     <<: [*restart, *internal-only]
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@postgres:5432/liverack?sslmode=disable
       NATS_URL: nats://nats:4222
       APP_ENV: production
     depends_on:
@@ -86,7 +86,7 @@ services:
     image: ghcr.io/${GHCR_OWNER}/liverack-insight:${IMAGE_TAG:-latest}
     <<: [*restart, *internal-only]
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@postgres:5432/liverack?sslmode=disable
       NATS_URL: nats://nats:4222
       APP_ENV: production
     depends_on:
@@ -100,7 +100,7 @@ services:
     image: ghcr.io/${GHCR_OWNER}/liverack-rollup:${IMAGE_TAG:-latest}
     <<: [*restart, *internal-only]
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@postgres:5432/liverack?sslmode=disable
       APP_ENV: production
     depends_on:
       postgres:
@@ -111,7 +111,7 @@ services:
     image: ghcr.io/${GHCR_OWNER}/liverack-signals:${IMAGE_TAG:-latest}
     <<: [*restart, *internal-only]
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@postgres:5432/liverack?sslmode=disable
       NATS_URL: nats://nats:4222
       APP_ENV: production
     depends_on:

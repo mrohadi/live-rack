@@ -178,7 +178,9 @@ jobs:
             # so run via a transient golang container that go-installs the
             # binary then runs goose against the liverack network so it
             # can reach the `postgres` service by name.
-            DB_URL="$(grep ^DATABASE_URL .env.prod | cut -d= -f2-)"
+            # Build DB_URL from POSTGRES_PASSWORD (single source of truth).
+            POSTGRES_PW="$(grep ^POSTGRES_PASSWORD .env.prod | cut -d= -f2-)"
+            DB_URL="postgres://postgres:${POSTGRES_PW}@postgres:5432/liverack?sslmode=disable"
             docker run --rm \
               --network liverack_liverack_internal \
               -v "$PWD/migrations:/m:ro" \

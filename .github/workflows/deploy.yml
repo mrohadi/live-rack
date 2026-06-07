@@ -30,8 +30,53 @@ env:
   IMAGE_OWNER: ${{ github.repository_owner }}
 
 jobs:
+  changes:
+    name: Detect changed paths
+    runs-on: ubuntu-latest
+    outputs:
+      web: ${{ steps.filter.outputs.web }}
+      api: ${{ steps.filter.outputs.api }}
+      ingest: ${{ steps.filter.outputs.ingest }}
+      insight: ${{ steps.filter.outputs.insight }}
+      rollup: ${{ steps.filter.outputs.rollup }}
+      signals: ${{ steps.filter.outputs.signals }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          # Any pkg/** change touches every Go service.
+          # workflow_dispatch (manual) rebuilds everything via fallback `**`.
+          filters: |
+            shared_go: &shared_go
+              - "pkg/**"
+              - "go.work"
+              - "go.work.sum"
+              - ".github/workflows/deploy.yml"
+              - "deploy/docker/**"
+            web:
+              - "apps/web/**"
+              - ".github/workflows/deploy.yml"
+              - "deploy/docker/**"
+            api:
+              - *shared_go
+              - "services/api/**"
+            ingest:
+              - *shared_go
+              - "services/ingest/**"
+            insight:
+              - *shared_go
+              - "services/insight/**"
+            rollup:
+              - *shared_go
+              - "services/rollup/**"
+            signals:
+              - *shared_go
+              - "services/signals/**"
+
   build-push:
     name: Build + push ${{ matrix.image }}
+    needs: changes
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -40,27 +85,39 @@ jobs:
           - image: liverack-web
             dockerfile: apps/web/Dockerfile
             context: .
+            changed: ${{ needs.changes.outputs.web == 'true' || github.event_name == 'workflow_dispatch' }}
           - image: liverack-api
             dockerfile: services/api/Dockerfile
             context: .
+            changed: ${{ needs.changes.outputs.api == 'true' || github.event_name == 'workflow_dispatch' }}
           - image: liverack-ingest
             dockerfile: services/ingest/Dockerfile
             context: .
+            changed: ${{ needs.changes.outputs.ingest == 'true' || github.event_name == 'workflow_dispatch' }}
           - image: liverack-insight
             dockerfile: services/insight/Dockerfile
             context: .
+            changed: ${{ needs.changes.outputs.insight == 'true' || github.event_name == 'workflow_dispatch' }}
           - image: liverack-rollup
             dockerfile: services/rollup/Dockerfile
             context: .
+            changed: ${{ needs.changes.outputs.rollup == 'true' || github.event_name == 'workflow_dispatch' }}
           - image: liverack-signals
             dockerfile: services/signals/Dockerfile
             context: .
+            changed: ${{ needs.changes.outputs.signals == 'true' || github.event_name == 'workflow_dispatch' }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Skip when unchanged
+        if: matrix.changed != 'true'
+        run: |
+          echo "::notice::No source changes for ${{ matrix.image }} — skipping build, will reuse :latest"
+          exit 0
 
-      # Buildx with built-in retry — guards against transient docker.io
-      # registry timeouts when booting the buildkit container.
+      - uses: actions/checkout@v4
+        if: matrix.changed == 'true'
+
       - name: Set up buildx
+        if: matrix.changed == 'true'
         uses: docker/setup-buildx-action@v3
         with:
           driver-opts: |
@@ -69,6 +126,7 @@ jobs:
           buildkitd-flags: --debug
 
       - name: Login to GHCR
+        if: matrix.changed == 'true'
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
@@ -76,27 +134,23 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Owner lowercase
+        if: matrix.changed == 'true'
         id: owner
         run: echo "lc=$(echo '${{ env.IMAGE_OWNER }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
 
       - name: Image metadata
+        if: matrix.changed == 'true'
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ steps.owner.outputs.lc }}/${{ matrix.image }}
-          # `prefix=` empty disables the default `sha-` prefix so the tag
-          # is the bare commit SHA — matches the IMAGE_TAG=${{ github.sha }}
-          # the deploy step writes to .env.prod on the host.
           tags: |
             type=sha,format=long,prefix=
             type=raw,value=latest,enable={{is_default_branch}}
 
-      # Compose build args at step level so the `secrets` context resolves.
-      # Strategy expressions cannot read secrets — that's what broke the
-      # earlier matrix.build_args approach.
       - name: Web build args
+        if: matrix.changed == 'true' && matrix.image == 'liverack-web'
         id: web_args
-        if: matrix.image == 'liverack-web'
         run: |
           {
             echo 'args<<EOF'
@@ -108,6 +162,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Build + push
+        if: matrix.changed == 'true'
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
@@ -116,8 +171,6 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: ${{ steps.web_args.outputs.args }}
-          # ignore-error=true so a GHA Cache outage doesn't fail a build
-          # that already pushed its image successfully.
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }},ignore-error=true
 
@@ -145,19 +198,20 @@ jobs:
       - name: Pull + restart on host
         uses: appleboy/ssh-action@v1.2.0
         env:
-          IMAGE_TAG_VAR: ${{ github.sha }}
           GHCR_OWNER_VAR: ${{ github.repository_owner }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: IMAGE_TAG_VAR,GHCR_OWNER_VAR
+          envs: GHCR_OWNER_VAR
           script: |
             set -euo pipefail
             cd ~/live-rack
-            # Inject deploy-specific overrides without touching long-lived secrets
+            # Use `latest` tag for every service. Path-filter skips rebuilds
+            # for unchanged services, so their :latest still points to the
+            # most-recent successful build. SHA tag stays on GHCR for forensics.
             grep -v -E '^(IMAGE_TAG|GHCR_OWNER)=' .env.prod > .env.prod.tmp || true
-            echo "IMAGE_TAG=${IMAGE_TAG_VAR}" >> .env.prod.tmp
+            echo "IMAGE_TAG=latest" >> .env.prod.tmp
             echo "GHCR_OWNER=$(echo ${GHCR_OWNER_VAR} | tr '[:upper:]' '[:lower:]')" >> .env.prod.tmp
             mv .env.prod.tmp .env.prod
             chmod 600 .env.prod

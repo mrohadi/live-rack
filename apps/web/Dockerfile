@@ -1,9 +1,13 @@
 # syntax=docker/dockerfile:1.7
 
 # ── Build stage ──────────────────────────────────────────────────────────────
-FROM node:20-alpine AS build
+# Node 22 + pinned pnpm. Node 20 + pnpm 11.x triggered:
+#   ERR_UNKNOWN_BUILTIN_MODULE inside corepack's pnpm
+FROM node:22-alpine AS build
 WORKDIR /src
-RUN corepack enable
+
+# Pin pnpm via npm (skip corepack — known signature/builtin issues with 11.x)
+RUN npm install -g pnpm@11.5.0
 
 # Workspace files (no root package.json — repo uses workspace root only)
 COPY pnpm-lock.yaml pnpm-workspace.yaml ./

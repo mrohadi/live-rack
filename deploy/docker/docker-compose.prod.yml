@@ -181,8 +181,11 @@ services:
       ZITADEL_EXTERNALDOMAIN: ${PUBLIC_DOMAIN}
       ZITADEL_EXTERNALPORT: 443
       ZITADEL_PORT: 8080
-      ZITADEL_OIDC_DEFAULTLOGINURLV2: ""
-      ZITADEL_OIDC_DEFAULTLOGOUTURLV2: ""
+      # Redirect every OIDC auth request to our SPA's custom login page.
+      # Zitadel appends ?authRequest=<id>; LoginPage.tsx reads it and drives
+      # the Session API. Empty → Zitadel's hosted /ui/login takes over.
+      ZITADEL_OIDC_DEFAULTLOGINURLV2: "https://live-rack.mrohadi.com/login?authRequest="
+      ZITADEL_OIDC_DEFAULTLOGOUTURLV2: "https://live-rack.mrohadi.com/"
 
       # Branding — shows on login page + WebAuthn / passkey prompts
       ZITADEL_DEFAULTINSTANCE_INSTANCENAME: "live-rack"

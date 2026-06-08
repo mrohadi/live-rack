@@ -29,6 +29,8 @@ const oidcConfig: AuthProviderProps = {
   response_type: "code",
   // Merge userinfo claims into profile — Zitadel emits resourceowner/org id there.
   loadUserInfo: true,
+  // Force Zitadel hosted login UI to English regardless of browser Accept-Language.
+  extraQueryParams: { ui_locales: "en" },
   // Strip the ?code/&state from the URL after a successful sign-in.
   onSigninCallback: () => {
     window.history.replaceState({}, document.title, "/");

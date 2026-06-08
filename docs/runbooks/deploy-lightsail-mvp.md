@@ -362,6 +362,27 @@ docker exec liverack-postgres-1 \
 
 ---
 
+### Step 12.6 — Hide Zitadel watermark + force English UI
+
+The hosted login page ships with a `Powered by ZITADEL` footer and auto-picks the browser's Accept-Language (often Indonesian for Asia hosts). Both are policy-driven and need a service-account PAT to flip.
+
+1. **Mint a service-account PAT** (Console UI — 60s):
+   1. Open `https://live-rack.mrohadi.com/ui/console`
+   2. Default Org → **Service Users** → **+ New** → Username `branding-bot` → Save
+   3. On the created user: **Personal Access Tokens** → **+ New** → copy the token
+   4. Default Org → **IAM** (top right org switch to "ZITADEL") → **Managers** → **+ Add** → user `branding-bot`, role `IAM_OWNER`
+2. **Apply branding**:
+   ```bash
+   export OIDC_ISSUER=https://live-rack.mrohadi.com
+   export ZITADEL_MGMT_TOKEN=<paste the PAT>
+   ./scripts/zitadel-branding.sh
+   ```
+3. **Verify** in an incognito window — login footer shows only the live-rack copy; UI is English regardless of browser language.
+
+> Logo and custom font upload is multipart and stays manual: Console → Default settings → Branding.
+
+---
+
 ### Step 13 — Verify
 
 | Check | Command |

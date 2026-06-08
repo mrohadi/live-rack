@@ -31,8 +31,11 @@ PALETTE='{
   "warnColorDark":       "#ef4444",
   "fontColorDark":       "#f8fafc",
   "hideLoginNameSuffix": true,
-  "disableWatermark":    false
+  "disableWatermark":    true
 }'
+
+# Admin v1 endpoint for instance-default language (English).
+ADMIN="${ISSUER%/}/admin/v1"
 
 # A fresh org inherits the default (instance) label policy, so we POST to create
 # a custom org policy first; PUT only succeeds once one exists. Both are
@@ -46,6 +49,15 @@ curl -fsS -o /dev/null -X PUT "${MGMT}/policies/label" "${auth[@]}" -d "${PALETT
 echo "→ activating label policy"
 curl -fsS -o /dev/null -X POST "${MGMT}/policies/label/_activate" "${auth[@]}" -d '{}'
 
+echo "→ setting default instance language to English"
+curl -fsS -o /dev/null -X PUT "${ADMIN}/restrictions" \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{"allowedLanguages":["en"]}' || true
+curl -fsS -o /dev/null -X PUT "${ADMIN}/languages/default" \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{"language":"en"}' || true
+
 echo "✓ branding applied. Hard-refresh the login page (incognito) to see it."
 echo "  Logo + Inter font: Console → Default settings → Branding (multipart upload)."
-echo "  English login: Console → Default settings → Languages → set default 'en'."

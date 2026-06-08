@@ -102,39 +102,69 @@ jobs:
           - image: liverack-web
             dockerfile: apps/web/Dockerfile
             context: .
-            changed: ${{ needs.changes.outputs.web == 'true' || github.event_name == 'workflow_dispatch' }}
+            key: web
           - image: liverack-api
             dockerfile: services/api/Dockerfile
             context: .
-            changed: ${{ needs.changes.outputs.api == 'true' || github.event_name == 'workflow_dispatch' }}
+            key: api
           - image: liverack-ingest
             dockerfile: services/ingest/Dockerfile
             context: .
-            changed: ${{ needs.changes.outputs.ingest == 'true' || github.event_name == 'workflow_dispatch' }}
+            key: ingest
           - image: liverack-insight
             dockerfile: services/insight/Dockerfile
             context: .
-            changed: ${{ needs.changes.outputs.insight == 'true' || github.event_name == 'workflow_dispatch' }}
+            key: insight
           - image: liverack-rollup
             dockerfile: services/rollup/Dockerfile
             context: .
-            changed: ${{ needs.changes.outputs.rollup == 'true' || github.event_name == 'workflow_dispatch' }}
+            key: rollup
           - image: liverack-signals
             dockerfile: services/signals/Dockerfile
             context: .
-            changed: ${{ needs.changes.outputs.signals == 'true' || github.event_name == 'workflow_dispatch' }}
+            key: signals
     steps:
+      # Gate: evaluate `needs.changes.outputs.<key>` at STEP level. Putting
+      # this expression in matrix.include silently yields empty string because
+      # complex per-row expressions referencing `needs` aren't always resolved
+      # at matrix-expansion time (observed on dorny/paths-filter v3 outputs).
+      # Step-level `if` is the reliable contract.
+      - name: Gate (compute changed flag)
+        id: gate
+        env:
+          WEB: ${{ needs.changes.outputs.web }}
+          API: ${{ needs.changes.outputs.api }}
+          INGEST: ${{ needs.changes.outputs.ingest }}
+          INSIGHT: ${{ needs.changes.outputs.insight }}
+          ROLLUP: ${{ needs.changes.outputs.rollup }}
+          SIGNALS: ${{ needs.changes.outputs.signals }}
+          KEY: ${{ matrix.key }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          case "$KEY" in
+            web)     v="$WEB" ;;
+            api)     v="$API" ;;
+            ingest)  v="$INGEST" ;;
+            insight) v="$INSIGHT" ;;
+            rollup)  v="$ROLLUP" ;;
+            signals) v="$SIGNALS" ;;
+            *)       v="false" ;;
+          esac
+          echo "changed=${v:-false}" >> "$GITHUB_OUTPUT"
+
       - name: Skip when unchanged
-        if: matrix.changed != 'true'
+        if: steps.gate.outputs.changed != 'true'
         run: |
           echo "::notice::No source changes for ${{ matrix.image }} — skipping build, will reuse :latest"
-          exit 0
 
       - uses: actions/checkout@v4
-        if: matrix.changed == 'true'
+        if: steps.gate.outputs.changed == 'true'
 
       - name: Set up buildx
-        if: matrix.changed == 'true'
+        if: steps.gate.outputs.changed == 'true'
         uses: docker/setup-buildx-action@v3
         with:
           driver-opts: |
@@ -143,7 +173,7 @@ jobs:
           buildkitd-flags: --debug
 
       - name: Login to GHCR
-        if: matrix.changed == 'true'
+        if: steps.gate.outputs.changed == 'true'
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
@@ -151,12 +181,12 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Owner lowercase
-        if: matrix.changed == 'true'
+        if: steps.gate.outputs.changed == 'true'
         id: owner
         run: echo "lc=$(echo '${{ env.IMAGE_OWNER }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
 
       - name: Image metadata
-        if: matrix.changed == 'true'
+        if: steps.gate.outputs.changed == 'true'
         id: meta
         uses: docker/metadata-action@v5
         with:
@@ -166,7 +196,7 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Web build args
-        if: matrix.changed == 'true' && matrix.image == 'liverack-web'
+        if: steps.gate.outputs.changed == 'true' && matrix.image == 'liverack-web'
         id: web_args
         run: |
           {
@@ -179,7 +209,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Build + push
-        if: matrix.changed == 'true'
+        if: steps.gate.outputs.changed == 'true'
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}

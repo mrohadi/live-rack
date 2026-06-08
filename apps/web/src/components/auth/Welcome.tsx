@@ -35,7 +35,7 @@ export function Welcome({ onSignIn }: WelcomeProps) {
       </div>
 
       <p className="mt-8 text-center text-xs text-muted-foreground">
-        Secured by Zitadel · SSO &amp; 2FA supported
+        Secure sign-in · SSO &amp; 2FA supported
       </p>
     </AuthLayout>
   );

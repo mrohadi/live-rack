@@ -325,13 +325,50 @@ gh workflow run deploy.yml --ref main
 gh run watch
 ```
 
+### Step 12.5 — Seed demo data (optional, one-time)
+
+Loads the demo org `Acme Retail`, one store, 4 zones, 11 items, locations, tasks, and a Restoration pipeline. Idempotent — re-running upserts the same rows. Skip for empty-state demos.
+
+```bash
+ssh ec2-user@<PUBLIC_IP>
+cd ~/live-rack
+POSTGRES_PW=$(grep ^POSTGRES_PASSWORD .env.prod | cut -d= -f2-)
+DB_URL="postgres://postgres:${POSTGRES_PW}@postgres:5432/liverack?sslmode=disable"
+
+docker run --rm \
+  --network liverack_liverack_internal \
+  -v "$HOME/live-rack/scripts/seed:/seed" \
+  -w /seed \
+  -e DATABASE_URL="$DB_URL" \
+  golang:1.26-alpine \
+  sh -c "apk add --no-cache git >/dev/null && go mod tidy && go run ."
+```
+
+Expected output:
+
+```
+INFO seed complete org="Acme Retail" store="Store #14"
+```
+
+To **reset** seeded data before re-seeding:
+
+```bash
+docker exec liverack-postgres-1 \
+  psql -U postgres -d liverack -c \
+  "TRUNCATE zones, items, item_locations, tasks, pipelines, pipeline_stages, pipeline_cards, integrations, scan_events, sales_events CASCADE;"
+```
+
+> **Note:** Seed runs against the prod Postgres on the `liverack_internal` network. `scripts/seed/` is SCP'd to the host as part of every deploy if added to the workflow's `scp source:` list (currently it's not — host already has a copy from the first deploy via `git clone`, or copy manually with `scp -r scripts/seed ec2-user@HOST:~/live-rack/scripts/`).
+
+---
+
 ### Step 13 — Verify
 
 | Check | Command |
 |---|---|
 | DNS | `dig +short live-rack.mrohadi.com` → `<PUBLIC_IP>` |
 | TLS | `curl -I https://live-rack.mrohadi.com` → 200 |
-| API health | `curl -I https://live-rack.mrohadi.com/api/health` → 200 |
+| API health | `curl -I https://live-rack.mrohadi.com/healthz` → 200 |
 | Zitadel console | open `/ui/console` in browser |
 | Login page reads "live-rack" | visual |
 | Passkey prompt reads "Use your passkey for live-rack" | enroll a passkey |

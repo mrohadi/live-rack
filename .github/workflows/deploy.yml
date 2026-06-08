@@ -45,34 +45,51 @@ jobs:
       - uses: dorny/paths-filter@v3
         id: filter
         with:
-          # Any pkg/** change touches every Go service.
-          # workflow_dispatch (manual) rebuilds everything via fallback `**`.
+          # YAML anchors don't survive inside the `filters: |` literal-block
+          # string — dorny/paths-filter sees the raw text. So duplicate
+          # the "shared Go deps" patterns into every service filter inline.
+          # Shared deps: pkg/**, go.work*, workflow file, deploy/docker/**.
+          # workflow_dispatch bypasses the filter via matrix `changed` expr.
           filters: |
-            shared_go: &shared_go
-              - "pkg/**"
-              - "go.work"
-              - "go.work.sum"
-              - ".github/workflows/deploy.yml"
-              - "deploy/docker/**"
             web:
               - "apps/web/**"
               - ".github/workflows/deploy.yml"
               - "deploy/docker/**"
             api:
-              - *shared_go
               - "services/api/**"
+              - "pkg/**"
+              - "go.work"
+              - "go.work.sum"
+              - ".github/workflows/deploy.yml"
+              - "deploy/docker/**"
             ingest:
-              - *shared_go
               - "services/ingest/**"
+              - "pkg/**"
+              - "go.work"
+              - "go.work.sum"
+              - ".github/workflows/deploy.yml"
+              - "deploy/docker/**"
             insight:
-              - *shared_go
               - "services/insight/**"
+              - "pkg/**"
+              - "go.work"
+              - "go.work.sum"
+              - ".github/workflows/deploy.yml"
+              - "deploy/docker/**"
             rollup:
-              - *shared_go
               - "services/rollup/**"
+              - "pkg/**"
+              - "go.work"
+              - "go.work.sum"
+              - ".github/workflows/deploy.yml"
+              - "deploy/docker/**"
             signals:
-              - *shared_go
               - "services/signals/**"
+              - "pkg/**"
+              - "go.work"
+              - "go.work.sum"
+              - ".github/workflows/deploy.yml"
+              - "deploy/docker/**"
 
   build-push:
     name: Build + push ${{ matrix.image }}

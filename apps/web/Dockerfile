@@ -23,11 +23,13 @@ COPY apps/web ./apps/web
 ARG VITE_OIDC_ISSUER
 ARG VITE_OIDC_CLIENT_ID
 ARG VITE_OIDC_REDIRECT_URI
-ARG VITE_API_BASE_URL
+# Code reads import.meta.env.VITE_API_URL (lib/api.ts, useLogin.ts, ws.ts, …).
+# Name must match exactly or the bundle falls back to http://localhost:8080.
+ARG VITE_API_URL
 ENV VITE_OIDC_ISSUER=${VITE_OIDC_ISSUER} \
     VITE_OIDC_CLIENT_ID=${VITE_OIDC_CLIENT_ID} \
     VITE_OIDC_REDIRECT_URI=${VITE_OIDC_REDIRECT_URI} \
-    VITE_API_BASE_URL=${VITE_API_BASE_URL}
+    VITE_API_URL=${VITE_API_URL}
 
 RUN pnpm -F web build
 

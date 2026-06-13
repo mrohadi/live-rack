@@ -31,6 +31,13 @@ Create once per environment:
    - ✅ Add user roles to access token
    - ✅ User roles inside ID token
 4. Project → **Roles**: `admin`, `manager`, `staff`, `readonly`, `service`.
+5. Project → **General → ✅ Assert Roles On Authentication** (REQUIRED).
+   Without it the project-roles claim is omitted from the token/userinfo for
+   self-service signup users (whose role is a cross-org *project grant*), and
+   the SPA shows "No organization found". The per-app token flags in step 3
+   alone are not sufficient for granted (cross-org) users.
+   API: `PUT /management/v1/projects/{id}` body `{"name":"live-rack",
+   "projectRoleAssertion":true, ...}` (preserve the other flags).
 
 > Org id derives from the project-roles claim key
 > `urn:zitadel:iam:org:project:{OIDC_PROJECT_ID}:roles` — no resourceowner claim.

@@ -58,6 +58,14 @@ services:
       S3_SECRET_KEY: ${S3_SECRET_KEY}
       OIDC_ISSUER: ${OIDC_ISSUER}
       OIDC_PROJECT_ID: ${OIDC_PROJECT_ID}
+      # Onboarding (signup/invite) + custom login drive Zitadel's management
+      # and session APIs. main.go reads ZITADEL_MGMT_TOKEN (service-account PAT,
+      # IAM_OWNER) for CreateOrg/user provisioning, and ZITADEL_LOGIN_CLIENT_TOKEN
+      # for the Session API — falling back to the mgmt token when unset. Without
+      # these the signup handler fails with 502 "create org".
+      APP_BASE_URL: https://${PUBLIC_DOMAIN}
+      ZITADEL_MGMT_TOKEN: ${ZITADEL_MGMT_TOKEN}
+      ZITADEL_LOGIN_CLIENT_TOKEN: ${ZITADEL_LOGIN_CLIENT_TOKEN:-}
       APP_ENV: production
       LOG_LEVEL: info
     depends_on:

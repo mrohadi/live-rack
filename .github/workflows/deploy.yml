@@ -290,23 +290,23 @@ jobs:
               golang:1.26-alpine \
               sh -c "go install github.com/pressly/goose/v3/cmd/goose@v3.27.1 && /go/bin/goose -dir /m up"
 
-            # Apply updated Caddy snippet: copy it into place then reload.
-            # The host Caddyfile imports ~/caddy/conf.d/*.conf; if that
-            # directory doesn't exist yet we fall back to overwriting the
-            # Caddyfile directly (first-boot path).
-            SNIPPET="$HOME/live-rack/deploy/docker/caddy-snippet.live-rack.conf"
+            # Caddy here is a SHARED, multi-site reverse proxy — it also serves
+            # pharmatrack.mrohadi.com and mrohadi.com. Its Caddyfile is
+            # operator-managed (runbook §2) and MUST NOT be overwritten from CI:
+            # copying the live-rack-only snippet over it deletes the sibling
+            # sites and takes them offline. We only manage an OPT-IN drop-in at
+            # ~/caddy/conf.d/live-rack.conf — and only if the operator created
+            # that directory (a dir mount imported by the host Caddyfile). When
+            # conf.d is absent (default), leave Caddy completely untouched; the
+            # live-rack routes live in the hand-maintained Caddyfile. Never
+            # restart the shared proxy from CI — at most a graceful reload.
             CADDY_CONF_D="$HOME/caddy/conf.d"
-            CADDY_FILE="$HOME/caddy/Caddyfile"
             if [ -d "$CADDY_CONF_D" ]; then
-              cp "$SNIPPET" "$CADDY_CONF_D/live-rack.conf"
-            elif [ -f "$CADDY_FILE" ]; then
-              cp "$SNIPPET" "$CADDY_FILE"
-            fi
-            # Reload without downtime; fall back to restart if reload fails.
-            CADDY_CTR="$(docker ps --filter 'name=caddy' --format '{{.Names}}' | head -1)"
-            if [ -n "$CADDY_CTR" ]; then
-              docker exec "$CADDY_CTR" caddy reload --config /etc/caddy/Caddyfile 2>/dev/null || \
-                docker restart "$CADDY_CTR"
+              cp "$HOME/live-rack/deploy/docker/caddy-snippet.live-rack.conf" \
+                 "$CADDY_CONF_D/live-rack.conf"
+              CADDY_CTR="$(docker ps --filter 'name=caddy' --format '{{.Names}}' | head -1)"
+              [ -n "$CADDY_CTR" ] && docker exec "$CADDY_CTR" \
+                caddy reload --config /etc/caddy/Caddyfile 2>/dev/null || true
             fi
 
             # Prune dangling images to free disk
